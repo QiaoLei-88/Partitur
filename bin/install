@@ -4,8 +4,9 @@
 Usage:
   install [--tool {auto,claude,codex,all}] --scope user [--uninstall]
   install [--tool {auto,claude,codex,all}] --scope project [PROJECT]
-          [--update | --uninstall] [--force]
-          [--name NAME] [--records DIR] [--branch MAIN] [--repo NAME:CHECKOUT:MAIN ...]
+          [--update | --uninstall] [--force [--backup-to PATH]] [--merge-rules]
+          [--name NAME] [--records DIR] [--branch MAIN]
+          [--repo NAME:CHECKOUT:MAIN ...] [--add-repo NAME:CHECKOUT:MAIN ...]
 
 --scope user
   Links this repository as the skill `partitur` in the user's skill
@@ -31,10 +32,19 @@ Usage:
   where <skill> is each ptt-* skill, and `partitur` (this repository)
   unless the user scope already links it for that tool.
   The name defaults to the directory's name and <records> to `workspace`.
-  Without --repo, the repository table lists every Git checkout directly in
-  PROJECT (name = directory, main branch = its checked-out branch), except
-  the records repository and Partitur itself; a checkout deeper down is
-  added later as a line in <records>/pr/repos.
+  The repository table (<records>/pr/repos) starts with every Git checkout
+  directly in PROJECT (name = directory, main branch = its checked-out
+  branch), except the records repository and Partitur itself. --repo sets it
+  to exactly the repositories given (the old table is backed up);
+  --add-repo adds to it, for example a checkout deeper down. Install warns
+  about any repository that existing requests name but the table lacks.
+
+  The rules file holds Partitur's rules as a block between
+  "<!-- partitur rules begin" and "<!-- partitur rules end -->"; the project's
+  own rules go outside it. An existing rules file without the block is left
+  alone and reported "not merged"; --merge-rules adds the block after the
+  file's title. Before that, ask the agent to compare both rule sets and list
+  every contradiction for the user to decide.
 
 --tool auto (the default) installs for the agent tools found on this machine:
 Claude Code if the `claude` command or ~/.claude exists, Codex if the `codex`
@@ -57,7 +67,9 @@ once created), and links. Compared with the project:
                      delivered; keeps seeded files, files changed here, and
                      every record (tasks, requests, roles).
   --force            with --update or --uninstall: also replaces or removes
-                     files changed here.
+                     files changed here, after copying each into a backup
+                     directory (PROJECT/partitur-backup-<UTC time>/, or
+                     --backup-to PATH).
 Install from a committed Partitur: with uncommitted changes there is no
 commit to stamp, and a later update cannot find what was dropped.
 Nothing is ever committed; the tool prints the `ptt record` command for it.
@@ -67,6 +79,7 @@ is printed.
 """
 import argparse
 import fcntl
+from datetime import datetime, timezone
 import hashlib
 import os
 import shutil
@@ -135,16 +148,99 @@ def known_commit(commit):
 
 def delivered(plan):
     """A plan as the entries install compares against: kind, content hash, target."""
-    return {rel: dict(kind=e["kind"], target=e.get("target"),
-                      sha=sha(e["data"]) if "data" in e else None) for rel, e in plan.items()}
+    out = {}
+    for rel, e in plan.items():
+        if e["kind"] == "rules":
+            digest = sha(block_of(e["data"].decode()) or "")
+        else:
+            digest = sha(e["data"]) if "data" in e else None
+        out[rel] = dict(kind=e["kind"], target=e.get("target"), sha=digest)
+    return out
 
 
-def apply(root, plan, old, mode, force, report):
+BEGIN = "<!-- partitur rules begin"
+END = "<!-- partitur rules end -->"
+AGENT_HINT = ("Ask the agent to compare Partitur's rules block with the project's own rules "
+              "and list every contradiction for you to decide before relying on them.")
+
+
+def block_of(text):
+    """Partitur's rules block in a rules file, markers included, or None."""
+    i = text.find(BEGIN)
+    j = text.find(END, i + 1) if i >= 0 else -1
+    return text[i:j + len(END)] if i >= 0 and j >= 0 else None
+
+
+def merge_block(text, block):
+    """Insert the block after the file's title and first paragraph."""
+    lines = text.split("\n")
+    k = 0
+    if lines and lines[0].startswith("# "):
+        k = 1
+        while k < len(lines) and not lines[k].strip():
+            k += 1
+        while k < len(lines) and lines[k].strip():
+            k += 1
+    return "\n".join(lines[:k] + ["", block, ""] + lines[k:]).replace("\n\n\n\n", "\n\n\n")
+
+
+def backup(path, root, opts, report):
+    """Copy path into the backup directory before a forced change."""
+    if not path.exists() or path.is_symlink():
+        return
+    if opts.backup_dir is None:
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        opts.backup_dir = (Path(opts.backup_to).resolve() if opts.backup_to
+                           else root / f"partitur-backup-{stamp}")
+    target = opts.backup_dir / path.relative_to(root)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(path, target)
+    report("backed up", path, f"to {os.path.relpath(target, root)}")
+
+
+def apply_rules(root, rel, e, before, opts, report):
+    path = root / rel
+    want = block_of(e["data"].decode())
+    if not path.exists():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(e["data"])
+        report("created", path)
+        return
+    text = path.read_text()
+    cur = block_of(text)
+    if cur is None:
+        if opts.merge_rules:
+            path.write_text(merge_block(text, want))
+            report("merged", path, "Partitur's rules block added; " + AGENT_HINT)
+        else:
+            report("not merged", path, "the project's rules lack Partitur's block; "
+                   "--merge-rules adds it. " + AGENT_HINT)
+        return
+    if cur == want:
+        report("kept", path)
+        return
+    untouched = before is not None and before["sha"] == sha(cur)
+    if opts.update and (untouched or opts.force):
+        if not untouched:
+            backup(path, root, opts, report)
+        path.write_text(text.replace(cur, want))
+        report("updated" if untouched else "replaced", path, "Partitur's rules block")
+    else:
+        report("outdated" if untouched else "modified", path,
+               "Partitur's rules block; --update replaces it" if untouched else
+               "Partitur's rules block was edited here; --update --force replaces it")
+
+
+def apply(root, plan, old, opts, report):
     """Bring the project to `plan` (rel path -> entry with kind, data or
     target); `old` is what the installing Partitur commit delivered."""
     old = old or {}
+    mode, force = ("update" if opts.update else "install"), opts.force
     for rel, e in plan.items():
         path, before = root / rel, old.get(rel)
+        if e["kind"] == "rules":
+            apply_rules(root, rel, e, before, opts, report)
+            continue
         if e["kind"] == "link":
             if path.is_symlink() and os.readlink(path) == e["target"]:
                 report("kept", path)
@@ -176,6 +272,8 @@ def apply(root, plan, old, mode, force, report):
         else:
             untouched = before is not None and before["sha"] == cur
             if mode == "update" and (untouched or force):
+                if not untouched:
+                    backup(path, root, opts, report)
                 path.write_bytes(e["data"] if isinstance(e["data"], bytes) else e["data"].encode())
                 if e.get("mode"):
                     path.chmod(e["mode"])
@@ -192,15 +290,32 @@ def apply(root, plan, old, mode, force, report):
             if before["kind"] != "seeded" and (path.exists() or path.is_symlink()):
                 report("obsolete", path, "--update removes it")
             continue
-        remove_entry(root, rel, before, force, report)
+        remove_entry(root, rel, before, opts, report)
 
 
-def remove_entry(root, rel, e, force, report):
+def remove_entry(root, rel, e, opts, report):
     """Remove what install delivered at rel, if it is still what it delivered."""
     path = root / rel
     if e["kind"] == "seeded":
         if path.exists():
             report("kept", path, "the project's file")
+        return False
+    if e["kind"] == "rules":
+        if not path.exists():
+            return True
+        text = path.read_text()
+        cur = block_of(text)
+        if cur is None:
+            report("kept", path, "the project's file")
+            return False
+        if sha(cur) != e["sha"] and not opts.force:
+            report("modified", path, "Partitur's rules block was edited here; kept "
+                   "(--force removes it)")
+            return False
+        if sha(cur) != e["sha"]:
+            backup(path, root, opts, report)
+        path.write_text(text.replace(cur + "\n", "").replace(cur, ""))
+        report("removed", path, "Partitur's rules block; the project's rules stay")
         return False
     if e["kind"] == "link":
         if path.is_symlink() and os.readlink(path) == e["target"]:
@@ -211,12 +326,14 @@ def remove_entry(root, rel, e, force, report):
         return not (path.exists() or path.is_symlink())
     if not path.exists():
         return True
-    if file_sha(path) == e["sha"] or force:
+    if file_sha(path) == e["sha"] or opts.force:
+        if file_sha(path) != e["sha"]:
+            backup(path, root, opts, report)
         path.unlink()
         report("removed", path)
         prune(path.parent, root)
         return True
-    report("modified", path, "changed here; kept (--force removes it)")
+    report("modified", path, "changed here; kept (--force removes it, after a backup)")
     return False
 
 
@@ -283,7 +400,7 @@ def project_plan(a, tools, repos, name, src, quiet=False):
     def add(rel, kind, data, mode=None):
         plan[rel] = dict(kind=kind, data=data if isinstance(data, bytes) else data.encode(),
                          mode=mode)
-    add(f"{R}/CLAUDE.md", "seeded", fill("rules.md"))
+    add(f"{R}/CLAUDE.md", "rules", fill("rules.md"))
     add(f"{R}/pr/README.md", "maintained", fill("pr-README.md"))
     for d in ("pr/open", "pr/merged", "pr/closed", "tasks/open", "tasks/done", "tasks/cancelled",
               "roles/designer", "roles/integrator", "handoff/notes"):
@@ -323,6 +440,51 @@ def records_lock(rec):
     return f
 
 
+def merge_repos(repos, extra):
+    names = {r[0] for r in repos}
+    return repos + [r for r in extra if r[0] not in names]
+
+
+def read_table(table):
+    rows = []
+    for line in table.read_text().splitlines() if table.exists() else []:
+        parts = line.split("#", 1)[0].split()
+        if len(parts) == 3:
+            rows.append(parts)
+    return rows
+
+
+def set_repos(a, root, rec, table, repos, add_repos, report):
+    """--repo: the table holds exactly these; --add-repo: these are added.
+    Then warn about repositories that requests name but the table lacks."""
+    current = read_table(table)
+    if a.repo and current != repos:
+        if table.exists() and current:
+            backup(table, root, a, report)
+        table.write_text("# name checkout main\n" + "".join(f"{n} {c} {m}\n" for n, c, m in repos))
+        report("replaced", table, "exactly the --repo repositories")
+        current = repos
+    new = [r for r in add_repos if r[0] not in {c[0] for c in current}]
+    if new:
+        with table.open("a") as f:
+            for n, c, m in new:
+                f.write(f"{n} {c} {m}\n")
+        report("updated", table, "added " + ", ".join(r[0] for r in new))
+        current = current + new
+    for n, c, _ in current:
+        if not (root / c / ".git").exists():
+            print(f"warning   repository {n}: no Git checkout at {c}")
+    named = set()
+    for req in rec.glob("pr/*/*/0001-request.md"):
+        for line in req.read_text().splitlines():
+            if line.startswith("repo:"):
+                named.add(line.split(":", 1)[1].strip())
+    missing = sorted(named - {c[0] for c in current} - {"", "?"})
+    for n in missing:
+        print(f"warning   requests name repository {n}, which pr/repos lacks; add it with "
+              f"--add-repo {n}:<checkout>:<main branch>")
+
+
 def read_stamp(path):
     if not path.exists():
         return None
@@ -356,7 +518,7 @@ def scope_project(a, tools, report):
         if old is None:
             print("warning   unknown installing commit; comparing with this Partitur instead")
             old = delivered(project_plan(a, tools, [], name, Source(), quiet=True))
-        kept = [rel for rel, e in old.items() if not remove_entry(root, rel, e, a.force, report)]
+        kept = [rel for rel, e in old.items() if not remove_entry(root, rel, e, a, report)]
         stamp.unlink()
         report("removed", stamp)
         if kept:
@@ -367,13 +529,17 @@ def scope_project(a, tools, report):
               f"{a.records}  (or with git, if bin/ptt was removed)")
         return
 
-    repos = []
-    for spec in a.repo:
-        parts = spec.split(":")
-        if len(parts) != 3 or not all(parts) or any(c.isspace() for c in spec):
-            sys.exit(f"install: --repo {spec!r}: expected NAME:CHECKOUT:MAIN, "
-                     "no spaces or colons in a field")
-        repos.append(parts)
+    def parse(specs, option):
+        out = []
+        for spec in specs:
+            parts = spec.split(":")
+            if len(parts) != 3 or not all(parts) or any(c.isspace() for c in spec):
+                sys.exit(f"install: {option} {spec!r}: expected NAME:CHECKOUT:MAIN, "
+                         "no spaces or colons in a field")
+            out.append(parts)
+        return out
+    repos = parse(a.repo, "--repo")
+    add_repos = parse(a.add_repo, "--add-repo")
     if (rec / ".git").exists():
         has_commits = not subprocess.run(["git", "-C", str(rec), "rev-parse", "-q", "--verify",
                                           "HEAD"], capture_output=True).returncode
@@ -387,18 +553,17 @@ def scope_project(a, tools, report):
         report("created", rec / ".git")
     held = held or records_lock(rec)
     table = rec / "pr" / "repos"
-    if not table.exists() and not repos:
+    if not table.exists() and not a.repo:
         repos = detect(root, rec)
-    if table.exists() and repos:
-        print(f"warning   {os.path.relpath(table, root)} exists; --repo ignored, edit it by hand")
     for tool in tools:
         entry = root / TOOLS[tool][0]
         if entry.exists() and not entry.is_symlink():
             print(f"warning   {entry.name} exists and is not the rules file, so the tool would "
                   f"not read the rules: move its content into {a.records}/CLAUDE.md, delete "
                   "it, and rerun")
-    plan = project_plan(a, tools, repos, name, Source())
-    apply(root, plan, old, "update" if a.update else "install", a.force, report)
+    plan = project_plan(a, tools, merge_repos(repos, add_repos), name, Source())
+    apply(root, plan, old, a, report)
+    set_repos(a, root, rec, table, repos, add_repos, report)
     now = partitur_commit()
     c = report.counts
     pending = c.get("outdated") or c.get("obsolete")
@@ -407,14 +572,16 @@ def scope_project(a, tools, report):
     if not now:
         print("\nwarning   this Partitur has uncommitted changes; a later update cannot find "
               "files it no longer ships. Install from a committed Partitur.")
-    for n, c_, _ in repos:
-        if not (root / c_ / ".git").exists():
-            print(f"warning   repository {n}: no Git checkout at {c_}")
     if pending and not a.update:
         print("\nThis Partitur is newer: rerun with --update to bring the project up to it.")
     if c.get("modified"):
         print("\nFiles changed here were left alone; --update --force replaces them.")
-    if any(c.get(k) for k in ("created", "updated", "replaced", "removed")):
+    if a.backup_dir:
+        print(f"\nBackups of replaced or removed files: {a.backup_dir}")
+    if c.get("not merged"):
+        print("\nThe project's rules lack Partitur's block: " + AGENT_HINT
+              + " Then rerun with --merge-rules.")
+    if any(c.get(k) for k in ("created", "updated", "replaced", "removed", "merged")):
         print(f"\nRecord the change: {a.records}/bin/ptt record -m \"install Partitur\" "
               f"{a.records}")
 
@@ -436,10 +603,20 @@ def main():
                       help="remove what install delivered and is unchanged; keep the project's "
                            "files and all records")
     ap.add_argument("--force", action="store_true",
-                    help="with --update or --uninstall: also replace or remove files changed here")
-    ap.add_argument("--repo", action="append", default=[],
-                    help="NAME:CHECKOUT:MAIN, CHECKOUT relative to PROJECT; repeatable")
+                    help="with --update or --uninstall: also replace or remove files changed "
+                         "here, after copying them to a backup directory")
+    ap.add_argument("--backup-to", metavar="PATH",
+                    help="where --force puts its backups (default: "
+                         "PROJECT/partitur-backup-<UTC time>/)")
+    ap.add_argument("--merge-rules", action="store_true",
+                    help="add Partitur's rules block to an existing rules file")
+    ap.add_argument("--repo", action="append", default=[], metavar="NAME:CHECKOUT:MAIN",
+                    help="the repository table holds exactly these (repeatable); CHECKOUT "
+                         "relative to PROJECT")
+    ap.add_argument("--add-repo", action="append", default=[], metavar="NAME:CHECKOUT:MAIN",
+                    help="add these to the repository table (repeatable)")
     a = ap.parse_args()
+    a.backup_dir = None
     if not a.scope:
         print(__doc__)
         sys.exit(2)

@@ -8,7 +8,8 @@
 | Project name | `--name` | the workspace root's directory name |
 | Records repository | `--records` | `workspace`, directly in the workspace root |
 | Its main branch | `--branch` | `master` |
-| Code repositories | `--repo NAME:CHECKOUT:MAIN`, repeatable; later, lines in `<records>/pr/repos` | every Git checkout directly in the workspace root, with its checked-out branch |
+| Code repositories | `--repo NAME:CHECKOUT:MAIN` (exactly these) or `--add-repo NAME:CHECKOUT:MAIN` (in addition), repeatable; later, lines in `<records>/pr/repos` | every Git checkout directly in the workspace root, with its checked-out branch |
+| Backups of forced changes | `--backup-to PATH` | `<workspace root>/partitur-backup-<UTC time>/` |
 
 Fields of the repository table are separated by whitespace and may not
 contain any.
@@ -19,7 +20,7 @@ Changing one of these means changing the tools or skills that use it.
 
 | Name or format | Value | Rule |
 | --- | --- | --- |
-| Rules file | `<records>/CLAUDE.md`; linked from the workspace root as `CLAUDE.md` (Claude Code) and `AGENTS.md` (Codex) | F1, F10 |
+| Rules file | `<records>/CLAUDE.md`, Partitur's rules as a marked block, the project's outside it; linked from the workspace root as `CLAUDE.md` (Claude Code) and `AGENTS.md` (Codex) | F1, F10, F13 |
 | Role files | `<records>/handoff/designer.md`, `integrator.md` | D8, D15 |
 | Tasks | `<records>/tasks/{open,done,cancelled}/NNNN[.N...]-slug/`: `charter.md`, `status.md`, events `MMMM-<kind>.md`; template `<records>/tasks/charter-template.md` | G8-G12 |
 | Role records | `<records>/roles/{designer,integrator}/MMMM-<kind>.md` | G1 |

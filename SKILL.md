@@ -47,14 +47,24 @@ user, including anything reported as differing.
 
 Then, with the user:
 
-1. Fill in the rules file's "Project Rules": domain rules, and any choice that
-   differs from the defaults *(Proposed, T2)*. The template includes rules not
-   yet exercised in practice *(Proposed, T1)*: asking the user only what the
-   user sees, decides, or uses; a successor checking its handover against the
-   records; worker sessions; withdrawing a request; offering to be cleared at
-   quiet points; taking roles and tasks with supervised leaving (G1-G13).
-   Keep or drop them.
-2. Fill in `<records>/handoff/designer.md`, then record the records
+1. **Rules.** If install reports the rules file "not merged" (an existing
+   project with its own rules), read the project's rules and Partitur's
+   rules block (`templates/rules.md`, between the markers) and list for the
+   user every contradiction and overlap, each with your recommendation. Only
+   when the user approves, run install again with `--merge-rules`, then
+   resolve each contradiction as the user decides, in the project's part of
+   the file (outside the block). A new project gets the block at install;
+   fill in its "Project Rules": domain rules, and any choice that differs
+   from the defaults *(Proposed, T2)*. The block includes rules not yet
+   exercised in practice *(Proposed, T1)*: asking the user only what the
+   user sees, decides, or uses; a successor checking its handover against
+   the records; worker sessions; withdrawing a request; offering to be
+   cleared at quiet points; taking roles and tasks with supervised leaving
+   (G1-G13). Tell the user, who keeps or drops them.
+2. **Repositories.** If install warns that requests name a repository the
+   table lacks, or a checkout lies deeper than the workspace root, propose
+   the `--add-repo NAME:CHECKOUT:MAIN` line and run it when the user agrees.
+3. Fill in `<records>/handoff/designer.md`, then record the records
    repository: `<records>/bin/ptt record -m "install Partitur" <records>`.
 
 ## Reading map

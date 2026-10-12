@@ -88,8 +88,12 @@ both.
    lists the code repositories it found; one deeper down is added as a line
    in `workspace/pr/repos`.
 4. **Fill in two files** with the session: the "Project Rules" at the end
-   of `workspace/CLAUDE.md` (your domain's rules), and the placeholders in
-   `workspace/handoff/designer.md`. Then record them:
+   of `workspace/CLAUDE.md` (your domain's rules; Partitur's own rules sit
+   in a marked block above them), and the placeholders in
+   `workspace/handoff/designer.md`. A project that already has a rules file
+   keeps it: install reports it "not merged", the session compares both and
+   lists every contradiction for you, and on your approval
+   `--merge-rules` adds Partitur's block. Then record them:
 
    ```
    workspace/bin/ptt record -m "install Partitur" workspace
@@ -109,7 +113,8 @@ To bring a project up to a newer Partitur, pull this repository and rerun
 step 3's command with `--update`. The project remembers which Partitur
 commit installed it (`workspace/.partitur-version`), so the update replaces
 what is outdated and removes what Partitur no longer ships, but leaves your
-rules, your records, and any file you changed (`--force` replaces those).
+rules, your records, and any file you changed (`--force` replaces those,
+after copying each into a backup directory).
 `--uninstall` removes what was installed the same way. For the user link,
 `--scope user --uninstall` covers the detected tools; add `--tool all` if
 you installed for both.

@@ -306,8 +306,44 @@ class InstallProject(unittest.TestCase):
         self.assertRegex(out, r"modified\s+workspace/bin/pr")
         self.assertIn("project rule", rules.read_text())
         self.assertIn("# local change", tool.read_text())
-        warn = self.install("--repo", "x:x:main").stdout
-        self.assertIn("--repo ignored", warn)
+
+    def test_repo_options(self):
+        self.install()
+        table = self.root / "workspace" / "pr" / "repos"
+        self.assertEqual(table.read_text().splitlines()[1:], ["code code master"])
+        out = self.install("--add-repo", "lib:third/lib:main").stdout
+        self.assertRegex(out, r"updated\s+workspace/pr/repos")
+        self.assertEqual(table.read_text().splitlines()[1:], ["code code master",
+                                                              "lib third/lib main"])
+        self.assertIn("repository lib: no Git checkout at third/lib", out)
+        out = self.install("--repo", "only:code:master").stdout
+        self.assertRegex(out, r"replaced\s+workspace/pr/repos")
+        self.assertRegex(out, r"backed up\s+workspace/pr/repos")
+        self.assertEqual(table.read_text().splitlines()[1:], ["only code master"])
+        req = self.root / "workspace" / "pr" / "merged" / "000001-x"
+        req.mkdir(parents=True)
+        (req / "0001-request.md").write_text("---\nrepo: research\n---\n")
+        out = self.install().stdout
+        self.assertIn("requests name repository research", out)
+        self.assertIn("--add-repo research:<checkout>:<main branch>", out)
+
+    def test_rules_merge_into_existing_file(self):
+        ws = self.root / "workspace"
+        ws.mkdir()
+        git(ws, "init", "-q", "-b", "master")
+        (ws / "pr").mkdir()
+        rules = ws / "CLAUDE.md"
+        rules.write_text("# My project\n\nOur own rules.\n\n## Domain\n\n- keep units SI\n")
+        out = self.install().stdout
+        self.assertRegex(out, r"not merged\s+workspace/CLAUDE.md")
+        self.assertIn("contradiction", out)
+        self.assertNotIn("partitur rules begin", rules.read_text())
+        out = self.install("--merge-rules").stdout
+        self.assertRegex(out, r"merged\s+workspace/CLAUDE.md")
+        text = rules.read_text()
+        self.assertTrue(text.startswith("# My project\n\nOur own rules.\n\n<!-- partitur rules begin"))
+        self.assertIn("- keep units SI", text)
+        self.assertRegex(self.install().stdout, r"kept\s+workspace/CLAUDE.md")
 
     def partitur_clone(self):
         """A committed copy of Partitur, to install from and then change."""
@@ -373,6 +409,38 @@ class InstallProject(unittest.TestCase):
         self.assertRegex(out, r"removed\s+\.claude/skills/ptt-whoami")
         self.assertFalse(old.exists())
         self.assertFalse((self.root / ".claude" / "skills" / "ptt-whoami").is_symlink())
+
+    def test_rules_block_update_and_forced_backup(self):
+        clone = self.partitur_clone()
+        self.install_from(clone)
+        rules = self.root / "workspace" / "CLAUDE.md"
+        rules.write_text(rules.read_text().replace("(Rules specific to this project.)",
+                                                   "- our domain rule"))
+        t = clone / "templates" / "rules.md"
+        t.write_text(t.read_text().replace("## Authorization and Scope",
+                                           "## Authorization and Scope\n\n- a v2 rule"))
+        tool = clone / "project" / "bin" / "pr"
+        tool.write_text(tool.read_text() + "\n# v2\n")
+        self.commit_clone(clone, "v2")
+        mine = self.root / "workspace" / "bin" / "pr"
+        mine.write_text(mine.read_text() + "\n# mine\n")
+        out = self.install_from(clone).stdout
+        self.assertRegex(out, r"outdated\s+workspace/CLAUDE.md")
+        out = self.install_from(clone, "--update").stdout
+        self.assertRegex(out, r"updated\s+workspace/CLAUDE.md")
+        text = rules.read_text()
+        self.assertIn("- a v2 rule", text)
+        self.assertIn("- our domain rule", text)
+        backups = self.home / "bk"
+        out = self.install_from(clone, "--update", "--force", "--backup-to", str(backups)).stdout
+        self.assertRegex(out, r"replaced\s+workspace/bin/pr")
+        self.assertIn("# mine", (backups / "workspace" / "bin" / "pr").read_text())
+        self.assertNotIn("# mine", mine.read_text())
+        self.assertIn(f"Backups of replaced or removed files: {backups}", out)
+        out = self.install_from(clone, "--uninstall").stdout
+        self.assertRegex(out, r"removed\s+workspace/CLAUDE.md")
+        self.assertNotIn("partitur rules begin", rules.read_text())
+        self.assertIn("- our domain rule", rules.read_text())
 
     def test_uninstall_keeps_records_and_changes(self):
         clone = self.partitur_clone()

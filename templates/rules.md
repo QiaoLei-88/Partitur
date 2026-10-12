@@ -1,8 +1,10 @@
 # {{PROJECT}} Project Instructions
 
-These instructions apply to {{PROJECT}} and its development worktrees. They
-follow Partitur ({{PARTITUR}}); subsequent explicit decisions by the user
-take precedence.
+These instructions apply to {{PROJECT}} and its development worktrees.
+Subsequent explicit decisions by the user take precedence.
+
+<!-- partitur rules begin: maintained by Partitur's install; write project rules outside this block -->
+The rules between these markers follow Partitur ({{PARTITUR}}).
 
 ## Authorization and Scope
 
@@ -61,6 +63,8 @@ take precedence.
 - Findings meant for another session go into a file, not only into chat. A temporary note to the designer is deleted by its author once the designer has recorded its outcome; its text stays reachable by commit. A closed or cancelled task is kept as history in `{{RECORDS}}/tasks/done/` or `cancelled/`.
 - Records locate code and documents by lasting references: repository and repository-relative path, plus the request number before integration and the main-branch merge commit after it. A worktree path, development branch, or branch head is never the location, since cleanup removes them; it may appear as provenance or to describe unfinished work. Documents in code repositories cite records only by records commit, request number, or run id.
 - Status records (`status.md`, the role files) cite requests by number and record no review state, which `{{RECORDS}}/bin/pr list` gives; after a decision, the requesting session updates its status with the outcome and, for a merge, the main-branch merge commit.
+
+<!-- partitur rules end -->
 
 ## Project Rules
 
