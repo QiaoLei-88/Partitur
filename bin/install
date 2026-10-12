@@ -2,7 +2,12 @@
 """Install Partitur for Claude Code, Codex, or both, for a user or a project.
 
 Usage:
-  install [--tool {auto,claude,codex,all}] --scope user
+  install [--tool {auto,claude,codex,all}] --scope user [--uninstall]
+  install [--tool {auto,claude,codex,all}] --scope project [PROJECT]
+          [--update | --uninstall] [--force]
+          [--name NAME] [--records DIR] [--branch MAIN] [--repo NAME:CHECKOUT:MAIN ...]
+
+--scope user
   install [--tool {auto,claude,codex,all}] --scope project [PROJECT] [--update]
           [--name NAME] [--records DIR] [--branch MAIN] [--repo NAME:CHECKOUT:MAIN ...]
 
@@ -40,19 +45,30 @@ Claude Code if the `claude` command or ~/.claude exists, Codex if the `codex`
 command or ~/.codex exists. It reports what it found, and stops if it finds
 neither; --tool claude, codex, or all chooses explicitly.
 
-Both scopes are safe to rerun: nothing that exists is overwritten or
-removed, and nothing is committed. Every path is reported as created, kept,
-or differs. Files the project owns once created (the rules file, the
-designer's and integrator's files, the repository table) are kept as they
-are. Files
-Partitur maintains (bin/, skills/, pr/README.md) and links are compared:
-"differs" means the project's copy was changed or is older than this
-Partitur, so a rerun shows what an update would bring; --update replaces
-them (the project's own files are never replaced). Without --scope,
-nothing is changed and this text is printed.
+Every project install keeps a manifest, <records>/.partitur/manifest: each
+file and link it delivered, its kind, and a SHA-256 of the content it
+delivered. Kinds: "maintained" (tools, skills, pr/README.md, the charter
+template: Partitur's to update), "seeded" (the rules file, the role files,
+the repository table, empty-directory markers: the project's once created),
+and "link". With it:
+  install            creates what is missing and reports the rest: "kept",
+                     "outdated" (unchanged here, but this Partitur has a
+                     newer version), "modified" (changed here), "obsolete"
+                     (delivered before, no longer part of Partitur).
+  --update           also replaces outdated files and removes obsolete ones.
+  --uninstall        removes every maintained file and link that is still as
+                     delivered; keeps seeded files, files changed here, and
+                     every record (tasks, requests, roles).
+  --force            with --update or --uninstall: also replaces or removes
+                     files changed here.
+Nothing is ever committed; the tool prints the `ptt record` command for it.
+The user scope is one link per tool, which --uninstall removes if it still
+points to this Partitur. Without --scope, nothing is changed and this text
+is printed.
 """
 import argparse
-import filecmp
+import fcntl
+import hashlib
 import os
 import shutil
 import subprocess
@@ -66,66 +82,157 @@ SKILLS = ("ptt-take", "ptt-leave", "ptt-whoami", "ptt-mktask", "ptt-done", "ptt-
 TOOLS = {"claude": ("CLAUDE.md", ".claude"), "codex": ("AGENTS.md", ".agents")}
 
 
-UPDATE = False                      # --update: replace Partitur-maintained files that differ
-
-
 class Report:
     def __init__(self, base):
-        self.base, self.differs = base, 0
+        self.base, self.counts = base, {}
 
-    def __call__(self, kind, path):
-        self.differs += kind == "differs"
-        print(f"{kind:8} {os.path.relpath(path, self.base)}")
+    def __call__(self, kind, path, note=""):
+        self.counts[kind] = self.counts.get(kind, 0) + 1
+        print(f"{kind:9} {os.path.relpath(path, self.base)}" + (f"  ({note})" if note else ""))
 
 
-def seed(path, text, report):
-    """Create a file the project owns from then on; never compare it."""
-    if path.exists() or path.is_symlink():
-        report("kept", path)
-        return
+def sha(data):
+    return hashlib.sha256(data if isinstance(data, bytes) else data.encode()).hexdigest()
+
+
+def file_sha(path):
+    return sha(path.read_bytes()) if path.is_file() and not path.is_symlink() else None
+
+
+def partitur_version():
+    r = subprocess.run(["git", "-C", str(HERE), "describe", "--always", "--dirty"],
+                       capture_output=True, text=True)
+    return r.stdout.strip() or "unknown"
+
+
+# --- the manifest: what install delivered, so that update and uninstall
+#     remove exactly that and nothing else --------------------------------
+
+MANIFEST_HEAD = "# Partitur manifest, written by bin/install; do not edit by hand\n"
+
+
+def read_manifest(path, root):
+    entries = {}
+    if not path.exists():
+        return None
+    for line in path.read_text().splitlines():
+        if not line or line.startswith("#") or line.startswith("partitur "):
+            continue
+        kind, digest, rel, *rest = line.split(" ")
+        entries[rel] = dict(kind=kind, sha=None if digest == "-" else digest,
+                            target=rest[1] if rest[:1] == ["->"] else None)
+    return entries
+
+
+def write_manifest(path, root, entries):
+    lines = [MANIFEST_HEAD, f"partitur {partitur_version()}\n"]
+    for rel in sorted(entries):
+        e = entries[rel]
+        line = f"{e['kind']} {e['sha'] or '-'} {rel}"
+        if e["target"]:
+            line += f" -> {e['target']}"
+        lines.append(line + "\n")
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text)
-    report("created", path)
+    path.write_text("".join(lines))
 
 
-def write_new(path, text, report):
-    if path.exists() or path.is_symlink():
-        same = path.is_file() and path.read_text() == text
-        if same or not UPDATE or path.is_symlink():
-            report("kept" if same else "differs", path)
-            return
-        path.write_text(text)
-        report("updated", path)
-        return
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text)
-    report("created", path)
+def apply(root, plan, old, mode, force, report):
+    """Bring the project to `plan` (rel path -> entry with kind, data or
+    target); `old` is the previous manifest. Returns the new manifest."""
+    old = old or {}
+    new = {}
+    for rel, e in plan.items():
+        path, before = root / rel, old.get(rel)
+        if e["kind"] == "link":
+            if path.is_symlink() and os.readlink(path) == e["target"]:
+                report("kept", path)
+            elif path.is_symlink() and before and os.readlink(path) == before["target"] \
+                    and mode == "update":
+                path.unlink()
+                path.symlink_to(e["target"])
+                report("updated", path)
+            elif path.exists() or path.is_symlink():
+                report("differs", path, "not Partitur's link; left alone")
+                continue
+            else:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.symlink_to(e["target"])
+                report("created", path)
+            new[rel] = dict(kind="link", sha=None, target=e["target"])
+            continue
+        want = sha(e["data"])
+        cur = file_sha(path)
+        if cur is None and not path.exists():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(e["data"] if isinstance(e["data"], bytes) else e["data"].encode())
+            if e.get("mode"):
+                path.chmod(e["mode"])
+            report("created", path)
+            new[rel] = dict(kind=e["kind"], sha=want, target=None)
+        elif e["kind"] == "seeded":
+            report("kept", path, "the project's file")
+            new[rel] = before or dict(kind="seeded", sha=cur, target=None)
+        elif cur == want:
+            report("kept", path)
+            new[rel] = dict(kind="maintained", sha=want, target=None)
+        else:
+            untouched = before is not None and before["sha"] == cur
+            if mode == "update" and (untouched or force):
+                path.write_bytes(e["data"] if isinstance(e["data"], bytes) else e["data"].encode())
+                if e.get("mode"):
+                    path.chmod(e["mode"])
+                report("updated" if untouched else "replaced", path)
+                new[rel] = dict(kind="maintained", sha=want, target=None)
+            else:
+                report("outdated" if untouched else "modified", path,
+                       "--update replaces it" if untouched else
+                       "changed here; --update --force replaces it")
+                new[rel] = before or dict(kind="maintained", sha=None, target=None)
+    for rel, before in old.items():
+        if rel in plan:
+            continue
+        path = root / rel
+        if mode != "update":
+            new[rel] = before
+            if before["kind"] != "seeded" and (path.exists() or path.is_symlink()):
+                report("obsolete", path, "--update removes it")
+            continue
+        removed = remove_entry(root, rel, before, force, report)
+        if not removed:
+            new[rel] = before
+    return new
 
 
-def copy_new(src, dst, report):
-    if dst.exists() or dst.is_symlink():
-        same = dst.is_file() and filecmp.cmp(src, dst, shallow=False)
-        if same or not UPDATE or dst.is_symlink():
-            report("kept" if same else "differs", dst)
-            return
-        shutil.copyfile(src, dst)
-        dst.chmod(0o755)
-        report("updated", dst)
-        return
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(src, dst)
-    dst.chmod(0o755)
-    report("created", dst)
+def remove_entry(root, rel, e, force, report):
+    """Remove what install delivered at rel, if it is still what it delivered."""
+    path = root / rel
+    if e["kind"] == "seeded":
+        if path.exists():
+            report("kept", path, "the project's file")
+        return False
+    if e["kind"] == "link":
+        if path.is_symlink() and os.readlink(path) == e["target"]:
+            path.unlink()
+            report("removed", path)
+            prune(path.parent, root)
+            return True
+        return not (path.exists() or path.is_symlink())
+    if not path.exists():
+        return True
+    if file_sha(path) == e["sha"] or force:
+        path.unlink()
+        report("removed", path)
+        prune(path.parent, root)
+        return True
+    report("modified", path, "changed here; kept (--force removes it)")
+    return False
 
 
-def link_new(link, target, report):
-    if link.is_symlink() or link.exists():
-        same = link.is_symlink() and os.readlink(link) == str(target)
-        report("kept" if same else "differs", link)
-        return
-    link.parent.mkdir(parents=True, exist_ok=True)
-    link.symlink_to(target)
-    report("created", link)
+def prune(d, root):
+    """Remove directories left empty, up to root."""
+    while d != root and d.is_dir() and not any(d.iterdir()):
+        d.rmdir()
+        d = d.parent
 
 
 def detect(root, rec):
@@ -150,9 +257,74 @@ def detect(root, rec):
     return found
 
 
-def scope_user(tools, report):
+def scope_user(a, tools, report):
     for tool in tools:
-        link_new(Path.home() / TOOLS[tool][1] / "skills" / "partitur", HERE, report)
+        link = Path.home() / TOOLS[tool][1] / "skills" / "partitur"
+        if a.uninstall:
+            if link.is_symlink() and Path(os.readlink(link)) == HERE:
+                link.unlink()
+                report("removed", link)
+            elif link.exists() or link.is_symlink():
+                report("differs", link, "not a link to this Partitur; left alone")
+        elif link.is_symlink() and Path(os.readlink(link)) == HERE:
+            report("kept", link)
+        elif link.exists() or link.is_symlink():
+            report("differs", link, "not a link to this Partitur; left alone")
+        else:
+            link.parent.mkdir(parents=True, exist_ok=True)
+            link.symlink_to(HERE)
+            report("created", link)
+
+
+def project_plan(a, tools, root, rec, repos, name):
+    """Everything install delivers to the project, as rel path -> entry."""
+    plan = {}
+    R = a.records
+
+    def fill(template):
+        text = (HERE / "templates" / template).read_text()
+        return (text.replace("{{PROJECT}}", name).replace("{{RECORDS}}", R)
+                .replace("{{PARTITUR}}", URL)
+                .replace("{{PROJECT_RULES}}", "(Rules specific to this project.)"))
+
+    def add(rel, kind, data, mode=None):
+        plan[rel] = dict(kind=kind, data=data, mode=mode)
+    add(f"{R}/CLAUDE.md", "seeded", fill("rules.md"))
+    add(f"{R}/pr/README.md", "maintained", fill("pr-README.md"))
+    for d in ("pr/open", "pr/merged", "pr/closed", "tasks/open", "tasks/done", "tasks/cancelled",
+              "roles/designer", "roles/integrator", "handoff/notes"):
+        add(f"{R}/{d}/.gitkeep", "seeded", "")
+    add(f"{R}/pr/repos", "seeded",
+        "# name checkout main\n" + "".join(f"{n} {c} {m}\n" for n, c, m in repos))
+    add(f"{R}/handoff/designer.md", "seeded", fill("designer.md"))
+    add(f"{R}/handoff/integrator.md", "seeded", fill("integrator.md"))
+    for tool in ("ptt", "pr", "test-run"):
+        add(f"{R}/bin/{tool}", "maintained", (HERE / "project" / "bin" / tool).read_bytes(), 0o755)
+    add(f"{R}/tasks/charter-template.md", "maintained", (HERE / "templates" / "charter.md").read_text())
+    for skill in SKILLS:
+        text = (HERE / "project" / "skills" / skill / "SKILL.md").read_text()
+        add(f"{R}/skills/{skill}/SKILL.md", "maintained", text.replace("<records>", R))
+    for tool in tools:
+        entry, tool_dir = TOOLS[tool]
+        plan[entry] = dict(kind="link", target=f"{R}/CLAUDE.md")
+        for skill in SKILLS:
+            plan[f"{tool_dir}/skills/{skill}"] = dict(kind="link",
+                                                      target=f"../../{R}/skills/{skill}")
+        if (Path.home() / tool_dir / "skills" / "partitur").exists():
+            print(f"skipped   {tool_dir}/skills/partitur (linked for the user already)")
+        else:
+            plan[f"{tool_dir}/skills/partitur"] = dict(kind="link", target=str(HERE))
+    return plan
+
+
+def records_lock(rec):
+    """The lock every ptt command takes (F11), so that install never writes
+    while a session records."""
+    r = subprocess.run(["git", "-C", str(rec), "rev-parse", "--git-common-dir"],
+                       capture_output=True, text=True)
+    f = open((rec / r.stdout.strip()).resolve() / "ptt.lock", "w")
+    fcntl.flock(f, fcntl.LOCK_EX)
+    return f
 
 
 def scope_project(a, tools, report):
@@ -161,6 +333,27 @@ def scope_project(a, tools, report):
         sys.exit(f"install: {root} is not a directory")
     if "/" in a.records or a.records in ("", ".", ".."):
         sys.exit("install: --records must be a directory name directly in the project")
+    rec = root / a.records
+    manifest = rec / ".partitur" / "manifest"
+    held = records_lock(rec) if (rec / ".git").exists() else None
+    old = read_manifest(manifest, root)
+
+    if a.uninstall:
+        if old is None:
+            sys.exit(f"install: no manifest at {manifest.relative_to(root)}; nothing to uninstall")
+        kept = {rel: e for rel, e in old.items()
+                if not remove_entry(root, rel, e, a.force, report)}
+        if kept:
+            write_manifest(manifest, root, kept)
+            print(f"\n{len(kept)} path(s) kept (the project's files, or changed here); the "
+                  "manifest lists them. Records (tasks, requests, roles) are never touched.")
+        else:
+            manifest.unlink()
+            prune(manifest.parent, root)
+        print(f"\nRecord the change: {a.records}/bin/ptt record -m \"uninstall Partitur\" "
+              f"{a.records}  (or with git, if bin/ptt was removed)")
+        return
+
     repos = []
     for spec in a.repo:
         parts = spec.split(":")
@@ -168,9 +361,6 @@ def scope_project(a, tools, report):
             sys.exit(f"install: --repo {spec!r}: expected NAME:CHECKOUT:MAIN, "
                      "no spaces or colons in a field")
         repos.append(parts)
-    name = a.name or root.name
-    rec = root / a.records
-
     if (rec / ".git").exists():
         has_commits = not subprocess.run(["git", "-C", str(rec), "rev-parse", "-q", "--verify",
                                           "HEAD"], capture_output=True).returncode
@@ -182,56 +372,30 @@ def scope_project(a, tools, report):
         rec.mkdir(exist_ok=True)
         subprocess.run(["git", "init", "-q", "-b", a.branch, str(rec)], check=True)
         report("created", rec / ".git")
-
-    def fill(template):
-        text = (HERE / "templates" / template).read_text()
-        return (text.replace("{{PROJECT}}", name).replace("{{RECORDS}}", a.records)
-                .replace("{{PARTITUR}}", URL)
-                .replace("{{PROJECT_RULES}}", "(Rules specific to this project.)"))
-
-    seed(rec / "CLAUDE.md", fill("rules.md"), report)
-    write_new(rec / "pr" / "README.md", fill("pr-README.md"), report)
-    for state in ("open", "merged", "closed"):
-        write_new(rec / "pr" / state / ".gitkeep", "", report)
+    held = held or records_lock(rec)
     table = rec / "pr" / "repos"
     if not table.exists() and not repos:
         repos = detect(root, rec)
     if table.exists() and repos:
-        print(f"warning  {os.path.relpath(table, root)} exists; --repo ignored, edit it by hand")
-    seed(table, "# name checkout main\n" + "".join(f"{n} {c} {m}\n" for n, c, m in repos),
-         report)
-    seed(rec / "handoff" / "designer.md", fill("designer.md"), report)
-    seed(rec / "handoff" / "integrator.md", fill("integrator.md"), report)
-    write_new(rec / "handoff" / "notes" / ".gitkeep", "", report)
-    for tool in ("ptt", "pr", "test-run"):
-        copy_new(HERE / "project" / "bin" / tool, rec / "bin" / tool, report)
-    for state in ("open", "done", "cancelled"):
-        write_new(rec / "tasks" / state / ".gitkeep", "", report)
-    write_new(rec / "tasks" / "charter-template.md", (HERE / "templates" / "charter.md").read_text(),
-              report)
-    for role in ("designer", "integrator"):
-        write_new(rec / "roles" / role / ".gitkeep", "", report)
-    for skill in SKILLS:
-        text = (HERE / "project" / "skills" / skill / "SKILL.md").read_text()
-        write_new(rec / "skills" / skill / "SKILL.md", text.replace("<records>", a.records),
-                  report)
+        print(f"warning   {os.path.relpath(table, root)} exists; --repo ignored, edit it by hand")
     for tool in tools:
-        entry, tool_dir = TOOLS[tool]
-        if (root / entry).exists() and not (root / entry).is_symlink():
-            print(f"warning  {entry} exists and is not the rules file, so the tool would not "
-                  f"read the rules: move its content into {a.records}/CLAUDE.md, delete it, "
-                  "and rerun")
-        link_new(root / entry, Path(a.records) / "CLAUDE.md", report)
-        for skill in SKILLS:
-            link_new(root / tool_dir / "skills" / skill,
-                     Path("..") / ".." / a.records / "skills" / skill, report)
-        if (Path.home() / tool_dir / "skills" / "partitur").exists():
-            print(f"skipped  {tool_dir}/skills/partitur (linked for the user already)")
-        else:
-            link_new(root / tool_dir / "skills" / "partitur", HERE, report)
+        entry = root / TOOLS[tool][0]
+        if entry.exists() and not entry.is_symlink():
+            print(f"warning   {entry.name} exists and is not the rules file, so the tool would "
+                  f"not read the rules: move its content into {a.records}/CLAUDE.md, delete "
+                  "it, and rerun")
+    plan = project_plan(a, tools, root, rec, repos, a.name or root.name)
+    new = apply(root, plan, old, "update" if a.update else "install", a.force, report)
+    write_manifest(manifest, root, new)
     for n, c, _ in repos:
         if not (root / c / ".git").exists():
-            print(f"warning  repository {n}: no Git checkout at {c}")
+            print(f"warning   repository {n}: no Git checkout at {c}")
+    c = report.counts
+    if c.get("outdated") or c.get("obsolete"):
+        print("\nThis Partitur is newer: rerun with --update to bring the project up to it.")
+    if c.get("modified"):
+        print("\nFiles changed here were left alone; --update --force replaces them.")
+    print(f"\nRecord the change: {a.records}/bin/ptt record -m \"install Partitur\" {a.records}")
 
 
 def main():
@@ -243,17 +407,23 @@ def main():
     ap.add_argument("--name", help="project name (default: the directory's name)")
     ap.add_argument("--records", default="workspace", help="records repository directory")
     ap.add_argument("--branch", default="master", help="records repository's main branch")
-    ap.add_argument("--update", action="store_true",
-                    help="replace Partitur-maintained files (bin/, skills/, pr/README.md, "
-                         "tasks/charter-template.md) that differ; never the project's own files")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--update", action="store_true",
+                      help="bring the project up to this Partitur: replace delivered files not "
+                           "changed since, remove those no longer delivered")
+    mode.add_argument("--uninstall", action="store_true",
+                      help="remove what install delivered and is unchanged; keep the project's "
+                           "files and all records")
+    ap.add_argument("--force", action="store_true",
+                    help="with --update or --uninstall: also replace or remove files changed here")
     ap.add_argument("--repo", action="append", default=[],
                     help="NAME:CHECKOUT:MAIN, CHECKOUT relative to PROJECT; repeatable")
     a = ap.parse_args()
-    global UPDATE
-    UPDATE = a.update
     if not a.scope:
         print(__doc__)
         sys.exit(2)
+    if a.force and not (a.update or a.uninstall):
+        sys.exit("install: --force goes with --update or --uninstall")
     if a.tool == "auto":
         found = {"claude": shutil.which("claude") or (Path.home() / ".claude").is_dir(),
                  "codex": shutil.which("codex") or (Path.home() / ".codex").is_dir()}
@@ -262,23 +432,15 @@ def main():
             sys.exit("install: found neither Claude Code nor Codex on this machine; "
                      "choose with --tool claude, codex, or all")
         print("detected " + " and ".join({"claude": "Claude Code", "codex": "Codex"}[t]
-                                          for t in tools) + "; installing for "
+                                          for t in tools) + "; using "
               + ("both" if len(tools) == 2 else "it") + " (--tool chooses otherwise)")
     else:
         tools = ("claude", "codex") if a.tool == "all" else (a.tool,)
-    base = a.project.resolve() if a.scope == "project" else Path.home()
-    report = Report(base)
+    report = Report(a.project.resolve() if a.scope == "project" else Path.home())
     if a.scope == "user":
-        scope_user(tools, report)
+        scope_user(a, tools, report)
     else:
         scope_project(a, tools, report)
-    if report.differs:
-        print(f"\n{report.differs} path(s) differ from Partitur's version and were left"
-              " as they are; compare them, then rerun with --update to replace the files"
-              " Partitur maintains.")
-    if a.scope == "project":
-        print("\nNext: record the records repository's changes, from the workspace root:\n"
-              f"  {a.records}/bin/ptt record -m \"install Partitur\" {a.records}")
 
 
 if __name__ == "__main__":

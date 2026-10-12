@@ -23,6 +23,7 @@ Changing one of these means changing the tools or skills that use it.
 | Role files | `<records>/handoff/designer.md`, `integrator.md` | D8, D15 |
 | Tasks | `<records>/tasks/{open,done,cancelled}/NNNN[.N...]-slug/`: `charter.md`, `status.md`, events `MMMM-<kind>.md`; template `<records>/tasks/charter-template.md` | G8-G12 |
 | Role records | `<records>/roles/{designer,integrator}/MMMM-<kind>.md` | G1 |
+| Install manifest | `<records>/.partitur/manifest`: kind, SHA-256, path of every delivered file and link | F12 |
 | Holder names | `designer-g<N>`, `integrator-<N>`, `<kind>-<task>`, then `-2`, `-3` for later holders | G2 |
 | Stale holder | no record for 7 days, listed for the supervisor | G6 |
 | Request directories | `<records>/pr/{open,merged,closed}/NNNNNN-short-name/`, six-digit numbers | C1, C3a |

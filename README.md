@@ -106,8 +106,12 @@ skills only from the Git root of its starting directory downwards, and the
 workspace root is usually not inside a Git repository.
 
 To bring a project up to a newer Partitur, pull this repository and rerun
-step 3's command with `--update`; it replaces only the files Partitur
-maintains, never your rules or records.
+step 3's command with `--update`. A manifest in `workspace/.partitur/`
+records what was installed, so the update replaces what is outdated and
+removes what Partitur no longer ships, but leaves your rules, your records,
+and any file you changed (`--force` replaces those). `--uninstall` removes
+what was installed the same way; `--scope user --uninstall` removes the
+link for your tools.
 
 Taking roles and tasks, the install command, and Codex support are recent
 and marked *Proposed* in the [rules index](rules.md) until they have been

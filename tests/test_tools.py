@@ -301,28 +301,97 @@ class InstallProject(unittest.TestCase):
         tool.write_text(tool.read_text() + "\n# local change\n")
         out = self.install().stdout
         self.assertNotIn("created", out)
-        self.assertIn("kept     workspace/CLAUDE.md", out)
-        self.assertIn("kept     workspace/pr/repos", out)
-        self.assertIn("differs  workspace/bin/pr", out)
-        self.assertIn("1 path(s) differ", out)
+        self.assertRegex(out, r"kept\s+workspace/CLAUDE\.md")
+        self.assertRegex(out, r"kept\s+workspace/pr/repos")
+        self.assertRegex(out, r"modified\s+workspace/bin/pr")
         self.assertIn("project rule", rules.read_text())
         self.assertIn("# local change", tool.read_text())
         warn = self.install("--repo", "x:x:main").stdout
         self.assertIn("--repo ignored", warn)
 
-    def test_update_replaces_only_partitur_files(self):
+    def manifest(self):
+        return self.root / "workspace" / ".partitur" / "manifest"
+
+    def set_delivered(self, rel, data):
+        """Pretend an older Partitur delivered `data` at rel."""
+        import hashlib
+        (self.root / rel).write_text(data)
+        lines = self.manifest().read_text().splitlines()
+        h = hashlib.sha256(data.encode()).hexdigest()
+        lines = [" ".join([l.split(" ")[0], h] + l.split(" ")[2:]) if l.split(" ")[2:3] == [rel]
+                 else l for l in lines]
+        self.manifest().write_text("\n".join(lines) + "\n")
+
+    def test_update_replaces_outdated_keeps_modified(self):
+        self.install()
+        self.assertIn("partitur ", self.manifest().read_text())
+        self.set_delivered("workspace/bin/pr", "# older pr\n")
+        mine = self.root / "workspace" / "bin" / "test-run"
+        mine.write_text(mine.read_text() + "\n# my change\n")
+        rules = self.root / "workspace" / "CLAUDE.md"
+        rules.write_text(rules.read_text() + "\nproject rule\n")
+        out = self.install().stdout
+        self.assertRegex(out, r"outdated\s+workspace/bin/pr")
+        self.assertRegex(out, r"modified\s+workspace/bin/test-run")
+        self.assertIn("--update", out)
+        out = self.install("--update").stdout
+        self.assertRegex(out, r"updated\s+workspace/bin/pr")
+        self.assertNotIn("older pr", (self.root / "workspace" / "bin" / "pr").read_text())
+        self.assertIn("# my change", mine.read_text())
+        self.assertIn("project rule", rules.read_text())
+        out = self.install("--update", "--force").stdout
+        self.assertRegex(out, r"replaced\s+workspace/bin/test-run")
+        self.assertNotIn("# my change", mine.read_text())
+        self.assertIn("ptt record -m", out)
+
+    def test_update_removes_what_is_no_longer_delivered(self):
+        self.install()
+        old = self.root / "workspace" / "skills" / "ptt-submit" / "SKILL.md"
+        old.parent.mkdir()
+        old.write_text("old skill\n")
+        link = self.root / ".claude" / "skills" / "ptt-submit"
+        link.symlink_to("../../workspace/skills/ptt-submit")
+        import hashlib
+        h = hashlib.sha256(b"old skill\n").hexdigest()
+        with self.manifest().open("a") as f:
+            f.write(f"maintained {h} workspace/skills/ptt-submit/SKILL.md\n")
+            f.write("link - .claude/skills/ptt-submit -> ../../workspace/skills/ptt-submit\n")
+        out = self.install().stdout
+        self.assertRegex(out, r"obsolete\s+workspace/skills/ptt-submit/SKILL.md")
+        self.assertTrue(old.exists())
+        out = self.install("--update").stdout
+        self.assertRegex(out, r"removed\s+workspace/skills/ptt-submit/SKILL.md")
+        self.assertRegex(out, r"removed\s+\.claude/skills/ptt-submit")
+        self.assertFalse(old.parent.exists())
+        self.assertFalse(link.is_symlink())
+        self.assertNotIn("ptt-submit", self.manifest().read_text().replace("ptt-pr-submit", ""))
+
+    def test_uninstall_keeps_records_and_changes(self):
         self.install()
         ws = self.root / "workspace"
-        tool = ws / "bin" / "pr"
-        tool.write_text(tool.read_text() + "\n# old\n")
-        rules = ws / "CLAUDE.md"
-        rules.write_text(rules.read_text() + "\nproject rule\n")
-        out = self.install("--update").stdout
-        self.assertIn("updated  workspace/bin/pr", out)
-        self.assertNotIn("# old", tool.read_text())
-        self.assertIn("project rule", rules.read_text())
-        self.assertIn("kept     workspace/CLAUDE.md", out)
-        self.assertIn("ptt record -m", out)
+        task = ws / "tasks" / "open" / "0001-x"
+        task.mkdir()
+        (task / "charter.md").write_text("a task\n")
+        mine = ws / "bin" / "pr"
+        mine.write_text(mine.read_text() + "\n# mine\n")
+        out = self.install("--uninstall").stdout
+        self.assertRegex(out, r"removed\s+workspace/bin/ptt")
+        self.assertRegex(out, r"removed\s+CLAUDE\.md")
+        self.assertRegex(out, r"modified\s+workspace/bin/pr")
+        self.assertFalse((ws / "bin" / "ptt").exists())
+        self.assertFalse((self.root / "CLAUDE.md").is_symlink())
+        self.assertFalse((self.root / ".claude").exists())
+        self.assertTrue((ws / "CLAUDE.md").exists())
+        self.assertTrue((task / "charter.md").exists())
+        self.assertTrue(mine.exists())
+        self.assertIn("workspace/bin/pr", self.manifest().read_text())
+        self.install("--uninstall", "--force")
+        self.assertFalse(mine.exists())
+
+    def test_uninstall_without_manifest(self):
+        r = self.install("--uninstall", check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("no manifest", r.stderr)
 
     def test_defaults_detect_checkouts(self):
         other = self.root / "lib"
@@ -350,7 +419,7 @@ class InstallProject(unittest.TestCase):
     def test_existing_entry_file_warns(self):
         (self.root / "CLAUDE.md").write_text("old notes\n")
         out = self.install(tool="claude").stdout
-        self.assertIn("warning  CLAUDE.md exists and is not the rules file", out)
+        self.assertRegex(out, r"warning\s+CLAUDE\.md\ exists\ and\ is\ not\ the\ rules\ file")
         self.assertEqual((self.root / "CLAUDE.md").read_text(), "old notes\n")
 
     def test_unusual_main_branch_warns(self):
@@ -358,7 +427,7 @@ class InstallProject(unittest.TestCase):
         dev.mkdir()
         git(dev, "init", "-q", "-b", "develop")
         out = self.install(tool="claude").stdout
-        self.assertIn("warning  dev: is develop its main branch?", out)
+        self.assertRegex(out, r"warning\s+dev:\ is\ develop\ its\ main\ branch\?")
 
     def test_refuses_code_repository_as_records(self):
         code = self.root / "code"
@@ -373,7 +442,7 @@ class InstallProject(unittest.TestCase):
         (self.home / ".claude" / "skills").mkdir(parents=True)
         (self.home / ".claude" / "skills" / "partitur").symlink_to(HERE)
         out = self.install().stdout
-        self.assertIn("skipped  .claude/skills/partitur", out)
+        self.assertRegex(out, r"skipped\s+\.claude/skills/partitur")
         self.assertFalse((self.root / ".claude" / "skills" / "partitur").exists())
         self.assertTrue((self.root / ".agents" / "skills" / "partitur").is_symlink())
 
@@ -420,13 +489,19 @@ class InstallUser(unittest.TestCase):
             self.assertFalse((home / ".claude").exists())
             out = run("python3", str(INSTALL), "--tool", "all", "--scope", "user",
                       env=env).stdout
-            self.assertIn("kept     .agents/skills/partitur", out)
-            self.assertIn("created  .claude/skills/partitur", out)
+            self.assertRegex(out, r"kept\s+\.agents/skills/partitur")
+            self.assertRegex(out, r"created\s+\.claude/skills/partitur")
             (home / ".claude" / "skills" / "partitur").unlink()
             (home / ".claude" / "skills" / "partitur").mkdir()
             out = run("python3", str(INSTALL), "--tool", "claude", "--scope", "user",
                       env=env).stdout
-            self.assertIn("differs  .claude/skills/partitur", out)
+            self.assertRegex(out, r"differs\s+\.claude/skills/partitur")
+            (home / ".claude" / "skills" / "partitur").rmdir()
+            run("python3", str(INSTALL), "--tool", "all", "--scope", "user", env=env)
+            out = run("python3", str(INSTALL), "--tool", "all", "--scope", "user",
+                      "--uninstall", env=env).stdout
+            self.assertRegex(out, r"removed\s+\.agents/skills/partitur")
+            self.assertFalse((home / ".claude" / "skills" / "partitur").is_symlink())
         finally:
             shutil.rmtree(home)
 
