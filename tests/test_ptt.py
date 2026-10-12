@@ -185,6 +185,19 @@ class Ptt(unittest.TestCase):
         self.assertIn("pr 000001: submit (by track-T0001)", log)
         self.assertIn("pr 000001: merged (by integrator-1)", log)
 
+    def test_holder_sees_amendments_since_its_take(self):
+        d = self.designer()
+        n = self.task("probe", d)
+        self.ptt("amend", n, "--as", d, "--text", "before the take")
+        holder = self.ptt("take", n).stdout.strip()
+        self.assertNotIn("amended", self.ptt("whoami", holder).stdout)
+        self.ptt("amend", n, "--as", d, "--text", "scope narrowed")
+        out = self.ptt("whoami", holder).stdout
+        self.assertRegex(out, r"amended since your take: \d{4}-amend.md; read it with `ptt show T0001`")
+        self.ptt("leave", holder)
+        self.ptt("approve-leave", n, "--as", d)
+        self.assertNotIn("amended", self.ptt("whoami", self.ptt("take", n).stdout.strip()).stdout)
+
     def test_root_task_has_no_dependencies(self):
         d = self.designer()
         self.assertIn("never closes", self.refused("mktask", "x", "--as", d, "--depends", "T0000"))

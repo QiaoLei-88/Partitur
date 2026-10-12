@@ -289,15 +289,18 @@ def raw_info(place, d):
                 depends=parse_ids(charter.get("depends", "")),
                 state="ready" if number == ROOT else "draft", holder=None, last_holder=None,
                 takes=0,
-                leave_request=None, done=None)
+                leave_request=None, done=None, amended=[])
     for e in events(d):
         k = e["kind"]
         if k == "release":
             info["state"] = "ready"
-        elif k == "amend" and "depends" in e:
-            info["depends"] = parse_ids(e["depends"])
+        elif k == "amend":
+            if "depends" in e:
+                info["depends"] = parse_ids(e["depends"])
+            if info["holder"]:
+                info["amended"].append(e["path"].name)
         elif k == "take":
-            info.update(state="held", holder=e["by"], leave_request=None, done=None)
+            info.update(state="held", holder=e["by"], leave_request=None, done=None, amended=[])
             info["takes"] += 1
         elif k == "leave-request":
             info["leave_request"] = e
@@ -814,6 +817,9 @@ def cmd_whoami(a):
             print("waiting: your request to leave")
         if i["done"]:
             print("waiting: your done report")
+        for name in i["amended"]:
+            print(f"amended since your take: {name}; read it with "
+                  f"`ptt show {tid(i['number'])}`")
     for line in unclear(subtree(a.name)):
         print("waits on you:", line)
 

@@ -10,8 +10,10 @@ writes; other work needs AtE (rules file).
 
 - No argument, with the holder name this session got from `/ptt-take`:
   `<records>/bin/ptt whoami <name>`; report the role or task, supervisor,
-  charter, and every "waits on you" line (leave requests, done reports,
-  silent holders), each with a suggested next step.
+  charter, every "waits on you" line (leave requests, done reports, silent
+  holders), and every "amended since your take" line (read the amendment
+  with `ptt show` and say what changes for the work), each with a suggested
+  next step.
 - `NAME` (typically after `/clear`): this session continues as that holder.
   Run `<records>/bin/ptt whoami NAME`, read what it starts from (`/ptt-take`,
   step 4) and its status record, and report where it stands; use NAME as
