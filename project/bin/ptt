@@ -11,7 +11,8 @@ task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
   ptt take designer|integrator|TASK   take the root design task T0000 (designer),
                                    the integrator role, or a ready task; prints the
                                    holder name
-  ptt leave NAME [--status TEXT]   give up a role, or ask to give up a task
+  ptt leave NAME [--status TEXT]   give up the integrator role or T0000 (designer), or
+                                   ask to give up any other task
   ptt approve-leave TASK --as NAME   supervisor: accept a holder's request to leave
   ptt free TASK|ROLE --as NAME --reason TEXT
                                    supervisor (or --as user): free a task or role whose
@@ -29,7 +30,7 @@ task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
   ptt pr-move N merged|closed -m MESSAGE
                                    integrator: move a decided request, recorded at once
   ptt record -m MESSAGE PATH...    commit exactly these paths of the records repository
-                                   (request messages, status.md, role files), under
+                                   (request messages, status.md, handoff/integrator.md), under
                                    the same lock as every other change
 
 Records: <records>/tasks/{open,done,cancelled}/TNNNN[.N...]-slug/ holds
@@ -47,7 +48,7 @@ the state, checks it, writes, and commits exactly its paths as one commit,
 leaving everything else staged alone; if the commit fails, the change is
 removed again. Every write to the
 records repository goes through ptt (`ptt record` for request messages,
-status.md, and role files), so writes run one after another. Git commands
+status.md, and handoff/integrator.md), so writes run one after another. Git commands
 run by hand in the records repository while sessions work (stash,
 checkout, a manual commit) are outside this guarantee.
 
@@ -269,7 +270,14 @@ def find_task(ref):
 
 def parse_ids(text):
     """Task numbers from a list of IDs as written in a charter: T0007, T0007.1."""
-    return [x.strip().lstrip("T") for x in text.split(",") if x.strip()]
+    out = []
+    for x in text.split(","):
+        m = re.fullmatch(r"\s*[Tt]?(\d+(?:\.\d+)*)(?:-[a-z0-9-]+)?\s*", x)
+        if m:
+            out.append(normalize(m.group(1)))
+        elif x.strip():
+            out.append(x.strip())   # a slug; `ready` and `amend` refuse it unresolved
+    return out
 
 
 def raw_info(place, d):
@@ -309,7 +317,7 @@ def infos():
     out = [raw_info(p, d) for p, _, d in all_tasks()]
     states = {i["number"]: i["state"] for i in out}
     for i in out:
-        if i["state"] == "ready" and any(states.get(dep) != "closed" for dep in i["depends"]):
+        if i["state"] == "ready" and i["number"] != ROOT and any(states.get(dep) != "closed" for dep in i["depends"]):
             i["state"] = "blocked"
             i["blocked_by"] = [dep for dep in i["depends"] if states.get(dep) != "closed"]
     return out
@@ -333,8 +341,10 @@ def check_depends(number, refs):
         n = get(ref)["number"] if not isinstance(ref, dict) else ref["number"]
         if n not in deps:
             deps.append(n)
+    need(number != ROOT or not deps, f"task {tid(ROOT)}, the root design, has no dependencies")
     tasks = {i["number"]: i for i in infos()}
     for n in deps:
+        need(n != ROOT, f"no task depends on {tid(ROOT)}, the root design, which never closes")
         need(n != number, f"task {tid(number)} cannot depend on itself")
         need(not number.startswith(n + "."), f"task {tid(number)} cannot depend on {tid(n)}, which contains it")
         need(not n.startswith(number + "."), f"task {tid(number)} cannot depend on its own subtask {tid(n)}")
@@ -543,6 +553,8 @@ def cmd_mktask(a):
     prefix = "" if held[1]["number"] == ROOT else held[1]["number"] + "."
     need(re.fullmatch(r"[a-z][a-z0-9-]*", a.slug),
          "slug: starts with a letter; lower-case letters, digits, hyphens")
+    need(a.slug not in ("designer", "integrator") and not re.match(r"t\d", a.slug),
+         "slug: `designer`, `integrator`, and t<digit>... are reserved for roles and task IDs")
     need(a.kind in KINDS, f"kind must be one of {', '.join(KINDS)}")
     need(not [t for t in all_tasks() if t[0] == "open" and t[2].name.split("-", 1)[1] == a.slug],
          f"an unfinished task is already named {a.slug}")
@@ -572,7 +584,9 @@ def cmd_ready(a):
     need("{{" not in charter, f"the charter of task {tid(i['number'])} still has {{{{...}}}} "
          "placeholders; fill them in first")
     need(i["kind"] in KINDS, f"kind '{i['kind']}' must be one of {', '.join(KINDS)}")
-    check_depends(i["number"], i["depends"])
+    deps = check_depends(i["number"], i["depends"])
+    need(deps == i["depends"], "write the charter's `depends:` as task IDs: "
+         + ", ".join(map(tid, deps)))
     record(f"task {tid(i['number'])}: charter as released", add=[i["dir"] / "charter.md"])
     add_event(i["dir"], "release", dict(by=a.as_), "", f"task {tid(i['number'])}: released by {a.as_}")
     print(f"task {tid(i['number'])} is ready to take")
@@ -787,6 +801,23 @@ MUTATING = {"take", "leave", "approve-leave", "free", "mktask", "ready", "amend"
             "close", "reopen", "cancel", "record", "pr-move"}
 
 
+def check_format():
+    """Refuse records this ptt would misread rather than silently ignore them."""
+    old = [d for place in PLACES for d in sorted((TASKS / place).glob("[0-9]*-*"))
+           if d.is_dir()]
+    need(not old, f"{old[0].relative_to(REC) if old else ''}: a task directory in an earlier "
+         "Partitur format (no T prefix); rename each to T<number>-<slug> and write its "
+         "`depends:` as T IDs, then record the change")
+    roles = [e for e in (ROLES / "designer").glob("[0-9][0-9][0-9][0-9]-*.md")]
+    need(not roles, "roles/designer/ holds designer role records of an earlier Partitur "
+         "format; the designer is now the holder of task T0000. Move them out of the "
+         "records' tasks and roles (for example to an archive directory), then record the "
+         "change")
+    need(any(n == ROOT for _, n, _ in all_tasks()),
+         f"the root design task T{ROOT} (tasks/open/T{ROOT}-design/) is missing; "
+         "run Partitur's install for this project")
+
+
 def main():
     ap = argparse.ArgumentParser(prog="ptt", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -829,6 +860,7 @@ def main():
                          capture_output=True, text=True).stdout.strip()
     need(Path(own).resolve() == git_dir(), "ptt runs only in the primary checkout of the "
          "records repository, not in a linked worktree: all sessions must share one state")
+    check_format()
     run = globals()["cmd_" + a.cmd.replace("-", "_")]
     if a.cmd in MUTATING:
         with lock():

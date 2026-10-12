@@ -56,8 +56,10 @@ A project records which Partitur commit installed it, in one line of
 <records>/.partitur-version. Git already knows what Partitur ships, so
 install rebuilds from that commit what it delivered then: "maintained" files
 (tools, skills, pr/README.md, the charter template), "seeded" files (the
-rules file, role files, repository table, directory markers: the project's
-once created), and links. Compared with the project:
+rules file, the root design task's charter and status, the integrator's
+file, repository table, directory markers: the project's once created), and
+links. A seeded file an earlier Partitur used but this one no longer does is
+reported "superseded", with where its content goes; it is never removed. Compared with the project:
   install            creates what is missing and reports the rest: "kept",
                      "outdated" (unchanged here, but this Partitur has a
                      newer version), "modified" (changed here), "obsolete"
@@ -133,6 +135,12 @@ class Source:
         return subprocess.run(["git", "-C", str(HERE), "show", f"{self.commit}:{rel}"],
                               capture_output=True, check=True).stdout
 
+    def has(self, rel):
+        if self.commit is None:
+            return (HERE / rel).exists()
+        return subprocess.run(["git", "-C", str(HERE), "cat-file", "-e", f"{self.commit}:{rel}"],
+                              capture_output=True).returncode == 0
+
     def names(self, rel):
         if self.commit is None:
             return sorted(p.name for p in (HERE / rel).iterdir())
@@ -158,6 +166,14 @@ def delivered(plan):
         out[rel] = dict(kind=e["kind"], target=e.get("target"), sha=digest)
     return out
 
+
+SUPERSEDED = {
+    "handoff/designer.md": "the root designer is now the holder of task T0000: move this "
+    "file's role and read-first parts into tasks/open/T0000-design/charter.md and its state "
+    "and next steps into status.md there, then delete it",
+    "roles/designer/.gitkeep": "designers' takes are now events of task T0000; move earlier "
+    "role records out of roles/designer/ (ptt refuses while it holds events), then delete it",
+}
 
 BEGIN = "<!-- partitur rules begin"
 END = "<!-- partitur rules end -->"
@@ -290,6 +306,11 @@ def apply(root, plan, old, opts, report):
         if rel in plan:
             continue
         path = root / rel
+        if before["kind"] == "seeded":
+            note = SUPERSEDED.get(Path(rel).relative_to(opts.records).as_posix())
+            if note and path.exists():
+                report("superseded", path, note)
+            continue
         if mode != "update":
             if before["kind"] != "seeded" and (path.exists() or path.is_symlink()):
                 report("obsolete", path, "--update removes it")
@@ -411,8 +432,12 @@ def project_plan(a, tools, repos, name, src, quiet=False):
         add(f"{R}/{d}/.gitkeep", "seeded", "")
     add(f"{R}/pr/repos", "seeded",
         "# name checkout main\n" + "".join(f"{n} {c} {m}\n" for n, c, m in repos))
-    add(f"{R}/tasks/open/T0000-design/charter.md", "seeded", fill("root-charter.md"))
-    add(f"{R}/tasks/open/T0000-design/status.md", "seeded", fill("root-status.md"))
+    if src.has("templates/root-charter.md"):
+        add(f"{R}/tasks/open/T0000-design/charter.md", "seeded", fill("root-charter.md"))
+        add(f"{R}/tasks/open/T0000-design/status.md", "seeded", fill("root-status.md"))
+    else:                         # earlier Partitur: the designer was a role
+        add(f"{R}/handoff/designer.md", "seeded", fill("designer.md"))
+        add(f"{R}/roles/designer/.gitkeep", "seeded", "")
     add(f"{R}/handoff/integrator.md", "seeded", fill("integrator.md"))
     for tool in src.names("project/bin"):
         add(f"{R}/bin/{tool}", "maintained", src.read(f"project/bin/{tool}"), 0o755)
@@ -571,14 +596,17 @@ def scope_project(a, tools, report):
     set_repos(a, root, rec, table, repos, add_repos, report)
     now = partitur_commit()
     c = report.counts
-    pending = c.get("outdated") or c.get("obsolete")
+    pending = c.get("outdated") or c.get("obsolete") or c.get("superseded")
     if not stamp.exists() or a.update or not pending:
         stamp.write_text("partitur " + (now or "uncommitted") + "\n")
     if not now:
         print("\nwarning   this Partitur has uncommitted changes; a later update cannot find "
               "files it no longer ships. Install from a committed Partitur.")
-    if pending and not a.update:
+    if (c.get("outdated") or c.get("obsolete")) and not a.update:
         print("\nThis Partitur is newer: rerun with --update to bring the project up to it.")
+    if c.get("superseded"):
+        print("\nSuperseded files hold the project's content, so Partitur never removes them: "
+              "move what they hold as noted, delete them, and record the change.")
     if c.get("modified") or c.get("differs"):
         print("\nFiles changed here, or not installed by Partitur, were left alone; "
               "--update --force replaces them after a backup.")

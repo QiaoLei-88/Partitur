@@ -92,7 +92,8 @@ both.
    of `workspace/CLAUDE.md` (your domain's rules; Partitur's own rules sit
    in a marked block above them), and the placeholders in
    `workspace/tasks/open/T0000-design/charter.md` (the root designer's
-   charter; its `status.md` is the designer's handover). A project that
+   charter, filled in directly this once and amended by you afterwards;
+   its `status.md` is the designer's handover). A project that
    already has a rules file keeps it: install reports it "not merged", the
    session compares both and lists every contradiction for you, and on
    your approval `--merge-rules` adds Partitur's block. Then record them:
@@ -146,7 +147,8 @@ used in a real project.
 - `project/`: what a project receives (`bin/ptt` for roles and tasks,
   `bin/pr` for requests, `bin/test-run`, the `ptt-*` skills).
 - `templates/`: files filled in at install (rules file, request README,
-  designer's and integrator's files, the task charter).
+  the root design task's charter and status, the integrator's file, the
+  task charter).
 - [SKILL.md](SKILL.md): the entry point for agent sessions.
 - [Contributing](CONTRIBUTING.md); tests:
   `python3 -m unittest discover -s tests`.

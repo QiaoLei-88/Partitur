@@ -139,13 +139,13 @@ project's development notes.
 | G1 | A session holds the integrator role or a task only by taking it with a command (the designer by taking the root design task `T0000`); taking is recorded as an event file and committed at once; a held role or task cannot be taken, and of simultaneous takes one wins | Proposed |
 | G2 | The take gives the session its holder name (`designer-g2` for `T0000`, `integrator-1`, `track-T0007`, `track-T0007-2` for a second holder), used as its name in every command and message | Proposed |
 | G3 | Supervision is a tree: the designer (holder of `T0000`) supervises top-level tasks, the holder of a design task its subtasks, the user the designer and integrator | Proposed |
-| G4 | A task holder leaves only with its supervisor's approval; a designer or integrator leaves on the user's command | Proposed |
+| G4 | A task holder leaves only with its supervisor's approval; the root designer (holder of `T0000`) or the integrator leaves on the user's command | Proposed |
 | G5 | Nobody leaves while anything below them is unclear (a leave request or done report waiting, or a holder with no record for seven days, anywhere in the subtree), and the integrator not with a decision not carried out; a design task with unfinished subtasks cannot be cancelled | Proposed |
 | G6 | A supervisor checks on a subordinate with no record for seven days and frees its task if it is gone; holders therefore commit their status at least daily; the user acts for a vacant supervisor | Proposed |
 | G7 | Only the user frees the designer (`T0000`) or the integrator role | Proposed |
 | G8 | A task goes draft, ready, held, closed (or cancelled); states are derived from its events | Proposed |
 | G9 | A released task whose dependencies are not all closed is blocked | Proposed |
-| G10 | A design task opens a sub-scope; its holder is the sub-designer; the root scope is the design task `T0000`, never closed; a task ID is `T`, a number showing the tree, and a slug (`T0007.1-indexing`), its directory name, never changed | Proposed |
+| G10 | A design task opens a sub-scope; its holder is the sub-designer; the root scope is the design task `T0000`, never closed; a task ID is `T`, a number showing the tree, and a slug (`T0007.1-indexing`), its directory name, never changed; `T0000` has no dependencies and no task depends on it | Proposed |
 | G11 | A charter is frozen once released; changes are amendments recorded as events | Proposed |
 | G12 | Only the holder writes its task's `status.md`; the designer closes a task after the holder reports done, or reopens it | Proposed |
 | G13 | Clearing a session's context does not change what it holds; the user names the holder a fresh session continues as | Proposed |

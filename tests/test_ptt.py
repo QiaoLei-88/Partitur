@@ -151,6 +151,41 @@ class Ptt(unittest.TestCase):
         self.assertIn("does not supervise", self.refused("amend", "T0000", "--as", d,
                                                          "--text", "x"))
 
+    def test_root_task_has_no_dependencies(self):
+        d = self.designer()
+        self.assertIn("never closes", self.refused("mktask", "x", "--as", d, "--depends", "T0000"))
+        self.task("first", d)
+        self.assertIn("no dependencies", self.refused("amend", "T0000", "--as", "user",
+                                                      "--text", "x", "--depends", "T0001"))
+
+    def test_reserved_slugs_and_hand_written_depends(self):
+        d = self.designer()
+        for slug in ("designer", "integrator", "t1", "t2-x"):
+            self.assertIn("reserved", self.refused("mktask", slug, "--as", d))
+        self.task("first", d)
+        path = Path(self.ptt("mktask", "second", "--as", d).stdout.strip())
+        self.fill(path)
+        path.write_text(path.read_text().replace("depends: \n", "depends: t1\n"))
+        self.ptt("ready", "second", "--as", d)
+        self.assertIn("waits for T0001", self.ptt("tasks").stdout)
+        path = Path(self.ptt("mktask", "third", "--as", d).stdout.strip())
+        self.fill(path)
+        path.write_text(path.read_text().replace("depends: \n", "depends: first\n"))
+        self.assertIn("as task IDs: T0001", self.refused("ready", "third", "--as", d))
+
+    def test_earlier_formats_and_missing_root_refused(self):
+        old = self.rec / "tasks" / "open" / "0001-old"
+        old.mkdir()
+        self.assertIn("earlier Partitur format", self.refused("tasks"))
+        old.rmdir()
+        roles = self.rec / "roles" / "designer"
+        roles.mkdir(parents=True)
+        (roles / "0001-take.md").write_text("---\nby: designer-g1\n---\n")
+        self.assertIn("roles/designer/", self.refused("who"))
+        shutil.rmtree(roles)
+        shutil.rmtree(self.rec / "tasks" / "open" / "T0000-design")
+        self.assertIn("run Partitur's install", self.refused("take", "designer"))
+
     def test_sub_designer_scope(self):
         d = self.designer()
         n = self.task("adapter", d, kind="design")
@@ -278,12 +313,12 @@ class Ptt(unittest.TestCase):
                   f"python3 {self.rec / 'bin' / 'ptt'} record -m n$i notes.txt >/dev/null; done")
         loop = subprocess.Popen(["sh", "-c", script], cwd=self.rec)
         for k in range(12):
-            self.ptt("mktask", f"t{k}", "--as", d)
+            self.ptt("mktask", f"s{k}", "--as", d)
         loop.wait()
         git = lambda *a: run("git", "-C", str(self.rec), *a).stdout
         tracked = git("ls-tree", "-r", "--name-only", "HEAD")
         for k in range(12):
-            self.assertIn(f"tasks/open/T{k + 1:04d}-t{k}/charter.md", tracked)
+            self.assertIn(f"tasks/open/T{k + 1:04d}-s{k}/charter.md", tracked)
         self.assertEqual(git("status", "--porcelain"), "")
         self.assertEqual(git("log", "-1", "--format=%s", "--", "notes.txt").strip(), "n40")
         self.assertEqual(loop.returncode, 0)
@@ -351,12 +386,12 @@ class Ptt(unittest.TestCase):
 
     def test_loose_task_files_are_reported(self):
         d = self.designer()
-        stray = self.rec / "tasks" / "open" / "0009-stray"
+        stray = self.rec / "tasks" / "open" / "T0009-stray"
         stray.mkdir(parents=True)
         (stray / "charter.md").write_text("x\n")
         out = self.ptt("tasks").stdout
         self.assertIn("uncommitted in the records repository", out)
-        self.assertIn("  tasks/open/0009-stray/charter.md", out)
+        self.assertIn("  tasks/open/T0009-stray/charter.md", out)
 
     def test_cancel_refuses_uncommitted_task_content(self):
         d = self.designer()

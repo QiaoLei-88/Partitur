@@ -103,7 +103,7 @@ author: requester
 session: <your holder name from /ptt-take>
 date: <YYYY-MM-DD>
 title: <one line>
-task: <the task number this request serves, or none>
+task: <the task ID this request serves (T0007), or none>
 repo: <a name from pr/repos>
 branch: <branch>
 base: <full SHA of the main branch at submission>

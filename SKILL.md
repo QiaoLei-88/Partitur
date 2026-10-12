@@ -65,8 +65,12 @@ Then, with the user:
    table lacks, or a checkout lies deeper than the workspace root, propose
    the `--add-repo NAME:CHECKOUT:MAIN` line and run it when the user agrees.
 3. Fill in `<records>/tasks/open/T0000-design/charter.md`, the root
-   designer's charter, then record the records
+   designer's charter, with the user (this first fill-in is a direct edit;
+   later changes are the user's amendments), then record the records
    repository: `<records>/bin/ptt record -m "install Partitur" <records>`.
+4. **Superseded files.** If install reports a file "superseded", move its
+   content as the note says, with the user's approval, delete it, and
+   record the change.
 
 ## Reading map
 

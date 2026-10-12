@@ -90,7 +90,8 @@ design task `T0000`, chartered by the user; every sub-designer holds a
 design task chartered by its parent designer. Task numbers show the tree:
 `T0007` is a top-level task in the root scope, `T0007.1` a task in the
 scope of design task `T0007`. The *level* of a design scope is the number
-of parts of its task number (`T0000` is level 0, `T0007` level 1); its
+of parts of its task number (`T0007` level 1, `T0007.1` level 2), and the
+root `T0000` is level 0; its
 *generation* counts the sessions that have taken it (`designer-g2`,
 `design-T0007-2`) *(Proposed, G10)*.
 
@@ -118,10 +119,11 @@ only when a scope needs one.
 
 The smallest setup is two sessions: one that works and an integrator that
 reviews its requests, because no session reviews its own work (C5). In it,
-one session may take the designer role and then the tasks it made, under a
-holder name for each, as long as every change still reaches a main branch
-through a request; closing its own task is then checked by the user
-*(Proposed, N10)*. Separate sessions are added when the work grows apart.
+one session may take the root design task (the designer) and then the tasks
+it made, under a holder name for each, as long as every change still reaches
+a main branch through a request; closing its own task is then checked by the
+user *(Proposed, N10)*. Separate sessions are added when the work grows
+apart.
 
 ## Information flow
 

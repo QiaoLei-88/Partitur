@@ -42,10 +42,12 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
    the designer, the holder of `T0000`; the holder of a `design` task is the
    designer of its subtasks (`T0007.1`, `T0007.2`, ...); the designer's and
    integrator's supervisor is the user (G3, G10). `T0000` is never done,
-   closed, or cancelled; its charter changes only by the user's amendment.
+   closed, or cancelled, and has no dependencies, nor does any task depend
+   on it. The user fills in its charter at install; after that it changes
+   only by the user's amendment.
 5. **Leaving needs the supervisor.** A task holder asks to leave; its
-   supervisor approves after reading `status.md`. A designer or integrator
-   leaves on the user's command (G4).
+   supervisor approves after reading `status.md`. The root designer (holder
+   of `T0000`) and the integrator leave on the user's command (G4).
 6. **Nobody leaves while anything below them is unclear:** a leave request
    or done report waiting, or a holder with no record for seven days,
    anywhere in the subtree; the integrator also not with a recorded decision
@@ -56,7 +58,8 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
    is gone, frees the task; `status.md` shows where it stood. A holder
    therefore commits `status.md` in the records repository at least once a day
    while it works, also when the work itself is on a code branch. Only the
-   user frees the designer (`T0000`) or the integrator role, and the user acts (`--as user`)
+   user frees the designer (`T0000`, with `--force` while it has recent
+   records) or the integrator role, and the user acts (`--as user`)
    for any task whose supervisor is vacant, for example after a sub-designer
    left (G6, G7).
 8. **A charter is frozen once released**; changes are amendments, recorded

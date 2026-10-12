@@ -369,6 +369,34 @@ class InstallProject(unittest.TestCase):
         return run("python3", str(clone / "bin" / "install"), "--tool", "claude", "--scope",
                    "project", str(self.root), *extra, check=check, env=self.env)
 
+    def test_update_from_designer_role_layout(self):
+        """A project installed when the designer was a role (handoff/designer.md)
+        updates without error and is told where that file's content goes."""
+        clone = self.partitur_clone()
+        templates = clone / "templates"
+        (templates / "designer.md").write_text("# Designer of {{PROJECT}}\n")
+        charter, status = (templates / n for n in ("root-charter.md", "root-status.md"))
+        saved = charter.read_text(), status.read_text()
+        charter.unlink()
+        status.unlink()
+        self.commit_clone(clone, "designer as a role")
+        self.install_from(clone)
+        ws = self.root / "workspace"
+        self.assertTrue((ws / "handoff" / "designer.md").exists())
+        self.assertFalse((ws / "tasks" / "open" / "T0000-design").exists())
+        (templates / "designer.md").unlink()
+        charter.write_text(saved[0])
+        status.write_text(saved[1])
+        self.commit_clone(clone, "root design task")
+        for extra in ((), ("--update",)):
+            out = self.install_from(clone, *extra).stdout
+            self.assertRegex(out, r"superseded\s+workspace/handoff/designer.md")
+            self.assertIn("T0000-design/charter.md", out)
+        self.assertTrue((ws / "handoff" / "designer.md").exists())
+        self.assertTrue((ws / "tasks" / "open" / "T0000-design" / "charter.md").exists())
+        self.assertNotIn("superseded", self.install_from(clone).stdout)
+        self.install_from(clone, "--uninstall")
+
     def test_update_replaces_outdated_keeps_modified(self):
         clone = self.partitur_clone()
         out = self.install_from(clone).stdout
