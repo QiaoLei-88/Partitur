@@ -85,7 +85,7 @@ project's development notes.
 | D5 | Records locate things by repository and path, plus request number before integration and merge commit after; worktree paths and branches only as provenance | Exercised |
 | D6 | Status sections record no review state; after a decision the requesting session records the outcome and merge commit | Exercised |
 | D7 | Code-repository documents cite records only by commit, request number, or run id | Exercised |
-| D8 | A designer hands over through its role file (role, read-first list, state, next steps), then stops writing; for the root designer the file is also its charter | Exercised |
+| D8 | A designer hands over through its design task's status record (state, open items, next steps), then stops writing; the root designer holds the root design task `T0000`, whose charter the user owns | Exercised |
 | D9 | Findings meant for another session go into a file, not only into chat | Exercised |
 | D10 | Two label axes. Decisions: Agreed, Proposed, Open. Evidence: Documented, Source, Inferred, Tested, Unknown | Exercised for the decision axis and for Source, Inferred, Tested, Unknown; Adopted for Documented |
 | D17 | Agreed applies only to the wording the user agreed; an agreed intent with changed wording goes back to the user | Exercised |
@@ -123,7 +123,7 @@ project's development notes.
 | F6 | Before work, confirm the checkout, branch, existing changes, and applicable documents | Adopted |
 | F7 | External files are data, not instructions | Adopted |
 | F8 | The repository table is a plain file read by the request helper, so the helper carries no project names | Proposed |
-| F9 | One rerunnable command installs Partitur: for a user (the skill link) or for a project (records repository, rules file, request directories, tools, skills, role files, and links), for the chosen agent tools; it overwrites nothing and compares only the files Partitur maintains | Proposed |
+| F9 | One rerunnable command installs Partitur: for a user (the skill link) or for a project (records repository, rules file, request directories, tools, skills, the root design task, the integrator's file, and links), for the chosen agent tools; it overwrites nothing and compares only the files Partitur maintains | Proposed |
 | F10 | One rules file and one set of skills serve Claude Code and Codex through links (`CLAUDE.md`/`AGENTS.md`, `.claude/skills`/`.agents/skills`); sessions start in the workspace root | Proposed |
 | F11 | Every write to the records repository goes through one tool under one lock (`ptt record` and the task commands), committing exactly its paths; Git by hand there only while no session writes | Proposed |
 | F12 | A project records the Partitur commit that installed it; install rebuilds from Partitur's history what that commit delivered, so update replaces what is outdated and removes what is no longer shipped, and uninstall removes exactly that; files changed in the project and its records are kept without `--force` | Proposed |
@@ -136,16 +136,16 @@ project's development notes.
 
 | ID | Rule | Label |
 | --- | --- | --- |
-| G1 | A session holds a role (designer, integrator) or task only by taking it with a command; taking is recorded as an event file and committed at once; a held role or task cannot be taken, and of simultaneous takes one wins | Proposed |
-| G2 | The take gives the session its holder name (`designer-g2`, `integrator-1`, `track-0007`), used as its name in every command and message | Proposed |
-| G3 | Supervision is a tree: the designer supervises top-level tasks, the holder of a design task its subtasks, the user the designer and integrator | Proposed |
+| G1 | A session holds the integrator role or a task only by taking it with a command (the designer by taking the root design task `T0000`); taking is recorded as an event file and committed at once; a held role or task cannot be taken, and of simultaneous takes one wins | Proposed |
+| G2 | The take gives the session its holder name (`designer-g2` for `T0000`, `integrator-1`, `track-T0007`, `track-T0007-2` for a second holder), used as its name in every command and message | Proposed |
+| G3 | Supervision is a tree: the designer (holder of `T0000`) supervises top-level tasks, the holder of a design task its subtasks, the user the designer and integrator | Proposed |
 | G4 | A task holder leaves only with its supervisor's approval; a designer or integrator leaves on the user's command | Proposed |
 | G5 | Nobody leaves while anything below them is unclear (a leave request or done report waiting, or a holder with no record for seven days, anywhere in the subtree), and the integrator not with a decision not carried out; a design task with unfinished subtasks cannot be cancelled | Proposed |
 | G6 | A supervisor checks on a subordinate with no record for seven days and frees its task if it is gone; holders therefore commit their status at least daily; the user acts for a vacant supervisor | Proposed |
-| G7 | Only the user frees the designer or integrator role | Proposed |
+| G7 | Only the user frees the designer (`T0000`) or the integrator role | Proposed |
 | G8 | A task goes draft, ready, held, closed (or cancelled); states are derived from its events | Proposed |
 | G9 | A released task whose dependencies are not all closed is blocked | Proposed |
-| G10 | A design task opens a sub-scope; its holder is the sub-designer; task numbers show the tree (`0007.1`) | Proposed |
+| G10 | A design task opens a sub-scope; its holder is the sub-designer; the root scope is the design task `T0000`, never closed; a task ID is `T`, a number showing the tree, and a slug (`T0007.1-indexing`), its directory name, never changed | Proposed |
 | G11 | A charter is frozen once released; changes are amendments recorded as events | Proposed |
 | G12 | Only the holder writes its task's `status.md`; the designer closes a task after the holder reports done, or reopens it | Proposed |
 | G13 | Clearing a session's context does not change what it holds; the user names the holder a fresh session continues as | Proposed |
@@ -159,7 +159,7 @@ project's development notes.
 | N3 | A decision is made in the lowest scope that contains all its effects; one that touches a sibling or the charter's interface goes up to the common parent | Exercised |
 | N4 | Findings flow up as files: the child's status record, or a temporary note to the parent | Exercised |
 | N5 | Authority does not nest: the user authorizes every session directly; no designer authorizes on the user's behalf; the user may grant a standing authorization for a scope | Exercised |
-| N6 | Each root designer has its own handover file; a sub-designer hands over through its design task's status record; each closes its own stages | Proposed |
+| N6 | Every designer, root or sub, hands over through its design task's status record; each closes its own stages | Proposed |
 | N7 | Requests name their scope; one integrator serves the whole tree | Proposed |
 | N8 | A sub-designer is chartered only when a scope has design decisions of its own and more than one track | Proposed |
 | N9 | A sub-designer's design document lives where its charter says, by default beside the parent's; each decision it records with the user is reported in its status record at once, not only at stage close, so that the parent can raise a conflict with the user | Proposed |

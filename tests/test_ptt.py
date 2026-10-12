@@ -29,6 +29,9 @@ class Ptt(unittest.TestCase):
         shutil.copy(HERE / "project" / "bin" / "ptt", self.rec / "bin" / "ptt")
         (self.rec / "tasks").mkdir()
         shutil.copy(HERE / "templates" / "charter.md", self.rec / "tasks" / "charter-template.md")
+        root = self.rec / "tasks" / "open" / "T0000-design"
+        root.mkdir(parents=True)
+        shutil.copy(HERE / "templates" / "root-charter.md", root / "charter.md")
         run("git", "-C", str(self.rec), "init", "-q", "-b", "master")
         run("git", "-C", str(self.rec), "config", "user.email", "t@example.org")
         run("git", "-C", str(self.rec), "config", "user.name", "t")
@@ -72,26 +75,26 @@ class Ptt(unittest.TestCase):
         d = self.designer()
         self.assertIn("not a designer", self.refused("mktask", "x", "--as", "track-9"))
         path = Path(self.ptt("mktask", "wall-distance", "--as", d).stdout.strip())
-        self.assertEqual(path.parent.name, "0001-wall-distance")
+        self.assertEqual(path.parent.name, "T0001-wall-distance")
         self.assertIn("kind: track", path.read_text())
-        self.assertIn("Task 0001", path.read_text())
-        self.assertIn("draft", self.refused("take", "0001"))
-        self.assertIn("placeholders", self.refused("ready", "0001", "--as", d))
+        self.assertIn("Task T0001", path.read_text())
+        self.assertIn("draft", self.refused("take", "T0001"))
+        self.assertIn("placeholders", self.refused("ready", "T0001", "--as", d))
         self.fill(path)
         self.ptt("ready", "wall-distance", "--as", d)
-        self.assertIn("is 0001-wall-distance", self.refused("take", "0001-other"))
+        self.assertIn("is T0001-wall-distance", self.refused("take", "T0001-other"))
         holder = self.ptt("take", "wall-distance").stdout.strip()
-        self.assertEqual(holder, "track-0001")
-        self.assertIn("held by track-0001", self.refused("take", "0001"))
+        self.assertEqual(holder, "track-T0001")
+        self.assertIn("held by track-T0001", self.refused("take", "T0001"))
         self.assertTrue((path.parent / "status.md").exists())
         me = self.ptt("whoami", holder).stdout
         self.assertIn("supervisor designer-g1", me)
-        self.assertIn("no done report", self.refused("close", "0001", "--as", d))
-        self.ptt("done", "0001", "--as", holder, "--requests", "000003")
+        self.assertIn("no done report", self.refused("close", "T0001", "--as", d))
+        self.ptt("done", "T0001", "--as", holder, "--requests", "000003")
         self.assertIn("reports done", self.ptt("whoami", d).stdout)
-        self.assertIn("does not supervise", self.refused("close", "0001", "--as", "integrator-1"))
-        self.ptt("close", "0001", "--as", d)
-        self.assertTrue((self.rec / "tasks" / "done" / "0001-wall-distance").is_dir())
+        self.assertIn("does not supervise", self.refused("close", "T0001", "--as", "integrator-1"))
+        self.ptt("close", "T0001", "--as", d)
+        self.assertTrue((self.rec / "tasks" / "done" / "T0001-wall-distance").is_dir())
         listing = self.ptt("tasks", "--all").stdout
         self.assertIn("closed", listing)
         self.assertNotIn("done reported", listing)
@@ -101,7 +104,7 @@ class Ptt(unittest.TestCase):
                      ("cancel", "1", "--as", d, "--reason", "x")):
             self.refused(*args)
         log = run("git", "-C", str(self.rec), "log", "--format=%s").stdout
-        self.assertIn("task 0001: taken by track-0001", log)
+        self.assertIn("task T0001: taken by track-T0001", log)
         self.assertEqual(run("git", "-C", str(self.rec), "status", "--porcelain").stdout, "")
 
     def test_leave_needs_supervisor_and_clear_subordinates(self):
@@ -114,7 +117,7 @@ class Ptt(unittest.TestCase):
         self.assertIn("already asked", self.refused("leave", holder))
         self.assertIn("asks to leave", self.refused("leave", d))
         self.ptt("approve-leave", n, "--as", d)
-        self.assertEqual(self.ptt("take", n).stdout.strip(), "track-0001-2")
+        self.assertEqual(self.ptt("take", n).stdout.strip(), "track-T0001-2")
         self.ptt("leave", d)
 
     def test_supervisor_frees_a_gone_holder_and_user_frees_a_role(self):
@@ -126,20 +129,38 @@ class Ptt(unittest.TestCase):
         self.assertIn("may still be working", self.refused("free", n, "--as", d, "--reason", "x"))
         self.ptt("free", n, "--as", d, "--reason", "session gone", "--force")
         self.assertIn("ready", self.ptt("tasks").stdout)
-        self.assertIn("only the user", self.refused("free", "designer", "--as", d, "--reason", "x"))
-        self.ptt("free", "designer", "--as", "user", "--reason", "session crashed")
+        self.assertIn("its supervisor is user",
+                      self.refused("free", "designer", "--as", d, "--reason", "x"))
+        self.assertIn("may still be working",
+                      self.refused("free", "designer", "--as", "user", "--reason", "x"))
+        self.ptt("free", "designer", "--as", "user", "--reason", "session crashed", "--force")
         self.assertEqual(self.designer(), "designer-g2")
+        self.assertIn("level 0, generation 2", self.ptt("whoami", "designer-g2").stdout)
+        self.assertIn("only the user", self.refused("free", "integrator", "--as", d,
+                                                    "--reason", "x"))
+
+    def test_root_design_task_stays_open(self):
+        d = self.designer()
+        self.assertIn("level 0, generation 1", self.ptt("whoami", d).stdout)
+        self.assertIn("supervisor user", self.ptt("whoami", d).stdout)
+        for args in (("done", "T0000", "--as", d), ("close", "designer", "--as", "user"),
+                     ("cancel", "0", "--as", "user", "--reason", "x")):
+            self.assertIn("root design", self.refused(*args))
+        self.assertIn("designer    designer-g1", self.ptt("who").stdout)
+        self.ptt("amend", "T0000", "--as", "user", "--text", "design document moved")
+        self.assertIn("does not supervise", self.refused("amend", "T0000", "--as", d,
+                                                         "--text", "x"))
 
     def test_sub_designer_scope(self):
         d = self.designer()
         n = self.task("adapter", d, kind="design")
         sub = self.ptt("take", n).stdout.strip()
-        self.assertEqual(sub, "design-0001")
+        self.assertEqual(sub, "design-T0001")
         child = self.task("indexing", sub)
-        self.assertEqual(child, "0001.1")
+        self.assertEqual(child, "T0001.1")
         self.assertIn("does not supervise", self.refused("close", child, "--as", d))
         w = self.ptt("take", child).stdout.strip()
-        self.assertIn("supervisor design-0001", self.ptt("whoami", w).stdout)
+        self.assertIn("supervisor design-T0001", self.ptt("whoami", w).stdout)
         self.ptt("done", n, "--as", sub)
         self.assertIn("subtasks are not closed", self.refused("close", n, "--as", d))
         self.ptt("done", child, "--as", w)
@@ -151,14 +172,14 @@ class Ptt(unittest.TestCase):
         d = self.designer()
         first = self.task("first", d)
         second = self.task("second", d, depends="1")
-        self.assertIn("depends: 0001", (self.rec / "tasks" / "open" / "0002-second" /
+        self.assertIn("depends: T0001", (self.rec / "tasks" / "open" / "T0002-second" /
                                         "charter.md").read_text())
-        self.assertIn("waits for 0001", self.ptt("tasks").stdout)
+        self.assertIn("waits for T0001", self.ptt("tasks").stdout)
         self.assertIn("blocked", self.refused("take", second))
         h = self.ptt("take", first).stdout.strip()
         self.ptt("done", first, "--as", h)
         self.ptt("close", first, "--as", d)
-        self.assertEqual(self.ptt("take", second).stdout.strip(), "track-0002")
+        self.assertEqual(self.ptt("take", second).stdout.strip(), "track-T0002")
 
     def test_cancel_and_reopen(self):
         d = self.designer()
@@ -189,7 +210,7 @@ class Ptt(unittest.TestCase):
                  for _ in range(4)]
         codes = [p.communicate() and p.returncode for p in procs]
         self.assertEqual(codes.count(0), 1, codes)
-        takes = list((self.rec / "tasks" / "open").glob("*/[0-9][0-9][0-9][0-9]-take.md"))
+        takes = list((self.rec / "tasks" / "open").glob("T0001-*/[0-9][0-9][0-9][0-9]-take.md"))
         self.assertEqual(len(takes), 1)
 
     def test_concurrent_role_take_has_one_winner(self):
@@ -262,7 +283,7 @@ class Ptt(unittest.TestCase):
         git = lambda *a: run("git", "-C", str(self.rec), *a).stdout
         tracked = git("ls-tree", "-r", "--name-only", "HEAD")
         for k in range(12):
-            self.assertIn(f"tasks/open/{k + 1:04d}-t{k}/charter.md", tracked)
+            self.assertIn(f"tasks/open/T{k + 1:04d}-t{k}/charter.md", tracked)
         self.assertEqual(git("status", "--porcelain"), "")
         self.assertEqual(git("log", "-1", "--format=%s", "--", "notes.txt").strip(), "n40")
         self.assertEqual(loop.returncode, 0)
@@ -275,7 +296,7 @@ class Ptt(unittest.TestCase):
                 check=False, env=env)
         (self.rec / ".git" / "index.lock").unlink()
         self.assertNotEqual(r.returncode, 0)
-        self.assertFalse((self.rec / "tasks" / "open" / "0001-x").exists())
+        self.assertFalse((self.rec / "tasks" / "open" / "T0001-x").exists())
         self.assertEqual(run("git", "-C", str(self.rec), "status", "--porcelain").stdout, "")
 
     def test_close_with_uncommitted_status_changes_nothing(self):
@@ -283,7 +304,7 @@ class Ptt(unittest.TestCase):
         n = self.task("x", d)
         h = self.ptt("take", n).stdout.strip()
         self.ptt("done", n, "--as", h)
-        status = next((self.rec / "tasks" / "open").glob("0001-*/status.md"))
+        status = next((self.rec / "tasks" / "open").glob("T0001-*/status.md"))
         status.write_text(status.read_text() + "more\n")
         self.assertIn("uncommitted", self.refused("close", n, "--as", d))
         self.assertIn("done reported", self.ptt("tasks").stdout)
@@ -303,7 +324,7 @@ class Ptt(unittest.TestCase):
         sub = self.ptt("take", design).stdout.strip()
         self.assertIn("contains it", self.refused("mktask", "c", "--as", sub, "--depends", design))
         path = Path(self.ptt("mktask", "e", "--as", d, "--depends", "1, a ,0001").stdout.strip())
-        self.assertIn("depends: 0001\n", path.read_text())
+        self.assertIn("depends: T0001\n", path.read_text())
 
     def test_names_and_free_with_done(self):
         d = self.designer()
@@ -340,7 +361,7 @@ class Ptt(unittest.TestCase):
     def test_cancel_refuses_uncommitted_task_content(self):
         d = self.designer()
         n = self.task("x", d)
-        (next((self.rec / "tasks" / "open").glob("0001-*")) / "notes.tmp").write_text("x\n")
+        (next((self.rec / "tasks" / "open").glob("T0001-*")) / "notes.tmp").write_text("x\n")
         self.assertIn("uncommitted changes", self.refused("cancel", n, "--as", d, "--reason", "r"))
 
     def test_records_worktree(self):

@@ -88,8 +88,7 @@ waiting for a decision. A reply pins the new head and returns the request to
 
 When the request is merged, rejected, or withdrawn, update your status
 record with the outcome and, for a merge, the main-branch merge commit:
-your task's `status.md`, or `<records>/handoff/designer.md` if you are the
-designer. Never record a review state there; `pr list` gives it.
+your task's `status.md` (for the designer, of `T0000`). Never record a review state there; `pr list` gives it.
 
 ## Templates
 

@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """Roles and tasks of a Partitur project, kept as files in the records repository.
 
-Usage (NAME is the holder name a session received when it took its role;
-a task is given by number, `0007` or `7`, sub-task `0007.1`, or by name):
+Usage (NAME is the holder name a session received when it took its role or
+task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
+`T0007.1`, by its full name `T0007-slug`, or by its slug):
   ptt who                          who holds which role and task
   ptt whoami NAME                  what NAME holds, and what waits on it
   ptt tasks [--all]                tasks and their states
   ptt show TASK                    a task's charter, status, and events
-  ptt take designer|integrator|TASK   take a role or a ready task; prints the holder name
+  ptt take designer|integrator|TASK   take the root design task T0000 (designer),
+                                   the integrator role, or a ready task; prints the
+                                   holder name
   ptt leave NAME [--status TEXT]   give up a role, or ask to give up a task
   ptt approve-leave TASK --as NAME   supervisor: accept a holder's request to leave
   ptt free TASK|ROLE --as NAME --reason TEXT
@@ -29,10 +32,15 @@ a task is given by number, `0007` or `7`, sub-task `0007.1`, or by name):
                                    (request messages, status.md, role files), under
                                    the same lock as every other change
 
-Records: <records>/tasks/{open,done,cancelled}/NNNN[.N...]-slug/ holds charter.md
-(the designer's, from tasks/charter-template.md; frozen once released),
-status.md (the holder's), and numbered event files MMMM-<kind>.md, each
-written once. <records>/roles/{designer,integrator}/ hold the role events. All
+Records: <records>/tasks/{open,done,cancelled}/TNNNN[.N...]-slug/ holds
+charter.md (the designer's, from tasks/charter-template.md; frozen once
+released), status.md (the holder's), and numbered event files
+MMMM-<kind>.md, each written once. The task ID (T0007.2) and its directory
+name never change. tasks/open/T0000-design/ is the root design task: it is
+ready from the start, never done, closed, or cancelled, and its holders are
+designer-g1, designer-g2, ...; other holders are named after the task
+(design-T0007, track-T0007.1, and track-T0007.1-2 for the second take).
+<records>/roles/integrator/ holds the integrator role's events. All
 state is derived from the events. Every change runs under one lock (a
 kernel file lock in the Git directory, released if the process dies), reads
 the state, checks it, writes, and commits exactly its paths as one commit,
@@ -43,8 +51,9 @@ status.md, and role files), so writes run one after another. Git commands
 run by hand in the records repository while sessions work (stash,
 checkout, a manual commit) are outside this guarantee.
 
-Supervision: the designer supervises top-level tasks; the holder of design
-task N supervises N.1, N.2, ...; the user supervises the designer, the
+Supervision: the holder of T0000 (the designer) supervises top-level tasks
+T0001, T0002, ...; the holder of design task TN supervises TN.1, TN.2, ...;
+the user supervises the designer, the
 integrator, and any task whose supervisor is vacant (--as user). A holder
 leaves a task only with its supervisor's approval. Nobody leaves, and no
 design task is cancelled, while anything below it is unclear: a leave
@@ -67,7 +76,8 @@ REC = Path(__file__).resolve().parent.parent
 TASKS = REC / "tasks"
 ROLES = REC / "roles"
 PLACES = ("open", "done", "cancelled")
-TASK_DIR = re.compile(r"^(\d{4}(?:\.\d+)*)-([a-z0-9][a-z0-9-]*)$")
+TASK_DIR = re.compile(r"^T(\d{4}(?:\.\d+)*)-([a-z0-9][a-z0-9-]*)$")
+ROOT = "0000"                      # the root design task, T0000-design
 EVENT = re.compile(r"^(\d{4})-([a-z-]+)\.md$")
 KINDS = ("track", "worker", "design")
 STALE_DAYS = float(os.environ.get("PTT_STALE_DAYS", "7"))
@@ -201,7 +211,12 @@ def role_state(role):
 
 
 def role_name(role, gen):
-    return f"designer-g{gen}" if role == "designer" else f"integrator-{gen}"
+    return f"integrator-{gen}"
+
+
+def tid(number):
+    """A task's ID as people read it: T0007.2."""
+    return "T" + number
 
 
 # --- tasks ------------------------------------------------------------------
@@ -227,14 +242,17 @@ def normalize(number):
 
 
 def find_task(ref):
-    """A task by number (0007, 7, 0007.1), directory name, or slug."""
+    """A task by ID (T0007.2, 0007.2, 7.2), full name (T0007.2-slug), or slug;
+    `designer` names the root design task T0000."""
     tasks = all_tasks()
-    m = re.fullmatch(r"(\d+(?:\.\d+)*)(?:-([a-z0-9-]+))?", ref)
+    if ref == "designer":
+        ref = ROOT
+    m = re.fullmatch(r"[Tt]?(\d+(?:\.\d+)*)(?:-([a-z0-9-]+))?", ref)
     if m:
         number, slug = normalize(m.group(1)), m.group(2)
         hits = [t for t in tasks if t[1] == number]
-        if hits and slug and hits[0][2].name != f"{number}-{slug}":
-            die(f"task {number} is {hits[0][2].name}, not {ref}")
+        if hits and slug and hits[0][2].name != f"T{number}-{slug}":
+            die(f"task {tid(number)} is {hits[0][2].name}, not {ref}")
     else:
         hits = [t for t in tasks if t[2].name.split("-", 1)[1] == ref]
         if len(hits) > 1:
@@ -242,11 +260,16 @@ def find_task(ref):
             if len(unfinished) == 1:
                 hits = unfinished
             else:
-                die(f"several tasks are named {ref}: " + ", ".join(t[1] for t in hits)
-                    + "; use the number")
+                die(f"several tasks are named {ref}: " + ", ".join(tid(t[1]) for t in hits)
+                    + "; use the ID")
     if not hits:
         die(f"task {ref} not found")
     return hits[0]
+
+
+def parse_ids(text):
+    """Task numbers from a list of IDs as written in a charter: T0007, T0007.1."""
+    return [x.strip().lstrip("T") for x in text.split(",") if x.strip()]
 
 
 def raw_info(place, d):
@@ -254,15 +277,16 @@ def raw_info(place, d):
     number = TASK_DIR.match(d.name).group(1)
     info = dict(number=number, slug=d.name.split("-", 1)[1], dir=d, place=place,
                 kind=charter.get("kind", "track"),
-                depends=[x.strip() for x in charter.get("depends", "").split(",") if x.strip()],
-                state="draft", holder=None, last_holder=None, takes=0,
+                depends=parse_ids(charter.get("depends", "")),
+                state="ready" if number == ROOT else "draft", holder=None, last_holder=None,
+                takes=0,
                 leave_request=None, done=None)
     for e in events(d):
         k = e["kind"]
         if k == "release":
             info["state"] = "ready"
         elif k == "amend" and "depends" in e:
-            info["depends"] = [x.strip() for x in e["depends"].split(",") if x.strip()]
+            info["depends"] = parse_ids(e["depends"])
         elif k == "take":
             info.update(state="held", holder=e["by"], leave_request=None, done=None)
             info["takes"] += 1
@@ -311,16 +335,16 @@ def check_depends(number, refs):
             deps.append(n)
     tasks = {i["number"]: i for i in infos()}
     for n in deps:
-        need(n != number, f"task {number} cannot depend on itself")
-        need(not number.startswith(n + "."), f"task {number} cannot depend on {n}, which contains it")
-        need(not n.startswith(number + "."), f"task {number} cannot depend on its own subtask {n}")
-        need(tasks[n]["state"] != "cancelled", f"dependency {n} is cancelled")
+        need(n != number, f"task {tid(number)} cannot depend on itself")
+        need(not number.startswith(n + "."), f"task {tid(number)} cannot depend on {tid(n)}, which contains it")
+        need(not n.startswith(number + "."), f"task {tid(number)} cannot depend on its own subtask {tid(n)}")
+        need(tasks[n]["state"] != "cancelled", f"dependency {tid(n)} is cancelled")
     graph = {k: list(v["depends"]) for k, v in tasks.items()}
     graph[number] = deps
     seen, stack = set(), list(deps)
     while stack:
         n = stack.pop()
-        need(n != number, f"dependencies of task {number} would form a cycle through {n}")
+        need(n != number, f"dependencies of task {tid(number)} would form a cycle through {tid(n)}")
         if n not in seen:
             seen.add(n)
             stack.extend(graph.get(n, []))
@@ -328,21 +352,28 @@ def check_depends(number, refs):
 
 
 def holder_name(info):
-    base = f"{info['kind']}-{info['number']}"
+    if info["number"] == ROOT:
+        return f"designer-g{info['takes'] + 1}"
+    base = f"{info['kind']}-{tid(info['number'])}"
     return base if info["takes"] == 0 else f"{base}-{info['takes'] + 1}"
 
 
+def level(number):
+    return 0 if number == ROOT else len(number.split("."))
+
+
 def supervisor(number):
-    """The holder name supervising task `number`, or None when vacant."""
-    if "." not in number:
-        return role_state("designer")[0]
-    return get(number.rsplit(".", 1)[0])["holder"]
+    """The holder name supervising task `number`: "user" for the root design
+    task, the holder of the parent design task otherwise, or None if vacant."""
+    if number == ROOT:
+        return "user"
+    parent = ROOT if "." not in number else number.rsplit(".", 1)[0]
+    return get(parent)["holder"]
 
 
 def held_by(name):
-    for role in ("designer", "integrator"):
-        if role_state(role)[0] == name:
-            return ("role", role)
+    if role_state("integrator")[0] == name:
+        return ("role", "integrator")
     for i in infos():
         if i["holder"] == name:
             return ("task", i)
@@ -350,15 +381,15 @@ def held_by(name):
 
 
 def subtree(name):
-    """Tasks below `name`: all tasks for the designer, all descendants of its
-    design task for a sub-designer."""
+    """Tasks below `name`, the holder of a design task: every task for the
+    root designer, the descendants of its design task for a sub-designer."""
     held = held_by(name)
-    if held == ("role", "designer"):
-        return infos()
-    if held and held[0] == "task" and held[1]["kind"] == "design":
-        p = held[1]["number"] + "."
-        return [i for i in infos() if i["number"].startswith(p)]
-    return []
+    if not (held and held[0] == "task" and held[1]["kind"] == "design"):
+        return []
+    n = held[1]["number"]
+    if n == ROOT:
+        return [i for i in infos() if i["number"] != ROOT]
+    return [i for i in infos() if i["number"].startswith(n + ".")]
 
 
 def last_record(i):
@@ -374,12 +405,12 @@ def unclear(tasks):
         if i["holder"] is None:
             continue
         if i["leave_request"]:
-            out.append(f"task {i['number']}: {i['holder']} asks to leave")
+            out.append(f"task {tid(i['number'])}: {i['holder']} asks to leave")
         if i["done"]:
-            out.append(f"task {i['number']}: {i['holder']} reports done")
+            out.append(f"task {tid(i['number'])}: {i['holder']} reports done")
         last = last_record(i)
         if last and now - last > STALE_DAYS * 86400:
-            out.append(f"task {i['number']}: no record from {i['holder']} for "
+            out.append(f"task {tid(i['number'])}: no record from {i['holder']} for "
                        f"{int((now - last) / 86400)} days")
     return out
 
@@ -388,7 +419,7 @@ def must_supervise(name, number):
     sup = supervisor(number)
     if name == "user" or sup == name:
         return
-    die(f"{name} does not supervise task {number} (its supervisor is "
+    die(f"{name} does not supervise task {tid(number)} (its supervisor is "
         f"{sup or 'vacant; the user acts with --as user'})")
 
 
@@ -406,7 +437,7 @@ def need(cond, msg):
 # --- commands -----------------------------------------------------------------
 
 def cmd_take(a):
-    if a.what in ("designer", "integrator"):
+    if a.what == "integrator":
         holder, gen = role_state(a.what)
         need(not holder, f"{a.what} is held by {holder}; it must leave first "
              "(or the user frees it)")
@@ -417,17 +448,17 @@ def cmd_take(a):
         return
     i = get(a.what)
     detail = (f" (held by {i['holder']})" if i["holder"] else "") + \
-             (f" (waits for {', '.join(i['blocked_by'])})" if i.get("blocked_by") else "")
-    need(i["state"] == "ready", f"task {i['number']} is {i['state']}{detail}; cannot take it")
+             (f" (waits for {', '.join(map(tid, i['blocked_by']))})" if i.get("blocked_by") else "")
+    need(i["state"] == "ready", f"task {tid(i['number'])} is {i['state']}{detail}; cannot take it")
     name = holder_name(i)
     status = i["dir"] / "status.md"
     extra = []
     if not status.exists():
-        status.write_text(f"# Status of task {i['number']}\n\nWritten by the holder: what is "
+        status.write_text(f"# Status of task {tid(i['number'])}\n\nWritten by the holder: what is "
                           "done (request numbers and merge commits), what is open, where it "
                           "stands. No review states.\n")
         extra = [status]
-    add_event(i["dir"], "take", dict(by=name), "", f"task {i['number']}: taken by {name}",
+    add_event(i["dir"], "take", dict(by=name), "", f"task {tid(i['number'])}: taken by {name}",
               also=extra)
     print(name)
 
@@ -436,6 +467,13 @@ def cmd_leave(a):
     held = held_by(a.name)
     need(held, f"{a.name} holds nothing")
     must_be_clear(a.name)
+    if held[0] == "task" and held[1]["number"] == ROOT:
+        i = held[1]
+        add_event(i["dir"], "leave", dict(by=a.name), a.status or "",
+                  f"task {tid(ROOT)}: {a.name} leaves the root design")
+        print(f"{a.name} left the root design; the next `ptt take designer` is "
+              f"designer-g{i['takes'] + 1}")
+        return
     if held[0] == "role":
         role = held[1]
         if role == "integrator":
@@ -453,29 +491,29 @@ def cmd_leave(a):
         print(f"{a.name} left the {role} role")
         return
     i = held[1]
-    need(not i["leave_request"], f"{a.name} already asked to leave task {i['number']}")
-    need(not i["done"], f"task {i['number']} is reported done; its supervisor closes or reopens it")
+    need(not i["leave_request"], f"{a.name} already asked to leave task {tid(i['number'])}")
+    need(not i["done"], f"task {tid(i['number'])} is reported done; its supervisor closes or reopens it")
     add_event(i["dir"], "leave-request", dict(by=a.name), a.status or "",
-              f"task {i['number']}: {a.name} asks to leave")
+              f"task {tid(i['number'])}: {a.name} asks to leave")
     sup = supervisor(i["number"])
-    print(f"asked to leave task {i['number']}; "
+    print(f"asked to leave task {tid(i['number'])}; "
           + (f"{sup} must approve" if sup else "the supervisor is vacant; the user approves")
-          + f" (ptt approve-leave {i['number']})")
+          + f" (ptt approve-leave {tid(i['number'])})")
 
 
 def cmd_approve_leave(a):
     i = get(a.task)
     must_supervise(a.as_, i["number"])
-    need(i["holder"] and i["leave_request"], f"nobody asked to leave task {i['number']}")
+    need(i["holder"] and i["leave_request"], f"nobody asked to leave task {tid(i['number'])}")
     if i["kind"] == "design":
         must_be_clear(i["holder"])
     add_event(i["dir"], "leave", dict(by=i["holder"], approved_by=a.as_), "",
-              f"task {i['number']}: {i['holder']} leaves, approved by {a.as_}")
-    print(f"task {i['number']} is ready again")
+              f"task {tid(i['number'])}: {i['holder']} leaves, approved by {a.as_}")
+    print(f"task {tid(i['number'])} is ready again")
 
 
 def cmd_free(a):
-    if a.what in ("designer", "integrator"):
+    if a.what == "integrator":
         need(a.as_ == "user", "only the user frees a role (--as user)")
         holder, _ = role_state(a.what)
         need(holder, f"{a.what} is not held")
@@ -485,8 +523,8 @@ def cmd_free(a):
         return
     i = get(a.what)
     must_supervise(a.as_, i["number"])
-    need(i["state"] == "held", f"task {i['number']} is not held")
-    need(not i["done"], f"task {i['number']} is reported done; close or reopen it first")
+    need(i["state"] == "held", f"task {tid(i['number'])} is not held")
+    need(not i["done"], f"task {tid(i['number'])} is reported done; close or reopen it first")
     last = last_record(i)
     silent = last is not None and time.time() - last > STALE_DAYS * 86400
     need(silent or a.force, f"{i['holder']} has a record from the last {STALE_DAYS:g} days; "
@@ -494,76 +532,74 @@ def cmd_free(a):
          "it is gone")
     add_event(i["dir"], "leave", dict(by=i["holder"], freed_by=a.as_, forced=bool(a.force)),
               a.reason,
-              f"task {i['number']}: {i['holder']} freed by {a.as_}")
-    print(f"task {i['number']} is ready again; its status.md shows where it stood")
+              f"task {tid(i['number'])}: {i['holder']} freed by {a.as_}")
+    print(f"task {tid(i['number'])} is ready again; its status.md shows where it stood")
 
 
 def cmd_mktask(a):
     held = held_by(a.as_)
-    if held == ("role", "designer"):
-        prefix = ""
-    elif held and held[0] == "task" and held[1]["kind"] == "design":
-        prefix = held[1]["number"] + "."
-    else:
+    if not (held and held[0] == "task" and held[1]["kind"] == "design"):
         die(f"{a.as_} is not a designer; only a designer makes tasks")
+    prefix = "" if held[1]["number"] == ROOT else held[1]["number"] + "."
     need(re.fullmatch(r"[a-z][a-z0-9-]*", a.slug),
          "slug: starts with a letter; lower-case letters, digits, hyphens")
     need(a.kind in KINDS, f"kind must be one of {', '.join(KINDS)}")
     need(not [t for t in all_tasks() if t[0] == "open" and t[2].name.split("-", 1)[1] == a.slug],
          f"an unfinished task is already named {a.slug}")
     siblings = [n for _, n, _ in all_tasks()
-                if n.startswith(prefix) and "." not in n[len(prefix):]]
+                if n.startswith(prefix) and "." not in n[len(prefix):] and n != ROOT]
     last = max((int(n[len(prefix):]) for n in siblings), default=0)
     number = f"{prefix}{last + 1}" if prefix else f"{last + 1:04d}"
     depends = check_depends(number, [x.strip() for x in (a.depends or "").split(",") if x.strip()])
-    d = TASKS / "open" / f"{number}-{a.slug}"
+    d = TASKS / "open" / f"{tid(number)}-{a.slug}"
     d.mkdir(parents=True)        # fails if it exists: the lock makes this a bug
     template = TASKS / "charter-template.md"
     body = template.read_text() if template.exists() else "# Task {{NUMBER}}: {{TITLE}}\n"
-    text = (f"---\ntask: {number}\nkind: {a.kind}\ndepends: {', '.join(depends)}\n"
+    text = (f"---\ntask: {tid(number)}\nkind: {a.kind}\ndepends: {', '.join(map(tid, depends))}\n"
             f"designer: {a.as_}\ndate: {date.today().isoformat()}\n---\n\n"
             + body.replace("{{TITLE}}", a.slug.replace("-", " ").capitalize())
-                  .replace("{{NUMBER}}", number))
+                  .replace("{{NUMBER}}", tid(number)))
     (d / "charter.md").write_text(text)
-    record(f"task {number}: draft by {a.as_}", add=[d / "charter.md"], created=[d])
+    record(f"task {tid(number)}: draft by {a.as_}", add=[d / "charter.md"], created=[d])
     print(d / "charter.md")
 
 
 def cmd_ready(a):
     i = get(a.task)
     must_supervise(a.as_, i["number"])
-    need(i["state"] == "draft", f"task {i['number']} is {i['state']}, not a draft")
+    need(i["state"] == "draft", f"task {tid(i['number'])} is {i['state']}, not a draft")
     charter = (i["dir"] / "charter.md").read_text()
-    need("{{" not in charter, f"the charter of task {i['number']} still has {{{{...}}}} "
+    need("{{" not in charter, f"the charter of task {tid(i['number'])} still has {{{{...}}}} "
          "placeholders; fill them in first")
     need(i["kind"] in KINDS, f"kind '{i['kind']}' must be one of {', '.join(KINDS)}")
     check_depends(i["number"], i["depends"])
-    record(f"task {i['number']}: charter as released", add=[i["dir"] / "charter.md"])
-    add_event(i["dir"], "release", dict(by=a.as_), "", f"task {i['number']}: released by {a.as_}")
-    print(f"task {i['number']} is ready to take")
+    record(f"task {tid(i['number'])}: charter as released", add=[i["dir"] / "charter.md"])
+    add_event(i["dir"], "release", dict(by=a.as_), "", f"task {tid(i['number'])}: released by {a.as_}")
+    print(f"task {tid(i['number'])} is ready to take")
 
 
 def cmd_amend(a):
     i = get(a.task)
     must_supervise(a.as_, i["number"])
     need(i["state"] not in ("draft", "closed", "cancelled"),
-         f"task {i['number']} is {i['state']}: a draft is edited directly, a finished task "
+         f"task {tid(i['number'])} is {i['state']}: a draft is edited directly, a finished task "
          "is not amended")
     fields = dict(by=a.as_)
     if a.depends is not None:
-        fields["depends"] = ", ".join(check_depends(
-            i["number"], [x.strip() for x in a.depends.split(",") if x.strip()]))
-    add_event(i["dir"], "amend", fields, a.text, f"task {i['number']}: amended by {a.as_}")
+        fields["depends"] = ", ".join(map(tid, check_depends(
+            i["number"], [x.strip() for x in a.depends.split(",") if x.strip()])))
+    add_event(i["dir"], "amend", fields, a.text, f"task {tid(i['number'])}: amended by {a.as_}")
     print("amended; tell the holder, if any")
 
 
 def cmd_done(a):
     i = get(a.task)
-    need(i["state"] == "held" and i["holder"] == a.as_, f"{a.as_} does not hold task {i['number']}")
-    need(not i["done"], f"task {i['number']} is already reported done")
-    need(not i["leave_request"], f"{a.as_} asked to leave task {i['number']}; settle that first")
+    not_root(i)
+    need(i["state"] == "held" and i["holder"] == a.as_, f"{a.as_} does not hold task {tid(i['number'])}")
+    need(not i["done"], f"task {tid(i['number'])} is already reported done")
+    need(not i["leave_request"], f"{a.as_} asked to leave task {tid(i['number'])}; settle that first")
     add_event(i["dir"], "done", dict(by=a.as_, requests=a.requests or ""), a.text or "",
-              f"task {i['number']}: {a.as_} reports done")
+              f"task {tid(i['number'])}: {a.as_} reports done")
     print(f"reported; {supervisor(i['number']) or 'the user (supervisor vacant)'} "
           "closes or reopens")
 
@@ -592,41 +628,49 @@ def finish(i, kind, place, fields, body, message):
     record(message, add=[target], remove=[i["dir"]], undo=undo)
 
 
+def not_root(i):
+    need(i["number"] != ROOT, f"task {tid(ROOT)} is the root design; it is never done, "
+         "closed, or cancelled (its holder leaves instead)")
+
+
 def cmd_close(a):
     i = get(a.task)
+    not_root(i)
     must_supervise(a.as_, i["number"])
-    need(i["state"] == "held" and i["done"], f"task {i['number']} has no done report to accept")
+    need(i["state"] == "held" and i["done"], f"task {tid(i['number'])} has no done report to accept")
     open_below = [x["number"] for x in infos() if x["number"].startswith(i["number"] + ".")
                   and x["state"] not in ("closed", "cancelled")]
-    need(not open_below, "its subtasks are not closed: " + ", ".join(open_below))
-    finish(i, "close", "done", dict(by=a.as_), "", f"task {i['number']}: closed by {a.as_}")
-    print(f"task {i['number']} closed; {i['holder']} holds nothing now")
+    need(not open_below, "its subtasks are not closed: " + ", ".join(map(tid, open_below)))
+    finish(i, "close", "done", dict(by=a.as_), "", f"task {tid(i['number'])}: closed by {a.as_}")
+    print(f"task {tid(i['number'])} closed; {i['holder']} holds nothing now")
 
 
 def cmd_reopen(a):
     i = get(a.task)
+    not_root(i)
     must_supervise(a.as_, i["number"])
-    need(i["state"] == "held" and i["done"], f"task {i['number']} has no done report to reopen")
+    need(i["state"] == "held" and i["done"], f"task {tid(i['number'])} has no done report to reopen")
     add_event(i["dir"], "reopen", dict(by=a.as_), a.reason,
-              f"task {i['number']}: reopened by {a.as_}")
-    print(f"task {i['number']} reopened; {i['holder']} continues")
+              f"task {tid(i['number'])}: reopened by {a.as_}")
+    print(f"task {tid(i['number'])} reopened; {i['holder']} continues")
 
 
 def cmd_cancel(a):
     i = get(a.task)
+    not_root(i)
     must_supervise(a.as_, i["number"])
     need(i["state"] in ("draft", "ready", "blocked"),
-         f"task {i['number']} is {i['state']}" + (f" by {i['holder']}; free it first"
+         f"task {tid(i['number'])} is {i['state']}" + (f" by {i['holder']}; free it first"
                                                 if i["holder"] else ""))
     below = [x["number"] for x in infos() if x["number"].startswith(i["number"] + ".")
              and x["state"] not in ("closed", "cancelled")]
-    need(not below, "its subtasks are not finished: " + ", ".join(below))
+    need(not below, "its subtasks are not finished: " + ", ".join(map(tid, below)))
     dependents = [x["number"] for x in infos() if i["number"] in x["depends"]
                   and x["state"] not in ("closed", "cancelled")]
-    need(not dependents, f"tasks {', '.join(dependents)} depend on it; amend or cancel them first")
+    need(not dependents, f"tasks {', '.join(map(tid, dependents))} depend on it; amend or cancel them first")
     finish(i, "cancel", "cancelled", dict(by=a.as_), a.reason,
-           f"task {i['number']}: cancelled by {a.as_}")
-    print(f"task {i['number']} cancelled")
+           f"task {tid(i['number'])}: cancelled by {a.as_}")
+    print(f"task {tid(i['number'])} cancelled")
 
 
 def cmd_pr_move(a):
@@ -674,9 +718,9 @@ def cmd_record(a):
 def cmd_tasks(a):
     def waiting(i):
         if i["holder"] is None:
-            return "waits for " + ", ".join(i["blocked_by"]) if i.get("blocked_by") else ""
+            return "waits for " + ", ".join(map(tid, i["blocked_by"])) if i.get("blocked_by") else ""
         return "leave asked" if i["leave_request"] else "done reported" if i["done"] else ""
-    rows = [(i["number"], i["kind"], i["state"],
+    rows = [(tid(i["number"]), i["kind"], i["state"],
              i["holder"] or (f"({i['last_holder']})" if i["last_holder"] else "-"),
              waiting(i), i["slug"]) for i in infos()
             if a.all or i["state"] not in ("closed", "cancelled")]
@@ -710,11 +754,11 @@ def cmd_show(a):
 
 
 def cmd_who(a):
-    for role in ("designer", "integrator"):
-        print(f"{role:11} {role_state(role)[0] or '(free)'}")
+    print(f"{'integrator':11} {role_state('integrator')[0] or '(free)'}")
+    print(f"{'designer':11} {get(ROOT)['holder'] or '(free)'}")
     for i in infos():
-        if i["holder"]:
-            print(f"task {i['number']:9} {i['holder']}  ({i['kind']}, {i['slug']})")
+        if i["holder"] and i["number"] != ROOT:
+            print(f"task {tid(i['number']):10} {i['holder']}  ({i['kind']}, {i['slug']})")
 
 
 def cmd_whoami(a):
@@ -727,7 +771,8 @@ def cmd_whoami(a):
     else:
         i = held[1]
         sup = supervisor(i["number"])
-        print(f"{a.name}: {i['kind']} of task {i['number']} ({i['slug']}); supervisor "
+        print(f"{a.name}: {i['kind']} task {tid(i['number'])}-{i['slug']}, level "
+              f"{level(i['number'])}, generation {i['takes']}; supervisor "
               + (sup or "vacant (the user acts until it is taken)"))
         print(f"charter: {(i['dir'] / 'charter.md').relative_to(REC.parent)}")
         if i["leave_request"]:

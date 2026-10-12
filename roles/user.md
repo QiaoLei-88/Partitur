@@ -15,8 +15,9 @@ many sessions without holding their details.
   (B2, D10).
 - Whether to open or resume a session *(Adopted, B10)*, and which role or
   task it takes (`/ptt-take`) *(Proposed, G1)*.
-- When a designer or integrator leaves, and freeing a role whose holder is
-  gone (`/ptt-leave free designer`) *(Proposed, G4, G7)*.
+- The root designer's charter, `T0000` (amendments with `--as user`), when
+  a designer or integrator leaves, and freeing one whose holder is gone
+  (`/ptt-leave free designer`) *(Proposed, G4, G7)*.
 
 ## Does
 

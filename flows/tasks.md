@@ -28,18 +28,21 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
 
 ## Rules
 
-1. **Take, never assume.** A session holds a role (designer, integrator) or
-   a task only by taking it; the tool prints its holder name (`designer-g2`,
-   `integrator-1`, `track-0007`), which is its `--as` name and its
-   `session:` in every message (G1, G2).
+1. **Take, never assume.** A session holds the integrator role or a task
+   only by taking it; the designer is the holder of the root design task
+   `T0000` (`/ptt-take designer`). The tool prints the holder name
+   (`designer-g2`, `integrator-1`, `track-T0007`, `design-T0007.1`, and
+   `track-T0007-2` for a task's second holder), which is its `--as` name and
+   its `session:` in every message (G1, G2).
 2. **Conflicts are refused.** A held role or task cannot be taken; a second
    simultaneous take loses. Nothing is overridden silently (G1).
 3. **Taking is not approval to work.** The user's command records the role;
    writes still need the user's AtE (A2).
-4. **Supervision is a tree.** A top-level task's supervisor is the designer;
-   the holder of a `design` task is the designer of its subtasks
-   (`0007.1`, `0007.2`, ...); the designer's and integrator's supervisor is
-   the user (G3, G10).
+4. **Supervision is a tree.** A top-level task's (`T0007`) supervisor is
+   the designer, the holder of `T0000`; the holder of a `design` task is the
+   designer of its subtasks (`T0007.1`, `T0007.2`, ...); the designer's and
+   integrator's supervisor is the user (G3, G10). `T0000` is never done,
+   closed, or cancelled; its charter changes only by the user's amendment.
 5. **Leaving needs the supervisor.** A task holder asks to leave; its
    supervisor approves after reading `status.md`. A designer or integrator
    leaves on the user's command (G4).
@@ -53,7 +56,7 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
    is gone, frees the task; `status.md` shows where it stood. A holder
    therefore commits `status.md` in the records repository at least once a day
    while it works, also when the work itself is on a code branch. Only the
-   user frees the designer or integrator role, and the user acts (`--as user`)
+   user frees the designer (`T0000`) or the integrator role, and the user acts (`--as user`)
    for any task whose supervisor is vacant, for example after a sub-designer
    left (G6, G7).
 8. **A charter is frozen once released**; changes are amendments, recorded
@@ -69,16 +72,22 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
 <records>/tasks/
   charter-template.md
   open/ done/ cancelled/
-    0007-wall-distance/
+    T0000-design/       the root design task: charter by the user, status.md
+                        the designer's handover
+    T0007-wall-distance/
       charter.md          the designer's, frozen at release
       status.md           the holder's: done, open, where it stands
       0001-release.md     events, each written once:
       0002-take.md          release, take, leave-request, leave, done,
       0003-leave-request.md reopen, amend, close, cancel
       ...
-<records>/roles/designer/   0001-take.md (designer-g1), 0002-leave.md, ...
-<records>/roles/integrator/
+<records>/roles/integrator/ 0001-take.md (integrator-1), 0002-leave.md, ...
 ```
+
+A task's ID is `T`, its number, and its slug: `T0007-wall-distance`, the
+directory name. It never changes once the task exists; commands accept the
+short forms `T0007`, `0007`, `7`, or the slug alone while it is unique among
+unfinished tasks (G10).
 
 A task's state is derived from its events, as a request's is from its
 messages; there is no state file to go stale (C2).
@@ -87,7 +96,7 @@ messages; there is no state file to go stale (C2).
 
 | Command | Who | Runs |
 | --- | --- | --- |
-| `/ptt-take [designer\|integrator\|task]` | any session | `ptt take`; a task by number (`7`, `0007`, `0007.1`) or name; without argument `ptt tasks` |
+| `/ptt-take [designer\|integrator\|task]` | any session | `ptt take`; a task by ID (`T0007`, `0007`, `7`, `T0007.1`), full name (`T0007-wall-distance`), or slug; without argument `ptt tasks` |
 | `/ptt-whoami [name\|all]` | any session | `ptt whoami`; with a name, continue as that holder; `all`: `ptt who`, `ptt tasks` |
 | `/ptt-mktask`, `release N`, `amend N` | designer | `ptt mktask`, `ptt ready`, `ptt amend` |
 | `/ptt-done` | holder | `ptt done` |
@@ -112,7 +121,7 @@ In Codex the commands start with `$` instead of `/`.
 - **One machine.** The lock that keeps concurrent commands consistent works
   for sessions on the same machine sharing the records repository.
 - **One gate for the records repository.** Every write to it goes through
-  `ptt` (`ptt record` for request messages, `status.md`, and role files),
+  `ptt` (`ptt record` for request messages, `status.md`, and `handoff/integrator.md`),
   which commits exactly its paths under the lock all sessions share. Git
   commands run by hand in the records repository while sessions work
   (stash, checkout, a manual commit) are outside this guarantee and can mix

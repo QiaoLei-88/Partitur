@@ -21,11 +21,13 @@ Changing one of these means changing the tools or skills that use it.
 | Name or format | Value | Rule |
 | --- | --- | --- |
 | Rules file | `<records>/CLAUDE.md`, Partitur's rules as a marked block, the project's outside it; linked from the workspace root as `CLAUDE.md` (Claude Code) and `AGENTS.md` (Codex) | F1, F10, F13 |
-| Role files | `<records>/handoff/designer.md`, `integrator.md` | D8, D15 |
-| Tasks | `<records>/tasks/{open,done,cancelled}/NNNN[.N...]-slug/`: `charter.md`, `status.md`, events `MMMM-<kind>.md`; template `<records>/tasks/charter-template.md` | G8-G12 |
-| Role records | `<records>/roles/{designer,integrator}/MMMM-<kind>.md` | G1 |
+| Integrator's file | `<records>/handoff/integrator.md` | D15 |
+| Tasks | `<records>/tasks/{open,done,cancelled}/TNNNN[.N...]-slug/`: `charter.md`, `status.md`, events `MMMM-<kind>.md`; template `<records>/tasks/charter-template.md` | G8-G12 |
+| Task IDs | `T` + four-digit number + `.N` per level + `-slug` (`T0007.2-adapter-indexing`), the directory name, never changed; short forms `T0007.2`, `0007.2`, `7.2`, the slug | G10 |
+| Root design task | `<records>/tasks/open/T0000-design/`, held by the designer, supervised by the user, never closed; `designer` names it in commands | D8, G10 |
+| Role records | `<records>/roles/integrator/MMMM-<kind>.md` | G1 |
 | Installed version | `<records>/.partitur-version`: the Partitur commit that installed or last updated the project | F12 |
-| Holder names | `designer-g<N>`, `integrator-<N>`, `<kind>-<task>`, then `-2`, `-3` for later holders | G2 |
+| Holder names | `designer-g<N>` (holders of `T0000`), `integrator-<N>`, `<kind>-<task ID>` (`track-T0007.1`), then `-2`, `-3` for later holders | G2 |
 | Stale holder | no record for 7 days, listed for the supervisor | G6 |
 | Request directories | `<records>/pr/{open,merged,closed}/NNNNNN-short-name/`, six-digit numbers | C1, C3a |
 | Message files | `MMMM-<kind>.md`, four digits; kinds request, review, decision, reply, cleanup | C1 |

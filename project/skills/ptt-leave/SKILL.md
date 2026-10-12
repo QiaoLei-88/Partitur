@@ -1,6 +1,6 @@
 ---
 name: ptt-leave
-description: Leave this session's Partitur role or task, approve a subordinate's request to leave, or free a role or task whose holder is gone. Arguments: none (this session leaves), approve N, free N|designer|integrator. Use when the user wants this session to stop holding its role or task, or to settle another session's departure.
+description: Leave this session's Partitur role or task, approve a subordinate's request to leave, or free a role or task whose holder is gone. Arguments: none (this session leaves), approve N, free N|designer|integrator (designer is the root design task T0000). Use when the user wants this session to stop holding its role or task, or to settle another session's departure.
 ---
 
 # Leave, approve leaving, or free
@@ -14,8 +14,8 @@ received when it took its role or task.
 
 ## This session leaves (no argument)
 
-1. Bring your status record up to date: `status.md` of your task, or
-   `<records>/handoff/designer.md` / `integrator.md` for a role. It must say
+1. Bring your status record up to date: `status.md` of your task (for the
+   designer, of `T0000`), or `<records>/handoff/integrator.md`. It must say
    what is done (requests with merge commits), what is open, and where it
    stands; nothing may exist only in this conversation. Record it:
 
@@ -31,8 +31,8 @@ received when it took its role or task.
      vacant, the user approves (`--as user`). Tell the user to run
      `/ptt-leave approve <N>` in the supervisor's session. Until then this
      session still holds the task.
-   - A designer or integrator leaves at once: the user is its supervisor,
-     and the user's command is the approval.
+   - The designer (holder of `T0000`) and the integrator leave at once: the
+     user is their supervisor, and the user's command is the approval.
 3. After leaving, offer the user to clear this session (`/clear`).
 
 ## Approve a subordinate's request (`approve N`)
@@ -55,8 +55,8 @@ user knows that session is gone:
 ```
 
 The task becomes ready; its `status.md` shows where it stood. Only the user
-frees the designer or integrator role, in any session at the user's
-request:
+frees the designer (`T0000`) or the integrator role, in any session at the
+user's request (`--force` as above while the holder has recent records):
 
 ```
 <records>/bin/ptt free designer --as user --reason "<why>"

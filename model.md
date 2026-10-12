@@ -47,8 +47,11 @@ use, *(Proposed)* one that is neither.
   to read, where results go, what is out of scope, when it is done; D1),
   the holder's `status.md` (D2), and its events (release, take, leave,
   done, close) *(Proposed, G8-G12)*. A `design` task opens a sub-scope.
-  The root designer's charter is its role file, `handoff/designer.md`,
-  which is also its handover (D8). See [roles and tasks](flows/tasks.md).
+  The root design task `T0000` is the root designer's: chartered by the
+  user, never closed, its `status.md` the handover from one designer to the
+  next (D8). A task's ID is `T`, its number, and its slug
+  (`T0007.2-adapter-indexing`), also its directory name, and never changes.
+  See [roles and tasks](flows/tasks.md).
 - **Request.** A proposed change to a main branch, reviewed and decided as
   a directory of numbered messages ([requests](flows/requests.md)).
 - **Run record.** The evidence of one verification run, written once
@@ -82,10 +85,14 @@ use, *(Proposed)* one that is neither.
 
 A *design scope* has one designer. A task opens either a child design
 scope (kind `design`), held by a *sub-designer* (the principal of a
-section), or a leaf: a track or a worker. The root designer is chartered by
-the user; every sub-designer by its parent designer. Task numbers show the
-tree: `0007` is a top-level task, `0007.1` a task in the scope of design
-task `0007` *(Proposed, G10)*.
+section), or a leaf: a track or a worker. The root designer holds the root
+design task `T0000`, chartered by the user; every sub-designer holds a
+design task chartered by its parent designer. Task numbers show the tree:
+`T0007` is a top-level task in the root scope, `T0007.1` a task in the
+scope of design task `T0007`. The *level* of a design scope is the number
+of parts of its task number (`T0000` is level 0, `T0007` level 1); its
+*generation* counts the sessions that have taken it (`designer-g2`,
+`design-T0007-2`) *(Proposed, G10)*.
 
 - Ownership is a tree: the parent owns a child task's charter except its status
   section; the child owns its own records (N2).

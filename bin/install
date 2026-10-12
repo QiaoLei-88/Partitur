@@ -19,11 +19,12 @@ Usage:
     <records>/                Git repository (main branch --branch, default master)
     <records>/CLAUDE.md       the rules file, from templates/rules.md
     <records>/pr/             request directories, repos table, README
-    <records>/handoff/        designer.md (the root designer's charter and
-                              handover), integrator.md (the integrator's
-                              status), notes/ (temporary notes to the designer)
-    <records>/tasks/          tasks: open/, done/, cancelled/, charter template
-    <records>/roles/          designer/ and integrator/ role records
+    <records>/handoff/        integrator.md (the integrator's status), notes/
+                              (temporary notes to the designer)
+    <records>/tasks/          tasks: open/, done/, cancelled/, charter template;
+                              open/T0000-design/, the root design task whose
+                              holder is the designer
+    <records>/roles/          integrator/ role records
     <records>/bin/            ptt, pr, and test-run, from project/bin/
     <records>/skills/         the ptt-* skills
   and, for each chosen tool, the links it reads in the workspace root:
@@ -406,11 +407,12 @@ def project_plan(a, tools, repos, name, src, quiet=False):
     add(f"{R}/CLAUDE.md", "rules", fill("rules.md"))
     add(f"{R}/pr/README.md", "maintained", fill("pr-README.md"))
     for d in ("pr/open", "pr/merged", "pr/closed", "tasks/open", "tasks/done", "tasks/cancelled",
-              "roles/designer", "roles/integrator", "handoff/notes"):
+              "roles/integrator", "handoff/notes"):
         add(f"{R}/{d}/.gitkeep", "seeded", "")
     add(f"{R}/pr/repos", "seeded",
         "# name checkout main\n" + "".join(f"{n} {c} {m}\n" for n, c, m in repos))
-    add(f"{R}/handoff/designer.md", "seeded", fill("designer.md"))
+    add(f"{R}/tasks/open/T0000-design/charter.md", "seeded", fill("root-charter.md"))
+    add(f"{R}/tasks/open/T0000-design/status.md", "seeded", fill("root-status.md"))
     add(f"{R}/handoff/integrator.md", "seeded", fill("integrator.md"))
     for tool in src.names("project/bin"):
         add(f"{R}/bin/{tool}", "maintained", src.read(f"project/bin/{tool}"), 0o755)

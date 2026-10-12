@@ -14,7 +14,7 @@ conversation without the command is not approval.
   supervisor, the charter, and every line "waits on you" (leave requests,
   done reports, subordinates with no record for days). Suggest the next
   step for each.
-- With a holder name as argument (`/ptt-whoami track-0007`), typically
+- With a holder name as argument (`/ptt-whoami track-T0007`), typically
   after `/clear`: this session continues as that holder. Run
   `<records>/bin/ptt whoami <name>`, read what that role or task starts from
   (see `/ptt-take`, step 4) and its status record, and report where it

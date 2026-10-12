@@ -84,16 +84,18 @@ both.
 
    and reports what it created: the records repository `workspace/` with
    the rules file, task and request directories, tools and skills, the
-   designer's and integrator's files, and the links your tools read. It
-   lists the code repositories it found; one deeper down is added as a line
-   in `workspace/pr/repos`.
+   root design task `T0000` (the designer's charter and handover), the
+   integrator's file, and the links your tools read. It lists the code
+   repositories it found; one deeper down is added as a line in
+   `workspace/pr/repos`.
 4. **Fill in two files** with the session: the "Project Rules" at the end
    of `workspace/CLAUDE.md` (your domain's rules; Partitur's own rules sit
    in a marked block above them), and the placeholders in
-   `workspace/handoff/designer.md`. A project that already has a rules file
-   keeps it: install reports it "not merged", the session compares both and
-   lists every contradiction for you, and on your approval
-   `--merge-rules` adds Partitur's block. Then record them:
+   `workspace/tasks/open/T0000-design/charter.md` (the root designer's
+   charter; its `status.md` is the designer's handover). A project that
+   already has a rules file keeps it: install reports it "not merged", the
+   session compares both and lists every contradiction for you, and on
+   your approval `--merge-rules` adds Partitur's block. Then record them:
 
    ```
    workspace/bin/ptt record -m "install Partitur" workspace

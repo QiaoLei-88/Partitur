@@ -9,7 +9,8 @@ The user's command (`/ptt-mktask`) is the approval for the records this skill
 writes, and for nothing else; the work itself still needs AtE. Agreement in
 conversation without the command is not approval.
 
-Only a designer makes tasks: the root designer makes top-level tasks; the
+Only a designer makes tasks: the root designer (holder of `T0000`) makes
+the top-level tasks `T0001`, `T0002`, ...; the
 holder of a `design` task makes the subtasks of its scope. `<name>` is this
 session's holder name.
 

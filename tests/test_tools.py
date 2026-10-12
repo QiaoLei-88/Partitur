@@ -4,6 +4,7 @@ each in a temporary directory.
 Run: python3 -m unittest discover -s tests   (from the repository root)
 """
 import os
+import sys
 import shutil
 import subprocess
 import tempfile
@@ -273,7 +274,13 @@ class InstallProject(unittest.TestCase):
         self.assertIn("written once", readme)
         self.assertNotIn("{{", readme)
         self.assertIn("Open concerns", (ws / "handoff" / "integrator.md").read_text())
-        self.assertIn("Designer of Demo", (ws / "handoff" / "designer.md").read_text())
+        root = ws / "tasks" / "open" / "T0000-design"
+        self.assertIn("Design of Demo", (root / "charter.md").read_text())
+        self.assertIn("Status of task T0000", (root / "status.md").read_text())
+        ptt = [sys.executable, str(ws / "bin" / "ptt")]
+        self.assertIn("T0000", run(*ptt, "tasks").stdout)
+        self.assertEqual(run(*ptt, "take", "designer").stdout.strip(), "designer-g1")
+        self.assertIn("Status of task T0000", (root / "status.md").read_text())
         skill = (ws / "skills" / "ptt-pr-submit" / "SKILL.md").read_text()
         self.assertNotIn("<records>", skill)
         self.assertIn("ws/pr/", skill)

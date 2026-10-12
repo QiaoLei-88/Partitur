@@ -64,7 +64,8 @@ Then, with the user:
 2. **Repositories.** If install warns that requests name a repository the
    table lacks, or a checkout lies deeper than the workspace root, propose
    the `--add-repo NAME:CHECKOUT:MAIN` line and run it when the user agrees.
-3. Fill in `<records>/handoff/designer.md`, then record the records
+3. Fill in `<records>/tasks/open/T0000-design/charter.md`, the root
+   designer's charter, then record the records
    repository: `<records>/bin/ptt record -m "install Partitur" <records>`.
 
 ## Reading map
@@ -79,5 +80,6 @@ Then, with the user:
   [requests](flows/requests.md), [handoff](flows/handoff.md),
   [evidence](flows/evidence.md), [references](flows/references.md).
 - Templates: [task charter](templates/charter.md);
-  [designer](templates/designer.md), [integrator](templates/integrator.md).
+  root design task [charter](templates/root-charter.md) and
+  [status](templates/root-status.md), [integrator](templates/integrator.md).
 - [Rules index](rules.md): every rule with its ID and label.

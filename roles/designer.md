@@ -1,9 +1,11 @@
 # Designer
 
-Holds the design of one design scope. The root designer takes its role
-(`/ptt-take designer`) and works from its role file `handoff/designer.md`;
-a sub-designer holds a `design` task of its parent designer (N2; relative
-roles *(Proposed, N1)*; taking *(Proposed, G1)*).
+Holds the design of one design scope, as the holder of a `design` task.
+The root designer holds the root design task `T0000`, chartered by the user
+(`/ptt-take designer`); a sub-designer holds a `design` task of its parent
+designer, for example `T0007` (N2; relative roles *(Proposed, N1)*; taking
+*(Proposed, G1)*). Both work the same way, from their task's charter and
+`status.md`.
 
 ## Owns (writes)
 
@@ -12,8 +14,7 @@ roles *(Proposed, N1)*; taking *(Proposed, G1)*).
 - The tasks of its scope: their charters while drafts, amendments after
   release, and their closing; never a holder's `status.md` (D1, D2;
   *(Proposed, G8-G12)*).
-- Its role file `handoff/designer.md`, its charter and handover, including
-  its Status (D8).
+- Its design task's `status.md`, its handover (D8).
 
 ## Decides, with the user
 
@@ -45,11 +46,10 @@ roles *(Proposed, N1)*; taking *(Proposed, G1)*).
 
 ## Lifecycle
 
-Takes the role, starts from its role file, and checks the state in it
-against the records *(Proposed, D13)*. Cannot leave while a subordinate's
-leave request, done report, or silent holder anywhere below it waits
-(*(Proposed, G5)*). Ends by updating
-the role file (state, open
+Takes its design task, starts from its charter and `status.md`, and checks
+the state in them against the records *(Proposed, D13)*. Cannot leave while
+a subordinate's leave request, done report, or silent holder anywhere below
+it waits (*(Proposed, G5)*). Ends by updating `status.md` (state, open
 items, next steps, all by lasting references) and stops writing once its
 successor takes over (D8). A handover may come at a stage boundary or
 mid-stage, whenever the session should end. It does not offer to be cleared
