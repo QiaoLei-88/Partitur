@@ -126,7 +126,7 @@ project's development notes.
 | F9 | One rerunnable command installs Partitur: for a user (the skill link) or for a project (records repository, rules file, request directories, tools, skills, role files, and links), for the chosen agent tools; it overwrites nothing and compares only the files Partitur maintains | Proposed |
 | F10 | One rules file and one set of skills serve Claude Code and Codex through links (`CLAUDE.md`/`AGENTS.md`, `.claude/skills`/`.agents/skills`); sessions start in the workspace root | Proposed |
 | F11 | Every write to the records repository goes through one tool under one lock (`ptt record` and the task commands), committing exactly its paths; Git by hand there only while no session writes | Proposed |
-| F12 | Install keeps a manifest of everything it delivered (kind, SHA-256, path), so update replaces what is outdated and removes what is no longer delivered, and uninstall removes exactly that; files changed in the project and its records are never touched without `--force` | Proposed |
+| F12 | A project records the Partitur commit that installed it; install rebuilds from Partitur's history what that commit delivered, so update replaces what is outdated and removes what is no longer shipped, and uninstall removes exactly that; files changed in the project and its records are kept without `--force` | Proposed |
 | T1 | The rules template and request README include A11, B5b, D13, D16, and C19 (withdrawal) as defaults, although none is exercised yet; a project keeps or drops them | Proposed |
 | T2 | Domain-specific rules go in the rules file's "Project Rules"; the template carries only generic rules (interface contracts, independent verification, tolerance-based comparison) | Proposed |
 

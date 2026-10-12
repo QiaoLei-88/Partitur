@@ -309,72 +309,81 @@ class InstallProject(unittest.TestCase):
         warn = self.install("--repo", "x:x:main").stdout
         self.assertIn("--repo ignored", warn)
 
-    def manifest(self):
-        return self.root / "workspace" / ".partitur" / "manifest"
+    def partitur_clone(self):
+        """A committed copy of Partitur, to install from and then change."""
+        clone = self.home / "partitur"
+        shutil.copytree(HERE, clone, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+        for args in (["init", "-q", "-b", "master"], ["add", "-A"],
+                     ["-c", "user.name=t", "-c", "user.email=t@x", "commit", "-qm", "v1"]):
+            git(clone, *args)
+        return clone
 
-    def set_delivered(self, rel, data):
-        """Pretend an older Partitur delivered `data` at rel."""
-        import hashlib
-        (self.root / rel).write_text(data)
-        lines = self.manifest().read_text().splitlines()
-        h = hashlib.sha256(data.encode()).hexdigest()
-        lines = [" ".join([l.split(" ")[0], h] + l.split(" ")[2:]) if l.split(" ")[2:3] == [rel]
-                 else l for l in lines]
-        self.manifest().write_text("\n".join(lines) + "\n")
+    def commit_clone(self, clone, message):
+        git(clone, "add", "-A")
+        git(clone, "-c", "user.name=t", "-c", "user.email=t@x", "commit", "-qm", message)
+
+    def install_from(self, clone, *extra, check=True):
+        return run("python3", str(clone / "bin" / "install"), "--tool", "claude", "--scope",
+                   "project", str(self.root), *extra, check=check, env=self.env)
 
     def test_update_replaces_outdated_keeps_modified(self):
-        self.install()
-        self.assertIn("partitur ", self.manifest().read_text())
-        self.set_delivered("workspace/bin/pr", "# older pr\n")
-        mine = self.root / "workspace" / "bin" / "test-run"
+        clone = self.partitur_clone()
+        out = self.install_from(clone).stdout
+        stamp = (self.root / "workspace" / ".partitur-version").read_text()
+        self.assertIn(git(clone, "rev-parse", "HEAD"), stamp)
+        self.assertNotIn("uncommitted", out)
+        ws = self.root / "workspace"
+        mine = ws / "bin" / "test-run"
         mine.write_text(mine.read_text() + "\n# my change\n")
-        rules = self.root / "workspace" / "CLAUDE.md"
+        rules = ws / "CLAUDE.md"
         rules.write_text(rules.read_text() + "\nproject rule\n")
-        out = self.install().stdout
+        for name in ("pr", "test-run"):
+            f = clone / "project" / "bin" / name
+            f.write_text(f.read_text() + "\n# v2\n")
+        self.commit_clone(clone, "v2")
+        out = self.install_from(clone).stdout
         self.assertRegex(out, r"outdated\s+workspace/bin/pr")
         self.assertRegex(out, r"modified\s+workspace/bin/test-run")
         self.assertIn("--update", out)
-        out = self.install("--update").stdout
+        out = self.install_from(clone, "--update").stdout
         self.assertRegex(out, r"updated\s+workspace/bin/pr")
-        self.assertNotIn("older pr", (self.root / "workspace" / "bin" / "pr").read_text())
+        self.assertIn("# v2", (ws / "bin" / "pr").read_text())
         self.assertIn("# my change", mine.read_text())
         self.assertIn("project rule", rules.read_text())
-        out = self.install("--update", "--force").stdout
+        self.assertIn(git(clone, "rev-parse", "HEAD"),
+                      (ws / ".partitur-version").read_text())
+        out = self.install_from(clone, "--update", "--force").stdout
         self.assertRegex(out, r"replaced\s+workspace/bin/test-run")
         self.assertNotIn("# my change", mine.read_text())
-        self.assertIn("ptt record -m", out)
 
-    def test_update_removes_what_is_no_longer_delivered(self):
-        self.install()
-        old = self.root / "workspace" / "skills" / "ptt-submit" / "SKILL.md"
-        old.parent.mkdir()
-        old.write_text("old skill\n")
-        link = self.root / ".claude" / "skills" / "ptt-submit"
-        link.symlink_to("../../workspace/skills/ptt-submit")
-        import hashlib
-        h = hashlib.sha256(b"old skill\n").hexdigest()
-        with self.manifest().open("a") as f:
-            f.write(f"maintained {h} workspace/skills/ptt-submit/SKILL.md\n")
-            f.write("link - .claude/skills/ptt-submit -> ../../workspace/skills/ptt-submit\n")
-        out = self.install().stdout
-        self.assertRegex(out, r"obsolete\s+workspace/skills/ptt-submit/SKILL.md")
+    def test_update_removes_what_is_no_longer_shipped(self):
+        clone = self.partitur_clone()
+        self.install_from(clone)
+        old = self.root / "workspace" / "skills" / "ptt-whoami"
+        self.assertTrue((self.root / ".claude" / "skills" / "ptt-whoami").is_symlink())
+        shutil.move(clone / "project" / "skills" / "ptt-whoami",
+                    clone / "project" / "skills" / "ptt-who")
+        self.commit_clone(clone, "rename a skill")
+        out = self.install_from(clone).stdout
+        self.assertRegex(out, r"obsolete\s+workspace/skills/ptt-whoami/SKILL.md")
+        self.assertRegex(out, r"created\s+workspace/skills/ptt-who/SKILL.md")
         self.assertTrue(old.exists())
-        out = self.install("--update").stdout
-        self.assertRegex(out, r"removed\s+workspace/skills/ptt-submit/SKILL.md")
-        self.assertRegex(out, r"removed\s+\.claude/skills/ptt-submit")
-        self.assertFalse(old.parent.exists())
-        self.assertFalse(link.is_symlink())
-        self.assertNotIn("ptt-submit", self.manifest().read_text().replace("ptt-pr-submit", ""))
+        out = self.install_from(clone, "--update").stdout
+        self.assertRegex(out, r"removed\s+workspace/skills/ptt-whoami/SKILL.md")
+        self.assertRegex(out, r"removed\s+\.claude/skills/ptt-whoami")
+        self.assertFalse(old.exists())
+        self.assertFalse((self.root / ".claude" / "skills" / "ptt-whoami").is_symlink())
 
     def test_uninstall_keeps_records_and_changes(self):
-        self.install()
+        clone = self.partitur_clone()
+        self.install_from(clone)
         ws = self.root / "workspace"
         task = ws / "tasks" / "open" / "0001-x"
         task.mkdir()
         (task / "charter.md").write_text("a task\n")
         mine = ws / "bin" / "pr"
         mine.write_text(mine.read_text() + "\n# mine\n")
-        out = self.install("--uninstall").stdout
+        out = self.install_from(clone, "--uninstall").stdout
         self.assertRegex(out, r"removed\s+workspace/bin/ptt")
         self.assertRegex(out, r"removed\s+CLAUDE\.md")
         self.assertRegex(out, r"modified\s+workspace/bin/pr")
@@ -384,14 +393,12 @@ class InstallProject(unittest.TestCase):
         self.assertTrue((ws / "CLAUDE.md").exists())
         self.assertTrue((task / "charter.md").exists())
         self.assertTrue(mine.exists())
-        self.assertIn("workspace/bin/pr", self.manifest().read_text())
-        self.install("--uninstall", "--force")
-        self.assertFalse(mine.exists())
+        self.assertFalse((ws / ".partitur-version").exists())
 
-    def test_uninstall_without_manifest(self):
+    def test_uninstall_without_stamp(self):
         r = self.install("--uninstall", check=False)
         self.assertNotEqual(r.returncode, 0)
-        self.assertIn("no manifest", r.stderr)
+        self.assertIn("nothing to uninstall", r.stderr)
 
     def test_defaults_detect_checkouts(self):
         other = self.root / "lib"
