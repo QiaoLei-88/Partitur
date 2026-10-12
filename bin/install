@@ -8,10 +8,6 @@ Usage:
           [--name NAME] [--records DIR] [--branch MAIN] [--repo NAME:CHECKOUT:MAIN ...]
 
 --scope user
-  install [--tool {auto,claude,codex,all}] --scope project [PROJECT] [--update]
-          [--name NAME] [--records DIR] [--branch MAIN] [--repo NAME:CHECKOUT:MAIN ...]
-
---scope user
   Links this repository as the skill `partitur` in the user's skill
   directories: ~/.claude/skills (Claude Code) and ~/.agents/skills (Codex).
   Every session of this user can then find Partitur in any project.
@@ -247,7 +243,7 @@ def detect(root, rec):
             continue
         branch = r.stdout.strip()
         found.append([d.name, d.name, branch])
-        print(f"found    {d.name} (main branch {branch})")
+        print(f"found     {d.name} (main branch {branch})")
         if branch not in ("main", "master"):
             print(f"warning  {d.name}: is {branch} its main branch? if not, correct pr/repos")
     return found
@@ -418,7 +414,9 @@ def scope_project(a, tools, report):
         print("\nThis Partitur is newer: rerun with --update to bring the project up to it.")
     if c.get("modified"):
         print("\nFiles changed here were left alone; --update --force replaces them.")
-    print(f"\nRecord the change: {a.records}/bin/ptt record -m \"install Partitur\" {a.records}")
+    if any(c.get(k) for k in ("created", "updated", "replaced", "removed")):
+        print(f"\nRecord the change: {a.records}/bin/ptt record -m \"install Partitur\" "
+              f"{a.records}")
 
 
 def main():

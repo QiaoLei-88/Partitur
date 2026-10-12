@@ -405,7 +405,7 @@ class InstallProject(unittest.TestCase):
         other.mkdir()
         git(other, "init", "-q", "-b", "main")
         out = self.install(tool="claude", cwd=self.root).stdout
-        self.assertIn("found    code (main branch master)", out)
+        self.assertIn("found     code (main branch master)", out)
         self.assertNotIn("warning  code", out)
         table = (self.root / "workspace" / "pr" / "repos").read_text().splitlines()
         self.assertEqual(table[1:], ["code code master", "lib lib main"])

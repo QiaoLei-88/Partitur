@@ -109,9 +109,10 @@ To bring a project up to a newer Partitur, pull this repository and rerun
 step 3's command with `--update`. The project remembers which Partitur
 commit installed it (`workspace/.partitur-version`), so the update replaces
 what is outdated and removes what Partitur no longer ships, but leaves your
-rules, your records, and any file you changed (`--force` replaces those). `--uninstall` removes
-what was installed the same way; `--scope user --uninstall` removes the
-link for your tools.
+rules, your records, and any file you changed (`--force` replaces those).
+`--uninstall` removes what was installed the same way. For the user link,
+`--scope user --uninstall` covers the detected tools; add `--tool all` if
+you installed for both.
 
 Taking roles and tasks, the install command, and Codex support are recent
 and marked *Proposed* in the [rules index](rules.md) until they have been
