@@ -1,63 +1,45 @@
 ---
 name: ptt-leave
-description: Leave this session's Partitur role or task, approve a subordinate's request to leave, or free a role or task whose holder is gone. Arguments: none (this session leaves), approve N, free N|designer|integrator (designer is the root design task T0000). Use when the user wants this session to stop holding its role or task, or to settle another session's departure.
+description: Leave this session's role or task, approve a subordinate's leave request, or free a role or task whose holder is gone. Arguments: none, approve N, free N|designer|integrator.
 ---
 
 # Leave, approve leaving, or free
 
-The user's command (`/ptt-leave`) is the approval for the records this skill
-writes, and for nothing else; the work itself still needs AtE. Agreement in
-conversation without the command is not approval.
+The command approves only the records this skill writes; other work needs
+AtE (rules file). `<name>` is your holder name.
 
-The tool is `<records>/bin/ptt`; `<name>` is the holder name this session
-received when it took its role or task.
+## Leave (no argument)
 
-## This session leaves (no argument)
+1. Bring your status record up to date: your task's `status.md` (the
+   designer's: of `T0000`), or `<records>/handoff/integrator.md`: what is
+   done (requests with merge commits), what is open, where it stands;
+   nothing only in this conversation. Record it with
+   `<records>/bin/ptt record -m "<message>" <file>`.
+2. `<records>/bin/ptt leave <name> --status "<one-line summary>"`.
+   - Refused while something waits on you as a supervisor (a leave request
+     or done report below you), or, for the integrator, while a recorded
+     decision is not carried out: settle that first.
+   - A task holder only asks: tell the user to run `/ptt-leave approve <N>`
+     in the supervisor's session (`ptt whoami <name>` names it), or to
+     approve `--as user` when it is vacant. Until then you hold the task.
+   - The designer and the integrator leave at once: the user supervises
+     them, and the command is the approval.
+3. After leaving, offer the user to clear this session.
 
-1. Bring your status record up to date: `status.md` of your task (for the
-   designer, of `T0000`), or `<records>/handoff/integrator.md`. It must say
-   what is done (requests with merge commits), what is open, and where it
-   stands; nothing may exist only in this conversation. Record it:
+## Approve (`approve N`)
 
-   ```
-   <records>/bin/ptt record -m "<message>" <file>
-   ```
-2. Run `<records>/bin/ptt leave <name> --status "<one-line summary>"`.
-   - The tool refuses while something waits on you as a supervisor (a
-     subordinate's leave request or done report), or, for the integrator,
-     while a recorded decision is not carried out. Settle that first.
-   - A task holder only *asks* to leave: the supervisor shown by
-     `<records>/bin/ptt whoami <name>` must approve; if the supervisor is
-     vacant, the user approves (`--as user`). Tell the user to run
-     `/ptt-leave approve <N>` in the supervisor's session. Until then this
-     session still holds the task.
-   - The designer (holder of `T0000`) and the integrator leave at once: the
-     user is their supervisor, and the user's command is the approval.
-3. After leaving, offer the user to clear this session (`/clear`).
+As task N's supervisor (or `--as user` when vacant): read its `status.md`
+and leave request (`<records>/bin/ptt show N`). Clear enough for a
+successor: `<records>/bin/ptt approve-leave <N> --as <name>` (the task is
+ready again). Otherwise tell the user what is missing; the holder adds it.
 
-## Approve a subordinate's request (`approve N`)
+## Free (`free N|designer|integrator`)
 
-As the supervisor of task N (or the user, `--as user`, when the supervisor is
-vacant): read its `status.md` and the leave request
-(`<records>/bin/ptt show N`). If the status is clear enough for a successor,
-run `<records>/bin/ptt approve-leave <N> --as <name>`; the task becomes ready
-again. If not, tell the user what is missing; the holder fills it in first.
-
-## Free a role or task whose holder is gone (`free ...`)
-
-A supervisor notices a gone subordinate (`<records>/bin/ptt whoami <name>`
-lists holders with no record for seven days) and repairs the gap. The tool
-refuses a holder with recent records unless `--force` is added because the
-user knows that session is gone:
-
-```
-<records>/bin/ptt free <N> --as <name> --reason "<why>"
-```
-
-The task becomes ready; its `status.md` shows where it stood. Only the user
-frees the designer (`T0000`) or the integrator role, in any session at the
-user's request (`--force` as above while the holder has recent records):
-
-```
-<records>/bin/ptt free designer --as user --reason "<why>"
-```
+A supervisor frees a task whose holder is gone (`ptt whoami` lists holders
+with no record for seven days):
+`<records>/bin/ptt free <N> --as <name> --reason "<why>"`; the task is ready
+again, its `status.md` shows where it stood. With recent records the tool
+needs `--force`, added only when the user knows the holder is gone. Only the
+user frees the designer (`T0000`) or the integrator, in any session:
+`<records>/bin/ptt free designer --as user --reason "<why>"` (same
+`--force` rule).

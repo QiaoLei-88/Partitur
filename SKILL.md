@@ -1,6 +1,6 @@
 ---
 name: partitur
-description: Partitur — roles, records, and request flow for one user directing several AI agent sessions on a software project. Use when the user asks to install or set up Partitur for a project (run bin/install), when a session must find out its role, what it may write, or how to hand over, or when deciding how work, findings, reviews, and decisions flow between sessions. Taking roles and tasks is the ptt-take, ptt-leave, ptt-whoami, ptt-mktask, ptt-done, and ptt-close skills; requests are ptt-pr-submit, ptt-pr-review, and ptt-pr-cleanup.
+description: Partitur, roles, records, and request flow for one user directing several AI agent sessions. Use to install or set up Partitur for a project, or when a session must know its role, what it may write, or how work and decisions flow; the ptt-* skills do the steps.
 ---
 
 # Partitur

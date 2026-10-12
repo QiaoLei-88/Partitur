@@ -1,98 +1,63 @@
 ---
 name: ptt-pr-submit
-description: Submit a local pull request for a development branch, reply to its review, or list this branch's requests, using numbered message files under <records>/pr/open/NNNNNN-name/. Arguments: list [BRANCH], reply N, or none to submit the current branch. Use when a development session has finished branch commits and wants them reviewed and integrated into its main branch, or must answer review comments.
+description: Submit the current branch as a local pull request for review and integration, reply to its review (reply N), or list this branch's requests (list [BRANCH]). Use when branch work is ready for review or a review needs an answer.
 ---
 
-# Submit or reply to a local pull request
+# Submit or reply to a local request
 
-The user's command (`/ptt-pr-submit`) is the approval for the records this skill
-writes, and for nothing else; the work itself still needs AtE. Agreement in
-conversation without the command is not approval.
+The command approves only the records this skill writes; other work, such
+as changing the branch, needs AtE (rules file). `<records>/pr/repos` maps a
+`repo` name to its primary checkout and main branch `<main>`. Request
+numbers may be short (`4`, `pr-4`, `000004`) and are never reused. You
+write only your own new message files: never edit a message or move a
+request.
 
-Local requests are directories under `<records>/pr/`, where `<records>`
-is the project's records repository. Read `<records>/pr/README.md` for the
-layout and rules; the table of repositories (`repo` values, primary
-checkouts, and main branches) is `<records>/pr/repos`. Below, `<repo>` is the
-request's repository (in commands and paths, its primary checkout from the
-table) and `<main>` its main branch. The workspace root is the
-directory that contains `<records>/`, the primary checkouts, and
-`worktrees/`; confirm these locations before writing. `<records>/` is its
-own Git repository.
+| Argument | Action |
+| --- | --- |
+| `list [BRANCH]` | `<records>/bin/pr list all --branch BRANCH` (default: current branch): report each status; "waiting for author" means a reply is due. |
+| `reply N` | Read `<records>/bin/pr show N`, then reply (below). |
+| none | Submit the current branch (below). |
 
-Every write to the records repository is committed with
-`<records>/bin/ptt record -m "<message>" <paths>`, never with plain Git: it
-commits exactly those paths under the lock all sessions share.
+## Submit
 
-The requesting session writes only its own message files. Never edit an
-existing message, and never move a request directory; moving belongs to the
-integrator.
+1. In the worktree: the branch is committed and clean (`git status
+   --porcelain` empty, `git diff --check <main> HEAD` clean) and its history
+   atomic (`git log --stat <main>..HEAD`: fold fixups, drop WIP and
+   reverted changes).
+2. `base` = `git rev-parse <main>`, `head` = `git rev-parse HEAD`, full
+   SHAs. If `git merge-base --is-ancestor <main> HEAD` fails, update the
+   branch first.
+3. Number: one more than the highest six-digit `NNNNNN` in `pr/open`,
+   `pr/merged`, `pr/closed`. `mkdir <records>/pr/open/NNNNNN-<short-name>`
+   (e.g. `000001-docs-terminology`) without `-p`; if it exists, allocate
+   again.
+4. Write `0001-request.md` from the template and record it:
+   `<records>/bin/ptt record -m "pr NNNNNN: submit <title>"
+   <records>/pr/open/NNNNNN-name`. Report the number and any `note:` the
+   tool printed (no integrator: the request waits until the user opens one
+   with `/ptt-take integrator`).
 
-## Arguments
-
-| Argument | Action | Writes |
-| --- | --- | --- |
-| `list [BRANCH]` | Run `<records>/bin/pr list all --branch BRANCH` (default: the current branch) and report each request's status; "waiting for author" means the user decided to request changes and a reply is needed. | no |
-| `reply N` | Reply to the review of request N (`<records>/bin/pr show N` first). | yes |
-| none | Submit the current branch as a new request. | yes |
-
-Request numbers may be given short (`4`, `pr-4`, `000004`). Listing needs no
-authorization; submitting and replying are writes and need it.
-
-## New request
-
-1. In the development worktree, confirm the branch is committed and clean
-   (`git status --porcelain` empty) and that `git diff --check <base> HEAD` is
-   clean. Make the history atomic before submitting: fold fixups into the
-   commits they fix, and remove WIP and reverted changes
-   (`git log --stat <base>..HEAD`).
-2. Record `base` as `git rev-parse <main>` and `head` as
-   `git rev-parse HEAD`, both full SHAs. Check
-   `git merge-base --is-ancestor <main> HEAD`; if it fails, bring the branch
-   up to date with `<main>` first.
-3. Allocate the request number: one more than the highest six-digit `NNNNNN`
-   found in `pr/open`, `pr/merged`, and `pr/closed`. Create the directory with
-   `mkdir` (without `-p`); if it already exists, another session took the
-   number, so allocate again.
-4. Write `0001-request.md` from the template below.
-5. Record it:
-
-   ```
-   <records>/bin/ptt record -m "pr NNNNNN: submit <title>" <records>/pr/open/NNNNNN-name
-   ```
-
-   Report the request number to the user, and any `note:` the tool
-   printed: if no session holds the integrator role, the request waits
-   until the user opens one (`/ptt-take integrator`, in a fresh session).
-
-## Replying to a review
+## Reply
 
 Reply whenever the branch changes or a review needs an answer, without
-waiting for a decision. A reply pins the new head and returns the request to
-"waiting for review". Decisions only gate merging and closing.
+waiting for a decision (decisions only gate merging and closing); a reply
+pins the new head and returns the request to "waiting for review".
 
-1. If code changes are needed, commit them on the same branch and repeat the
-   checks of steps 1–2 above for the new head. Rebasing and fixup/autosquash
-   are normal on the request's branch. Before any rewrite, tag the old
-   head as `recovery/<reason>/<branch slug>` (branch slug: the branch name
-   with `/` replaced by `-`, e.g. `recovery/pre-rebase/docs-design`; add
-   `-2`, `-3` when the tag exists) so that `ptt-pr-cleanup` can remove it
-   after the decision. If its history was rewritten, give the
-   new `base` if it changed, map old to new SHAs, and summarize
-   `git range-diff <base>..<old head> <base>..<new head>`.
-2. Allocate the message number: one more than the highest four-digit `MMMM`
-   in the request directory. Write `MMMM-reply.md` from the template. Answer
-   every comment by its ID (`C1: fixed in <sha>`, `C2: disagree, because ...`).
-3. After writing, list `MMMM-*` again. If another file now has the same
-   number, the reviewer wrote concurrently: rename your own file to the next
-   free number before committing.
-4. Record only your new file:
-   `<records>/bin/ptt record -m "pr NNNNNN: reply MMMM" <file>`.
+1. Code changes are commits on the same branch, checked as in steps 1-2.
+   Before rewriting history, tag the old head `recovery/<reason>/<branch
+   with / as ->` (`-2`, `-3` if taken), for `ptt-pr-cleanup` to remove
+   later; after a rewrite give the new `base` if it changed, the old-to-new
+   SHA map, and a `git range-diff <base>..<old head> <base>..<new head>`
+   summary.
+2. Write `MMMM-reply.md` (one more than the highest `MMMM`), answering every
+   comment by ID (`C1: fixed in <sha>`, `C2: disagree, because ...`). List
+   `MMMM-*` again; if another file has your number and is already
+   recorded, rename yours to the next free one.
+3. Record only it: `<records>/bin/ptt record -m "pr NNNNNN: reply MMMM" <file>`.
 
-## After the decision
-
-When the request is merged, rejected, or withdrawn, update your status
-record with the outcome and, for a merge, the main-branch merge commit:
-your task's `status.md` (for the designer, of `T0000`). Never record a review state there; `pr list` gives it.
+After the decision (merged, rejected, or withdrawn), put the outcome (and,
+for a merge, the merge commit) in your task's `status.md` (the designer's:
+of `T0000`), never a review state.
 
 ## Templates
 
@@ -104,30 +69,30 @@ request: NNNNNN
 message: 0001
 kind: request
 author: requester
-session: <your holder name from /ptt-take>
+session: <holder name>
 date: <YYYY-MM-DD>
 title: <one line>
-task: <the task ID this request serves (T0007), or none>
-repo: <a name from pr/repos>
+task: <task ID served (T0007), or none>
+repo: <name from pr/repos>
 branch: <branch>
-base: <full SHA of the main branch at submission>
-head: <full SHA of the branch tip under review>
+base: <full SHA of main at submission>
+head: <full SHA of the branch tip>
 worktree: <path relative to the workspace root>
 ---
 
 # <title>
 
 ## Summary
-What the change does and why, and the authorization it was made under (for
-example "AtE, 2026-10-11"). Distinguish agreed decisions, proposals, and
-unverified assumptions.
+What and why; the authorization it was made under (for example "AtE,
+2026-10-11"). Distinguish agreed decisions, proposals, and unverified
+assumptions.
 
 ## Commits
-`git log --oneline <base>..<head>` output.
+`git log --oneline <base>..<head>`.
 
 ## Verification
-Commands, environment, inputs, exit status, and passed/failed/skipped
-counts. State what was not run.
+Commands, environment, inputs, exit status, passed/failed/skipped counts;
+what was not run.
 
 ## Open items
 Known limitations and unfinished work.
@@ -141,16 +106,15 @@ request: NNNNNN
 message: MMMM
 kind: reply
 author: requester
-session: <your holder name from /ptt-take>
+session: <holder name>
 date: <YYYY-MM-DD>
-base: <full SHA; only when the base changed, e.g. after rebasing or rewriting>
+base: <full SHA; only if the base changed>
 head: <full SHA of the branch tip now under review>
 ---
 
 # Reply
 
 C1: <answer>
-C2: <answer>
 
 ## New commits
 `git log --oneline <previous head>..<head>`, or "none".
