@@ -98,9 +98,11 @@ both.
    `workspace/tasks/open/T0000-design/charter.md` (the root designer's
    charter, filled in directly this once and amended by you afterwards;
    its `status.md` is the designer's handover). A project that
-   already has a rules file keeps it: install reports it "not merged", the
-   session compares both and lists every contradiction for you, and on
-   your approval `--merge-rules` adds Partitur's block. Then record them:
+   already has a rules file keeps it: install reports it "not merged", and
+   the session compares both. It removes duplicates and keeps your domain
+   rules without asking; it asks you only about real conflicts and, once,
+   whether to adopt Partitur's block. On your approval `--merge-rules`
+   adds the block. Then record them:
 
    ```
    workspace/bin/ptt record -m "install Partitur" workspace

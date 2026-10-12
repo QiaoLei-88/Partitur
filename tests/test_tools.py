@@ -347,7 +347,7 @@ class InstallProject(unittest.TestCase):
         rules.write_text("# My project\n\nOur own rules.\n\n## Domain\n\n- keep units SI\n")
         out = self.install().stdout
         self.assertRegex(out, r"not merged\s+workspace/CLAUDE.md")
-        self.assertIn("contradiction", out)
+        self.assertIn("real conflicts", out)
         self.assertNotIn("partitur rules begin", rules.read_text())
         report = (self.root / "partitur-install-report.md").read_text()
         self.assertIn("rerun this install with --merge-rules", report)

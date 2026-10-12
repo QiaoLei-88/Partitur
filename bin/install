@@ -184,8 +184,9 @@ SUPERSEDED = {
 
 BEGIN = "<!-- partitur rules begin"
 END = "<!-- partitur rules end -->"
-AGENT_HINT = ("Ask the agent to compare Partitur's rules block with the project's own rules "
-              "and list every contradiction for you to decide before relying on them.")
+AGENT_HINT = ("Ask the agent to compare Partitur's rules block with the project's own rules: "
+              "it removes duplicates, keeps domain rules, and asks you only about real "
+              "conflicts and about adopting the block.")
 
 
 def block_of(text):
@@ -724,14 +725,18 @@ def write_report(a, tools, report, output):
         steps.append(
             f"Rules. Compare Partitur's rules block (`{HERE / 'templates' / 'rules.md'}`, "
             f"between the `partitur rules` markers) with the project's rules in {own}. "
-            f"List for the user: every contradiction, with a recommendation; rules of the "
-            f"block the project lacks (those labelled Proposed in `{HERE / 'rules.md'}` are "
-            f"not yet exercised in practice); and duplicates. The user decides each. "
-            + ("Then, on the user's approval, rerun this install with --merge-rules. "
+            f"Installing Partitur already chose its rules: ask the user only where the "
+            f"project deliberately differs. Remove duplicates of the block (list them, do not "
+            f"ask); keep domain rules and the project's concrete instances of the block's "
+            f"rules unchanged (do not ask); ask one question per conflict, with a "
+            f"recommendation, and one question for adopting the block's rules the project "
+            f"lacks (name those labelled Proposed in `{HERE / 'rules.md'}`: not yet exercised "
+            f"in practice). See Partitur's SKILL.md, step Rules. "
+            + ("On the user's approval, rerun this install with --merge-rules. "
                if c.get("not merged") else "")
-            + f"Then write the project's rules into `{R}/CLAUDE.md` after the block, as "
-            "\"## Project Rules\": only domain rules and the project's deliberate "
-            "differences, as the user decided.")
+            + f"Then write the project's part of `{R}/CLAUDE.md` after the block, as "
+            "\"## Project Rules\": domain rules, the project's instances, and each kept "
+            "conflict as a stated deviation (the block itself is never edited).")
     for p in loose:
         steps.append(f"`{p.name}` in the workspace root is a file, so the agent tool does not "
                      f"read `{R}/CLAUDE.md`: once its rules are merged, delete it with the "

@@ -53,17 +53,34 @@ Then, with the user:
 
 1. **Rules.** If install reports the rules file "not merged" (an existing
    project with its own rules), read the project's rules and Partitur's
-   rules block (`templates/rules.md`, between the markers) and list for the
-   user every contradiction and overlap, each with your recommendation. Only
-   when the user approves, run install again with `--merge-rules`, then
-   resolve each contradiction as the user decides, in the project's part of
-   the file (outside the block). A new project gets the block at install;
-   fill in its "Project Rules": domain rules, and any choice that differs
-   from the defaults *(Proposed, T2)*. The block includes rules not yet
-   exercised in practice *(Proposed, T1)*: a successor checking its
-   handover against the records; worker sessions; withdrawing a request;
-   offering to be cleared at quiet points; taking roles and tasks with
-   supervised leaving (G1-G13). Tell the user, who keeps or drops them.
+   rules block (`templates/rules.md`, between the markers). Installing
+   Partitur already chose its rules, so ask the user only where the project
+   deliberately differs. Sort each of the project's rules into one of four
+   kinds:
+   - **Duplicate** of a rule in the block: it is removed; list what you
+     remove, do not ask.
+   - **Domain rule**, or a concrete instance of a general rule in the block
+     (the project's names, paths, repositories, conventions): it stays,
+     unchanged, under "## Project Rules"; do not ask.
+   - **Conflict**, where the project's rule says otherwise than the block:
+     ask, one question per conflict, with your recommendation (usually the
+     block's rule). If the user keeps the project's way, it goes under
+     "## Project Rules" as a stated deviation ("Partitur's rule on ... does
+     not apply here: ..."), because install maintains the block and it is
+     never edited.
+   - **Partitur's rules the project lacks** come with the block. Ask one
+     question for all of them: adopt the block. Name the rules not yet
+     exercised in practice *(Proposed, T1)*: a successor checking its
+     handover against the records; worker sessions; withdrawing a request;
+     offering to be cleared at quiet points; taking roles and tasks with
+     supervised leaving (G1-G13). The user drops one only by saying so,
+     as a stated deviation.
+
+   Present the conflicts and the one block question together. On the
+   user's approval, run install again with `--merge-rules` and write the
+   project's part after the block as you sorted it. A new project gets the
+   block at install; fill in its "Project Rules": domain rules, and any
+   choice that differs from the defaults *(Proposed, T2)*.
 2. **Repositories.** If install warns that requests name a repository the
    table lacks, or a checkout lies deeper than the workspace root, propose
    the `--add-repo NAME:CHECKOUT:MAIN` line and run it when the user agrees.
