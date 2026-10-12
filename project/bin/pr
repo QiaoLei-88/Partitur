@@ -1,0 +1,408 @@
+#!/usr/bin/env python3
+"""Read-only helper for Partitur's local requests (pr/ in the records repository).
+
+Usage:
+  pr list [open|merged|closed|all] [--branch BRANCH]
+  pr show NUMBER
+  pr path NUMBER
+  pr gc [--days N]
+
+NUMBER may be given short: 4, 0004, 000004, pr-4 and pr-000004 all mean
+request 000004. This tool never writes anything: `gc` only prints which
+branches, worktrees, and recovery tags of decided requests are removable and
+the commands that would remove them (see the ptt-pr-cleanup skill).
+
+The repositories come from <root>/repos, one per line:
+  <name> <checkout relative to the workspace root> <main branch>
+separated by whitespace, so no field may contain any. Text after # is a
+comment. `list` and `gc` need the table; `show` and `path` do not. The workspace root is the
+parent of the records repository (the directory holding pr/).
+"""
+import argparse
+import re
+import shlex
+import subprocess
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+STATES = ("open", "merged", "closed")
+MESSAGE = re.compile(r"^(\d{4})-([a-z]+)\.md$")
+REQUEST = re.compile(r"^(\d{6})-(.+)$")
+MAIN = {}       # repository name -> main branch, from <root>/repos
+CHECKOUT = {}   # repository name -> primary checkout, relative to the workspace root
+REPOS = ()
+COOLDOWN_DAYS = 14
+
+
+def load_repos(root):
+    """Fill MAIN, CHECKOUT, and REPOS from <root>/repos."""
+    global REPOS
+    path = root / "repos"
+    if not path.is_file():
+        sys.exit(f"pr: repository table {path} not found")
+    for n, line in enumerate(path.read_text().splitlines(), 1):
+        parts = line.split("#", 1)[0].split()
+        if not parts:
+            continue
+        if len(parts) != 3:
+            sys.exit(f"pr: {path}:{n}: expected <name> <checkout> <main branch>")
+        name, checkout, main = parts
+        if name in MAIN:
+            sys.exit(f"pr: {path}:{n}: repository {name!r} listed twice")
+        MAIN[name], CHECKOUT[name] = main, checkout
+    REPOS = tuple(MAIN)
+
+
+def front_matter(path):
+    lines = path.read_text().splitlines()
+    fields = {}
+    if lines and lines[0] == "---":
+        for line in lines[1:]:
+            if line == "---":
+                break
+            key, sep, value = line.partition(":")
+            if sep:
+                fields[key.strip()] = value.strip()
+    return fields
+
+
+def normalize(number):
+    m = re.fullmatch(r"(?:pr-?)?0*(\d+)", number.strip(), re.IGNORECASE)
+    if not m or len(m.group(1)) > 6:
+        sys.exit(f"pr: invalid request number: {number!r}")
+    return m.group(1).zfill(6)
+
+
+def requests(root, states):
+    for state in states:
+        for d in sorted((root / state).iterdir()) if (root / state).is_dir() else []:
+            if d.is_dir() and REQUEST.match(d.name):
+                yield state, d
+
+
+def messages(d):
+    return sorted(p for p in d.iterdir() if MESSAGE.match(p.name))
+
+
+def find(root, number):
+    number = normalize(number)
+    found = [(s, d) for s, d in requests(root, STATES) if d.name.startswith(number + "-")]
+    if not found:
+        sys.exit(f"pr: request {number} not found under {root}")
+    if len(found) > 1:
+        sys.exit(f"pr: request {number} found more than once: "
+                 + ", ".join(str(d) for _, d in found))
+    return found[0]
+
+
+def summarize(state, d):
+    msgs = messages(d)
+    if not msgs:
+        return None, "no messages"
+    first = front_matter(msgs[0])
+    info = {"base": first.get("base", "?"), "head": first.get("head", "?"),
+            "title": first.get("title", "?"), "branch": first.get("branch", "?"),
+            "repo": first.get("repo", "?"), "task": first.get("task", "-") or "-"}
+    for p in msgs[1:]:
+        fm = front_matter(p)
+        if fm.get("author") == "requester":
+            for key in ("base", "head"):
+                if fm.get(key):
+                    info[key] = fm[key]
+    last = front_matter(msgs[-1])
+    latest = f"{msgs[-1].stem} by {last.get('author', '?')}"
+    kind = last.get("kind", "")
+    if state != "open":
+        status = state
+    elif kind == "review":
+        status = "waiting for decision"
+    elif kind == "decision":
+        if last.get("decision") == "changes-requested":
+            status = "waiting for author"
+        else:
+            status = f"decided {last.get('decision', '?')}, not applied"
+    elif last.get("author") == "requester":
+        status = "waiting for review"
+    else:
+        status = f"unknown ({msgs[-1].name})"
+    info["latest"] = latest
+    if info["repo"] not in REPOS:
+        status += f"; unknown repo {info['repo']!r}"
+    return info, status
+
+
+def cmd_list(root, which, branch):
+    states = STATES if which == "all" else (which,)
+    rows = []
+    for state, d in requests(root, states):
+        info, status = summarize(state, d)
+        if info is None:
+            if not branch:
+                rows.append((d.name[:6], state, "-", "-", "-", "-", "-", "-", status))
+            continue
+        if branch and info["branch"] != branch:
+            continue
+        rows.append((d.name[:6], state, info["repo"], info["task"], info["title"],
+                     info["branch"], info["head"][:7], info["latest"], status))
+    if not rows:
+        print(f"no {which} requests" + (f" for branch {branch}" if branch else ""))
+        return
+    header = ("request", "state", "repo", "task", "title", "branch", "head", "latest", "status")
+    widths = [max(len(str(r[i])) for r in rows + [header]) for i in range(len(header))]
+    for r in [header] + rows:
+        print("  ".join(str(c).ljust(w) for c, w in zip(r, widths)).rstrip())
+
+
+def git(repo, *args):
+    r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    return r.returncode, r.stdout.strip()
+
+
+def slug(branch):
+    return branch.replace("/", "-")
+
+
+def decision(d):
+    """Front matter of the request's last decision message, or None."""
+    found = None
+    for p in messages(d):
+        fm = front_matter(p)
+        if fm.get("kind") == "decision":
+            found = fm
+    return found
+
+
+def worktrees(repo):
+    """Map branch name -> worktree path; the first entry is the primary checkout."""
+    _, out = git(repo, "worktree", "list", "--porcelain")
+    result, path, first = {}, None, None
+    for line in out.splitlines():
+        if line.startswith("worktree "):
+            path = Path(line[len("worktree "):])
+            first = first or path
+        elif line.startswith("branch refs/heads/"):
+            result[line[len("branch refs/heads/"):]] = path
+    return result, first
+
+
+def merge_commit(repo, main_branch, number, dec):
+    """The merge commit of a merged request: the decision's merge_commit field
+    if it has one, otherwise the merge on the main branch whose message ends
+    with "(pr NNNNNN)"."""
+    if dec.get("merge_commit"):
+        return dec["merge_commit"]
+    rc, out = git(repo, "log", "--merges", "--format=%H", "-F",
+                  f"--grep=(pr {number})", main_branch)
+    found = out.split() if rc == 0 else []
+    return found[0] if found else ""
+
+
+def plan_request(state, d, repo, days, now):
+    """Return (status, actions) for one decided request; actions are argv lists."""
+    info, _ = summarize(state, d)
+    dec = decision(d)
+    if info is None or dec is None:
+        return "skip: no decision message", []
+    branch, head = info["branch"], dec.get("head", "")
+    main_branch = MAIN[info["repo"]]
+    if state == "merged":
+        merge = merge_commit(repo, main_branch, d.name[:6], dec)
+        rc, ct = git(repo, "log", "-1", "--format=%ct", merge) if merge else (1, "")
+        if rc or not ct:
+            return f"skip: merge commit {merge[:7] or 'for pr ' + d.name[:6]} not found", []
+        decided = int(ct)
+    else:
+        try:
+            decided = int(datetime.strptime(dec.get("date", ""), "%Y-%m-%d")
+                          .replace(tzinfo=timezone.utc).timestamp())
+        except ValueError:
+            return "skip: decision has no valid date", []
+    age = (now - decided) / 86400
+    if age < days:
+        ready = datetime.fromtimestamp(decided + days * 86400, timezone.utc)
+        return f"wait: decided {age:.0f} d ago, removable from {ready:%Y-%m-%d}", None
+
+    actions = []
+    if state != "merged":
+        # A rejected or withdrawn head stays reachable through an archive tag,
+        # whether or not its branch still exists.
+        if git(repo, "cat-file", "-e", f"{head}^{{commit}}")[0]:
+            return f"skip: decided head {head[:7] or '?'} not found; nothing to archive", []
+        tag = f"archive/pr-{d.name[:6]}"
+        rc, target = git(repo, "rev-parse", "--verify", "-q", f"refs/tags/{tag}^{{commit}}")
+        if rc == 0 and target != head:
+            return f"skip: {tag} exists at {target[:7]}, not {head[:7]}", []
+        if rc:
+            actions.append(["git", "-C", str(repo), "tag", tag, head])
+    wts, primary = worktrees(repo)
+    rc, tip = git(repo, "rev-parse", "--verify", "-q", f"refs/heads/{branch}")
+    if rc == 0:
+        if tip != head:
+            return f"skip: {branch} moved to {tip[:7]} after the decision on {head[:7]}", []
+        wt = wts.get(branch)
+        if wt == primary:
+            return f"skip: {branch} is checked out in the primary checkout", []
+        if wt is not None:
+            _, dirty = git(wt, "status", "--porcelain", "--ignored")
+            if dirty:
+                return f"skip: worktree {wt} has changes, untracked, or ignored files", []
+            actions.append(["git", "-C", str(repo), "worktree", "remove", str(wt)])
+        if state == "merged":
+            rc, _ = git(repo, "merge-base", "--is-ancestor", head, main_branch)
+            if rc:
+                return f"skip: {head[:7]} is not in {main_branch}", []
+            # `git branch -d` checks merging into HEAD of the primary checkout.
+            _, current = git(repo, "symbolic-ref", "-q", "HEAD")
+            if current != f"refs/heads/{main_branch}":
+                return f"skip: primary checkout is not on {main_branch}", []
+            actions.append(["git", "-C", str(repo), "branch", "-d", branch])
+        else:
+            actions.append(["git", "-C", str(repo), "branch", "-D", branch])
+    return "remove", actions
+
+
+def recovery_tags(repo, main_branch, branches):
+    """(tag, slug) for every recovery tag recovery/<reason>/<slug>[-N] whose
+    slug belongs to a known branch. A numbered suffix (-2, -3, ...) marks a
+    repeated tag of the same branch, unless the full name is itself the slug
+    of a known branch."""
+    known = {slug(b) for b in branches}
+    _, out = git(repo, "for-each-ref", "--format=%(refname:short)", "refs/tags/recovery/")
+    for tag in out.splitlines():
+        s = tag.rsplit("/", 1)[-1]
+        m = re.fullmatch(r"(.+)-\d+", s)
+        if s not in known and m:
+            s = m.group(1)
+        if s in known and s != slug(main_branch):
+            yield tag, s
+
+
+def gc_plan(root, days):
+    """Return (rows, actions): a status row per decided request or tag, and
+    (request, argv) removal commands; nothing is executed."""
+    ws_root = root.resolve().parent.parent
+    now = int(time.time())
+    rows, actions, planned = [], [], []
+    blocked = {r: set() for r in REPOS}    # branches with open, waiting, or skipped requests
+    cleared = {r: {} for r in REPOS}       # branch -> request numbers past the cooldown
+    for state, d in requests(root, STATES):
+        info, _ = summarize(state, d)
+        if info is None or info["repo"] not in REPOS:
+            continue
+        r, b = info["repo"], info["branch"]
+        if state == "open":
+            blocked[r].add(b)
+            continue
+        repo = ws_root / CHECKOUT[r]
+        if not repo.is_dir():
+            blocked[r].add(b)
+            rows.append((d.name[:6], state, r, b, f"skip: checkout {CHECKOUT[r]} not found"))
+            continue
+        status, acts = plan_request(state, d, repo, days, now)
+        if status != "remove":
+            blocked[r].add(b)
+            rows.append((d.name[:6], state, r, b, status))
+            continue
+        cleared[r].setdefault(b, []).append(d.name[:6])
+        planned.append((d.name[:6], state, r, b, acts))
+    # A branch name may be reused by several requests: remove it only when
+    # none of them is blocked, and only through the newest one. Archive tags
+    # of rejected requests are made for each request.
+    for num, state, r, branch, acts in planned:
+        newest = max(cleared[r][branch])
+        archive = [a for a in acts if a[3] == "tag"]
+        if branch in blocked[r]:
+            rows.append((num, state, r, branch,
+                         "skip: branch also belongs to an open, waiting, or skipped request"))
+            acts = archive
+        elif num != newest:
+            rows.append((num, state, r, branch, f"remove via {newest}"))
+            acts = archive
+        else:
+            rows.append((num, state, r, branch, "remove" if acts else "nothing left to remove"))
+        actions += [(num, a) for a in acts]
+    # A recovery tag is removed only when every branch with its slug is
+    # cleared and none is blocked (branches a/b and a-b share a slug).
+    for r in REPOS:
+        repo = ws_root / CHECKOUT[r]
+        if not repo.is_dir():
+            continue
+        by_slug = {}
+        for b in set(cleared[r]) | blocked[r]:
+            by_slug.setdefault(slug(b), set()).add(b)
+        for tag, s in recovery_tags(repo, MAIN[r], set(cleared[r]) | blocked[r]):
+            if by_slug[s] & blocked[r]:
+                continue
+            num = max(n for b in by_slug[s] for n in cleared[r][b])
+            rows.append((num, "tag", r, tag, "remove"))
+            actions.append((num, ["git", "-C", str(repo), "tag", "-d", tag]))
+    return rows, actions
+
+
+def cmd_gc(root, days):
+    rows, actions = gc_plan(root, days)
+    if not rows:
+        print(f"nothing to clean up (cooldown {days:g} days)")
+        return
+    header = ("request", "state", "repo", "branch/tag", "status")
+    widths = [max(len(str(x[i])) for x in rows + [header]) for i in range(len(header))]
+    for x in [header] + rows:
+        print("  ".join(str(c).ljust(w) for c, w in zip(x, widths)).rstrip())
+    if actions:
+        print(f"\ncommands (cooldown {days:g} days), by request:")
+        for num, a in actions:
+            print(f"  [{num}] {shlex.join(a)}")
+        for repo in sorted({a[2] for _, a in actions}):
+            print(f"  [-] {shlex.join(['git', '-C', repo, 'worktree', 'prune'])}")
+
+
+def gc_hint(root):
+    """One line for `pr list` when decided requests have removable items."""
+    _, actions = gc_plan(root, COOLDOWN_DAYS)
+    if actions:
+        print(f"\ncleanup: {len(actions)} removal(s) past the {COOLDOWN_DAYS}-day cooldown;"
+              " see `pr gc`")
+
+
+def cmd_show(root, number):
+    state, d = find(root, number)
+    print(f"# {d.name} ({state})")
+    for p in messages(d):
+        print(f"\n==> {p.name} <==")
+        print(p.read_text(), end="")
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="pr", description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--root", type=Path, default=Path(__file__).resolve().parent.parent / "pr",
+                    help="request directory (default: ../pr next to this tool's directory)")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("list")
+    p.add_argument("which", nargs="?", default="open", choices=STATES + ("all",))
+    p.add_argument("--branch")
+    p = sub.add_parser("show")
+    p.add_argument("number")
+    p = sub.add_parser("path")
+    p.add_argument("number")
+    p = sub.add_parser("gc")
+    p.add_argument("--days", type=float, default=COOLDOWN_DAYS,
+                   help=f"cooldown after the decision (default {COOLDOWN_DAYS})")
+    a = ap.parse_args()
+    if a.cmd in ("list", "gc"):
+        load_repos(a.root)
+    if a.cmd == "list":
+        cmd_list(a.root, a.which, a.branch)
+        gc_hint(a.root)
+    elif a.cmd == "gc":
+        cmd_gc(a.root, a.days)
+    elif a.cmd == "show":
+        cmd_show(a.root, a.number)
+    else:
+        print(find(a.root, a.number)[1])
+
+
+if __name__ == "__main__":
+    main()

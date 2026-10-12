@@ -1,0 +1,796 @@
+#!/usr/bin/env python3
+"""Roles and tasks of a Partitur project, kept as files in the records repository.
+
+Usage (NAME is the holder name a session received when it took its role;
+a task is given by number, `0007` or `7`, sub-task `0007.1`, or by name):
+  ptt who                          who holds which role and task
+  ptt whoami NAME                  what NAME holds, and what waits on it
+  ptt tasks [--all]                tasks and their states
+  ptt show TASK                    a task's charter, status, and events
+  ptt take designer|integrator|TASK   take a role or a ready task; prints the holder name
+  ptt leave NAME [--status TEXT]   give up a role, or ask to give up a task
+  ptt approve-leave TASK --as NAME   supervisor: accept a holder's request to leave
+  ptt free TASK|ROLE --as NAME --reason TEXT
+                                   supervisor (or --as user): free a task or role whose
+                                   holder is gone
+  ptt mktask SLUG --as NAME [--kind track|worker|design] [--depends TASK,TASK]
+                                   designer: create a draft task; prints its charter path
+  ptt ready TASK --as NAME         designer: release a completed draft for taking
+  ptt amend TASK --as NAME --text TEXT [--depends TASK,TASK]
+                                   designer: amend a released charter
+  ptt done TASK --as NAME [--requests N,N] [--text TEXT]
+                                   holder: report the task's acceptance met
+  ptt close TASK --as NAME         supervisor: accept the report; the hold ends
+  ptt reopen TASK --as NAME --reason TEXT   supervisor: reject the report
+  ptt cancel TASK --as NAME --reason TEXT   supervisor: cancel a task nobody holds
+  ptt pr-move N merged|closed -m MESSAGE
+                                   integrator: move a decided request, recorded at once
+  ptt record -m MESSAGE PATH...    commit exactly these paths of the records repository
+                                   (request messages, status.md, role files), under
+                                   the same lock as every other change
+
+Records: <records>/tasks/{open,done,cancelled}/NNNN[.N...]-slug/ holds charter.md
+(the designer's, from tasks/charter-template.md; frozen once released),
+status.md (the holder's), and numbered event files MMMM-<kind>.md, each
+written once. <records>/roles/{designer,integrator}/ hold the role events. All
+state is derived from the events. Every change runs under one lock (a
+kernel file lock in the Git directory, released if the process dies), reads
+the state, checks it, writes, and commits exactly its paths as one commit,
+leaving everything else staged alone; if the commit fails, the change is
+removed again. Every write to the
+records repository goes through ptt (`ptt record` for request messages,
+status.md, and role files), so writes run one after another. Git commands
+run by hand in the records repository while sessions work (stash,
+checkout, a manual commit) are outside this guarantee.
+
+Supervision: the designer supervises top-level tasks; the holder of design
+task N supervises N.1, N.2, ...; the user supervises the designer, the
+integrator, and any task whose supervisor is vacant (--as user). A holder
+leaves a task only with its supervisor's approval. Nobody leaves, and no
+design task is cancelled, while anything below it is unclear: a leave
+request or done report waiting, or a holder with no record for STALE_DAYS.
+Names given with --as are not authenticated: the records show who did what.
+"""
+import argparse
+import fcntl
+import os
+import re
+import shutil
+import subprocess
+import sys
+import time
+from contextlib import contextmanager
+from datetime import date
+from pathlib import Path
+
+REC = Path(__file__).resolve().parent.parent
+TASKS = REC / "tasks"
+ROLES = REC / "roles"
+PLACES = ("open", "done", "cancelled")
+TASK_DIR = re.compile(r"^(\d{4}(?:\.\d+)*)-([a-z0-9][a-z0-9-]*)$")
+EVENT = re.compile(r"^(\d{4})-([a-z-]+)\.md$")
+KINDS = ("track", "worker", "design")
+STALE_DAYS = float(os.environ.get("PTT_STALE_DAYS", "7"))
+
+
+def die(msg):
+    sys.exit(f"ptt: {msg}")
+
+
+def front_matter(path):
+    lines = path.read_text().splitlines()
+    fields, body = {}, ""
+    if lines and lines[0] == "---":
+        for i, line in enumerate(lines[1:], 1):
+            if line == "---":
+                body = "\n".join(lines[i + 1:]).strip()
+                break
+            key, sep, value = line.partition(":")
+            if sep:
+                fields[key.strip()] = value.strip()
+    return fields, body
+
+
+# --- records: lock, events, commits -----------------------------------------
+
+def git_dir():
+    r = subprocess.run(["git", "-C", str(REC), "rev-parse", "--git-common-dir"],
+                       capture_output=True, text=True)
+    if r.returncode:
+        die(f"{REC} is not a Git repository")
+    return (REC / r.stdout.strip()).resolve()
+
+
+@contextmanager
+def lock():
+    """Serialize all changes of every session on this machine."""
+    with open(git_dir() / "ptt.lock", "w") as f:
+        fcntl.flock(f, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(f, fcntl.LOCK_UN)
+
+
+def git(*args, check=True, raise_=False):
+    wait = float(os.environ.get("PTT_LOCK_WAIT", "60"))
+    for _ in range(max(1, int(wait * 4))):
+        r = subprocess.run(["git", "-C", str(REC), *args], capture_output=True, text=True)
+        if "index.lock" not in r.stderr:
+            break
+        time.sleep(0.25)          # a git command outside ptt is busy
+    if r.returncode and raise_:
+        raise RuntimeError(f"git {' '.join(args)}: {r.stderr.strip()}")
+    if check and r.returncode:
+        die(f"git {' '.join(args)} failed: {r.stderr.strip()}")
+    return r
+
+
+def record(message, add=(), remove=(), created=(), undo=None):
+    """Commit exactly `add` and `remove` (paths in the working tree, files or
+    directories) as one commit, leaving everything else staged alone. The
+    caller holds the lock. On any failure, `undo` runs, or the paths in
+    `created` are removed, the touched paths are unstaged, and nothing is
+    recorded."""
+    rel = [str(p.relative_to(REC)) for p in (*add, *remove)]
+    try:
+        git("add", "-A", "--", *rel, check=False, raise_=True)
+        if git("diff", "--cached", "--quiet", "--", *rel, check=False).returncode == 0:
+            return False
+        git("commit", "-q", "-m", message, "--", *rel, check=False, raise_=True)
+        return True
+    except BaseException as err:
+        git("reset", "-q", "--", *rel, check=False)
+        if undo:
+            undo()
+        for p in created:
+            if p.is_dir():
+                shutil.rmtree(p, ignore_errors=True)
+            else:
+                p.unlink(missing_ok=True)
+        if isinstance(err, RuntimeError):
+            die(f"commit failed, nothing recorded: {err}")
+        raise
+
+
+def events(d):
+    out = []
+    for p in sorted(d.iterdir()) if d.is_dir() else []:
+        m = EVENT.match(p.name)
+        if m:
+            fm, body = front_matter(p)
+            out.append(dict(fm, n=int(m.group(1)), kind=m.group(2), body=body, path=p))
+    return out
+
+
+def clean(value):
+    value = str(value)
+    if "\n" in value or "\r" in value:
+        die("field values may not contain line breaks")
+    return value
+
+
+def add_event(d, kind, fields, body, message, also=()):
+    """Write the next event in d and commit it, with the new files in `also`;
+    the caller holds the lock."""
+    evs = events(d)
+    n = (evs[-1]["n"] if evs else 0) + 1
+    path = d / f"{n:04d}-{kind}.md"
+    fields = dict(fields, event=kind, date=date.today().isoformat())
+    text = "---\n" + "".join(f"{k}: {clean(v)}\n" for k, v in fields.items()) + "---\n"
+    if body:
+        text += "\n" + body.strip() + "\n"
+    new_dir = [] if d.exists() else [d]
+    d.mkdir(parents=True, exist_ok=True)
+    with open(path, "x") as f:
+        f.write(text)
+    record(message, add=[path, *also], created=[path, *also, *new_dir])
+    return path
+
+
+# --- roles ------------------------------------------------------------------
+
+def role_state(role):
+    holder, gen = None, 0
+    for e in events(ROLES / role):
+        if e["kind"] == "take":
+            holder, gen = e["by"], gen + 1
+        elif e["kind"] == "leave":
+            holder = None
+    return holder, gen
+
+
+def role_name(role, gen):
+    return f"designer-g{gen}" if role == "designer" else f"integrator-{gen}"
+
+
+# --- tasks ------------------------------------------------------------------
+
+def key(number):
+    return tuple(int(x) for x in number.split("."))
+
+
+def all_tasks():
+    found = []
+    for place in PLACES:
+        base = TASKS / place
+        for d in base.iterdir() if base.is_dir() else []:
+            m = TASK_DIR.match(d.name)
+            if m and d.is_dir():
+                found.append((place, m.group(1), d))
+    return sorted(found, key=lambda t: key(t[1]))
+
+
+def normalize(number):
+    parts = number.split(".")
+    return ".".join([parts[0].zfill(4)] + parts[1:])
+
+
+def find_task(ref):
+    """A task by number (0007, 7, 0007.1), directory name, or slug."""
+    tasks = all_tasks()
+    m = re.fullmatch(r"(\d+(?:\.\d+)*)(?:-([a-z0-9-]+))?", ref)
+    if m:
+        number, slug = normalize(m.group(1)), m.group(2)
+        hits = [t for t in tasks if t[1] == number]
+        if hits and slug and hits[0][2].name != f"{number}-{slug}":
+            die(f"task {number} is {hits[0][2].name}, not {ref}")
+    else:
+        hits = [t for t in tasks if t[2].name.split("-", 1)[1] == ref]
+        if len(hits) > 1:
+            unfinished = [t for t in hits if t[0] == "open"]
+            if len(unfinished) == 1:
+                hits = unfinished
+            else:
+                die(f"several tasks are named {ref}: " + ", ".join(t[1] for t in hits)
+                    + "; use the number")
+    if not hits:
+        die(f"task {ref} not found")
+    return hits[0]
+
+
+def raw_info(place, d):
+    charter = front_matter(d / "charter.md")[0] if (d / "charter.md").exists() else {}
+    number = TASK_DIR.match(d.name).group(1)
+    info = dict(number=number, slug=d.name.split("-", 1)[1], dir=d, place=place,
+                kind=charter.get("kind", "track"),
+                depends=[x.strip() for x in charter.get("depends", "").split(",") if x.strip()],
+                state="draft", holder=None, last_holder=None, takes=0,
+                leave_request=None, done=None)
+    for e in events(d):
+        k = e["kind"]
+        if k == "release":
+            info["state"] = "ready"
+        elif k == "amend" and "depends" in e:
+            info["depends"] = [x.strip() for x in e["depends"].split(",") if x.strip()]
+        elif k == "take":
+            info.update(state="held", holder=e["by"], leave_request=None, done=None)
+            info["takes"] += 1
+        elif k == "leave-request":
+            info["leave_request"] = e
+        elif k == "leave":
+            info.update(state="ready", holder=None, leave_request=None, done=None)
+        elif k == "done":
+            info["done"] = e
+        elif k == "reopen":
+            info["done"] = None
+        elif k in ("close", "cancel"):
+            info.update(state="closed" if k == "close" else "cancelled",
+                        last_holder=info["holder"], holder=None, leave_request=None)
+    return info
+
+
+def infos():
+    """All tasks; a ready task whose dependencies are not all closed is blocked."""
+    out = [raw_info(p, d) for p, _, d in all_tasks()]
+    states = {i["number"]: i["state"] for i in out}
+    for i in out:
+        if i["state"] == "ready" and any(states.get(dep) != "closed" for dep in i["depends"]):
+            i["state"] = "blocked"
+            i["blocked_by"] = [dep for dep in i["depends"] if states.get(dep) != "closed"]
+    return out
+
+
+def task_info(d):
+    for i in infos():
+        if i["dir"] == d:
+            return i
+    die(f"task directory {d.name} not found")
+
+
+def get(ref):
+    return task_info(find_task(ref)[2])
+
+
+def check_depends(number, refs):
+    """Normalize, deduplicate, and validate dependencies of task `number`."""
+    deps = []
+    for ref in refs:
+        n = get(ref)["number"] if not isinstance(ref, dict) else ref["number"]
+        if n not in deps:
+            deps.append(n)
+    tasks = {i["number"]: i for i in infos()}
+    for n in deps:
+        need(n != number, f"task {number} cannot depend on itself")
+        need(not number.startswith(n + "."), f"task {number} cannot depend on {n}, which contains it")
+        need(not n.startswith(number + "."), f"task {number} cannot depend on its own subtask {n}")
+        need(tasks[n]["state"] != "cancelled", f"dependency {n} is cancelled")
+    graph = {k: list(v["depends"]) for k, v in tasks.items()}
+    graph[number] = deps
+    seen, stack = set(), list(deps)
+    while stack:
+        n = stack.pop()
+        need(n != number, f"dependencies of task {number} would form a cycle through {n}")
+        if n not in seen:
+            seen.add(n)
+            stack.extend(graph.get(n, []))
+    return deps
+
+
+def holder_name(info):
+    base = f"{info['kind']}-{info['number']}"
+    return base if info["takes"] == 0 else f"{base}-{info['takes'] + 1}"
+
+
+def supervisor(number):
+    """The holder name supervising task `number`, or None when vacant."""
+    if "." not in number:
+        return role_state("designer")[0]
+    return get(number.rsplit(".", 1)[0])["holder"]
+
+
+def held_by(name):
+    for role in ("designer", "integrator"):
+        if role_state(role)[0] == name:
+            return ("role", role)
+    for i in infos():
+        if i["holder"] == name:
+            return ("task", i)
+    return None
+
+
+def subtree(name):
+    """Tasks below `name`: all tasks for the designer, all descendants of its
+    design task for a sub-designer."""
+    held = held_by(name)
+    if held == ("role", "designer"):
+        return infos()
+    if held and held[0] == "task" and held[1]["kind"] == "design":
+        p = held[1]["number"] + "."
+        return [i for i in infos() if i["number"].startswith(p)]
+    return []
+
+
+def last_record(i):
+    out = git("log", "-1", "--format=%ct", "--", str(i["dir"].relative_to(REC)),
+              check=False).stdout.strip()
+    return int(out) if out else None
+
+
+def unclear(tasks):
+    """Lines describing tasks whose status is unclear."""
+    out, now = [], time.time()
+    for i in tasks:
+        if i["holder"] is None:
+            continue
+        if i["leave_request"]:
+            out.append(f"task {i['number']}: {i['holder']} asks to leave")
+        if i["done"]:
+            out.append(f"task {i['number']}: {i['holder']} reports done")
+        last = last_record(i)
+        if last and now - last > STALE_DAYS * 86400:
+            out.append(f"task {i['number']}: no record from {i['holder']} for "
+                       f"{int((now - last) / 86400)} days")
+    return out
+
+
+def must_supervise(name, number):
+    sup = supervisor(number)
+    if name == "user" or sup == name:
+        return
+    die(f"{name} does not supervise task {number} (its supervisor is "
+        f"{sup or 'vacant; the user acts with --as user'})")
+
+
+def must_be_clear(name, tasks=None):
+    lines = unclear(subtree(name) if tasks is None else tasks)
+    if lines:
+        die(f"{name}: something below is unclear; settle it first: " + "; ".join(lines))
+
+
+def need(cond, msg):
+    if not cond:
+        die(msg)
+
+
+# --- commands -----------------------------------------------------------------
+
+def cmd_take(a):
+    if a.what in ("designer", "integrator"):
+        holder, gen = role_state(a.what)
+        need(not holder, f"{a.what} is held by {holder}; it must leave first "
+             "(or the user frees it)")
+        name = role_name(a.what, gen + 1)
+        add_event(ROLES / a.what, "take", dict(by=name, generation=gen + 1), "",
+                  f"role {a.what}: taken by {name}")
+        print(name)
+        return
+    i = get(a.what)
+    detail = (f" (held by {i['holder']})" if i["holder"] else "") + \
+             (f" (waits for {', '.join(i['blocked_by'])})" if i.get("blocked_by") else "")
+    need(i["state"] == "ready", f"task {i['number']} is {i['state']}{detail}; cannot take it")
+    name = holder_name(i)
+    status = i["dir"] / "status.md"
+    extra = []
+    if not status.exists():
+        status.write_text(f"# Status of task {i['number']}\n\nWritten by the holder: what is "
+                          "done (request numbers and merge commits), what is open, where it "
+                          "stands. No review states.\n")
+        extra = [status]
+    add_event(i["dir"], "take", dict(by=name), "", f"task {i['number']}: taken by {name}",
+              also=extra)
+    print(name)
+
+
+def cmd_leave(a):
+    held = held_by(a.name)
+    need(held, f"{a.name} holds nothing")
+    must_be_clear(a.name)
+    if held[0] == "role":
+        role = held[1]
+        if role == "integrator":
+            pending = []
+            for d in sorted((REC / "pr" / "open").glob("*")):
+                msgs = sorted(d.glob("[0-9][0-9][0-9][0-9]-*.md"))
+                if msgs:
+                    fm = front_matter(msgs[-1])[0]
+                    if fm.get("kind") == "decision" and fm.get("decision") != "changes-requested":
+                        pending.append(d.name[:6])
+            need(not pending, "integrator cannot leave: decisions not carried out for "
+                 "request(s) " + ", ".join(pending))
+        add_event(ROLES / role, "leave", dict(by=a.name), a.status or "",
+                  f"role {role}: {a.name} leaves")
+        print(f"{a.name} left the {role} role")
+        return
+    i = held[1]
+    need(not i["leave_request"], f"{a.name} already asked to leave task {i['number']}")
+    need(not i["done"], f"task {i['number']} is reported done; its supervisor closes or reopens it")
+    add_event(i["dir"], "leave-request", dict(by=a.name), a.status or "",
+              f"task {i['number']}: {a.name} asks to leave")
+    sup = supervisor(i["number"])
+    print(f"asked to leave task {i['number']}; "
+          + (f"{sup} must approve" if sup else "the supervisor is vacant; the user approves")
+          + f" (ptt approve-leave {i['number']})")
+
+
+def cmd_approve_leave(a):
+    i = get(a.task)
+    must_supervise(a.as_, i["number"])
+    need(i["holder"] and i["leave_request"], f"nobody asked to leave task {i['number']}")
+    if i["kind"] == "design":
+        must_be_clear(i["holder"])
+    add_event(i["dir"], "leave", dict(by=i["holder"], approved_by=a.as_), "",
+              f"task {i['number']}: {i['holder']} leaves, approved by {a.as_}")
+    print(f"task {i['number']} is ready again")
+
+
+def cmd_free(a):
+    if a.what in ("designer", "integrator"):
+        need(a.as_ == "user", "only the user frees a role (--as user)")
+        holder, _ = role_state(a.what)
+        need(holder, f"{a.what} is not held")
+        add_event(ROLES / a.what, "leave", dict(by=holder, freed_by="user"), a.reason,
+                  f"role {a.what}: {holder} freed by the user")
+        print(f"{a.what} is free")
+        return
+    i = get(a.what)
+    must_supervise(a.as_, i["number"])
+    need(i["state"] == "held", f"task {i['number']} is not held")
+    need(not i["done"], f"task {i['number']} is reported done; close or reopen it first")
+    last = last_record(i)
+    silent = last is not None and time.time() - last > STALE_DAYS * 86400
+    need(silent or a.force, f"{i['holder']} has a record from the last {STALE_DAYS:g} days; "
+         "it may still be working. Ask it to leave (approval), or use --force if you know "
+         "it is gone")
+    add_event(i["dir"], "leave", dict(by=i["holder"], freed_by=a.as_, forced=bool(a.force)),
+              a.reason,
+              f"task {i['number']}: {i['holder']} freed by {a.as_}")
+    print(f"task {i['number']} is ready again; its status.md shows where it stood")
+
+
+def cmd_mktask(a):
+    held = held_by(a.as_)
+    if held == ("role", "designer"):
+        prefix = ""
+    elif held and held[0] == "task" and held[1]["kind"] == "design":
+        prefix = held[1]["number"] + "."
+    else:
+        die(f"{a.as_} is not a designer; only a designer makes tasks")
+    need(re.fullmatch(r"[a-z][a-z0-9-]*", a.slug),
+         "slug: starts with a letter; lower-case letters, digits, hyphens")
+    need(a.kind in KINDS, f"kind must be one of {', '.join(KINDS)}")
+    need(not [t for t in all_tasks() if t[0] == "open" and t[2].name.split("-", 1)[1] == a.slug],
+         f"an unfinished task is already named {a.slug}")
+    siblings = [n for _, n, _ in all_tasks()
+                if n.startswith(prefix) and "." not in n[len(prefix):]]
+    last = max((int(n[len(prefix):]) for n in siblings), default=0)
+    number = f"{prefix}{last + 1}" if prefix else f"{last + 1:04d}"
+    depends = check_depends(number, [x.strip() for x in (a.depends or "").split(",") if x.strip()])
+    d = TASKS / "open" / f"{number}-{a.slug}"
+    d.mkdir(parents=True)        # fails if it exists: the lock makes this a bug
+    template = TASKS / "charter-template.md"
+    body = template.read_text() if template.exists() else "# Task {{NUMBER}}: {{TITLE}}\n"
+    text = (f"---\ntask: {number}\nkind: {a.kind}\ndepends: {', '.join(depends)}\n"
+            f"designer: {a.as_}\ndate: {date.today().isoformat()}\n---\n\n"
+            + body.replace("{{TITLE}}", a.slug.replace("-", " ").capitalize())
+                  .replace("{{NUMBER}}", number))
+    (d / "charter.md").write_text(text)
+    record(f"task {number}: draft by {a.as_}", add=[d / "charter.md"], created=[d])
+    print(d / "charter.md")
+
+
+def cmd_ready(a):
+    i = get(a.task)
+    must_supervise(a.as_, i["number"])
+    need(i["state"] == "draft", f"task {i['number']} is {i['state']}, not a draft")
+    charter = (i["dir"] / "charter.md").read_text()
+    need("{{" not in charter, f"the charter of task {i['number']} still has {{{{...}}}} "
+         "placeholders; fill them in first")
+    need(i["kind"] in KINDS, f"kind '{i['kind']}' must be one of {', '.join(KINDS)}")
+    check_depends(i["number"], i["depends"])
+    record(f"task {i['number']}: charter as released", add=[i["dir"] / "charter.md"])
+    add_event(i["dir"], "release", dict(by=a.as_), "", f"task {i['number']}: released by {a.as_}")
+    print(f"task {i['number']} is ready to take")
+
+
+def cmd_amend(a):
+    i = get(a.task)
+    must_supervise(a.as_, i["number"])
+    need(i["state"] not in ("draft", "closed", "cancelled"),
+         f"task {i['number']} is {i['state']}: a draft is edited directly, a finished task "
+         "is not amended")
+    fields = dict(by=a.as_)
+    if a.depends is not None:
+        fields["depends"] = ", ".join(check_depends(
+            i["number"], [x.strip() for x in a.depends.split(",") if x.strip()]))
+    add_event(i["dir"], "amend", fields, a.text, f"task {i['number']}: amended by {a.as_}")
+    print("amended; tell the holder, if any")
+
+
+def cmd_done(a):
+    i = get(a.task)
+    need(i["state"] == "held" and i["holder"] == a.as_, f"{a.as_} does not hold task {i['number']}")
+    need(not i["done"], f"task {i['number']} is already reported done")
+    need(not i["leave_request"], f"{a.as_} asked to leave task {i['number']}; settle that first")
+    add_event(i["dir"], "done", dict(by=a.as_, requests=a.requests or ""), a.text or "",
+              f"task {i['number']}: {a.as_} reports done")
+    print(f"reported; {supervisor(i['number']) or 'the user (supervisor vacant)'} "
+          "closes or reopens")
+
+
+def finish(i, kind, place, fields, body, message):
+    """Write the closing event and move the task to `place`, as one commit."""
+    dirty = git("status", "--porcelain", "--untracked-files=all", "--",
+                str(i["dir"].relative_to(REC))).stdout.strip()
+    need(not dirty, f"{i['dir'].relative_to(REC)} has uncommitted changes; commit them first "
+         "(ptt record):\n" + dirty)
+    evs = events(i["dir"])
+    event = i["dir"] / f"{(evs[-1]['n'] if evs else 0) + 1:04d}-{kind}.md"
+    fields = dict(fields, event=kind, date=date.today().isoformat())
+    text = "---\n" + "".join(f"{k}: {clean(v)}\n" for k, v in fields.items()) + "---\n"
+    if body:
+        text += "\n" + body.strip() + "\n"
+    target = TASKS / place / i["dir"].name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with open(event, "x") as f:
+        f.write(text)
+    os.rename(i["dir"], target)
+
+    def undo():
+        os.rename(target, i["dir"])
+        (i["dir"] / event.name).unlink(missing_ok=True)
+    record(message, add=[target], remove=[i["dir"]], undo=undo)
+
+
+def cmd_close(a):
+    i = get(a.task)
+    must_supervise(a.as_, i["number"])
+    need(i["state"] == "held" and i["done"], f"task {i['number']} has no done report to accept")
+    open_below = [x["number"] for x in infos() if x["number"].startswith(i["number"] + ".")
+                  and x["state"] not in ("closed", "cancelled")]
+    need(not open_below, "its subtasks are not closed: " + ", ".join(open_below))
+    finish(i, "close", "done", dict(by=a.as_), "", f"task {i['number']}: closed by {a.as_}")
+    print(f"task {i['number']} closed; {i['holder']} holds nothing now")
+
+
+def cmd_reopen(a):
+    i = get(a.task)
+    must_supervise(a.as_, i["number"])
+    need(i["state"] == "held" and i["done"], f"task {i['number']} has no done report to reopen")
+    add_event(i["dir"], "reopen", dict(by=a.as_), a.reason,
+              f"task {i['number']}: reopened by {a.as_}")
+    print(f"task {i['number']} reopened; {i['holder']} continues")
+
+
+def cmd_cancel(a):
+    i = get(a.task)
+    must_supervise(a.as_, i["number"])
+    need(i["state"] in ("draft", "ready", "blocked"),
+         f"task {i['number']} is {i['state']}" + (f" by {i['holder']}; free it first"
+                                                if i["holder"] else ""))
+    below = [x["number"] for x in infos() if x["number"].startswith(i["number"] + ".")
+             and x["state"] not in ("closed", "cancelled")]
+    need(not below, "its subtasks are not finished: " + ", ".join(below))
+    dependents = [x["number"] for x in infos() if i["number"] in x["depends"]
+                  and x["state"] not in ("closed", "cancelled")]
+    need(not dependents, f"tasks {', '.join(dependents)} depend on it; amend or cancel them first")
+    finish(i, "cancel", "cancelled", dict(by=a.as_), a.reason,
+           f"task {i['number']}: cancelled by {a.as_}")
+    print(f"task {i['number']} cancelled")
+
+
+def cmd_pr_move(a):
+    number = a.request.lower().removeprefix("pr-").zfill(6)
+    hits = sorted((REC / "pr" / "open").glob(f"{number}-*"))
+    need(hits, f"request {number} is not in pr/open")
+    src = hits[0]
+    dirty = git("status", "--porcelain", "--untracked-files=all", "--",
+                str(src.relative_to(REC))).stdout.strip()
+    need(not dirty, f"{src.relative_to(REC)} has unrecorded changes; record them first:\n" + dirty)
+    target = REC / "pr" / a.to / src.name
+    target.parent.mkdir(parents=True, exist_ok=True)
+    os.rename(src, target)
+    record(a.message, add=[target], remove=[src], undo=lambda: os.rename(target, src))
+    print(f"request {number} moved to pr/{a.to}")
+
+
+def in_head(path):
+    return git("cat-file", "-e", f"HEAD:{path.relative_to(REC)}", check=False).returncode == 0
+
+
+def cmd_record(a):
+    paths = []
+    for x in a.paths:
+        p = (Path.cwd() / x).resolve() if not Path(x).is_absolute() else Path(x).resolve()
+        need(p == REC or REC in p.parents, f"{x} is outside the records repository")
+        paths.append(p)
+    need(paths, "name the paths to record")
+    for p in paths:
+        r = p.relative_to(REC).parts
+        if len(r) < 3 or r[0] not in ("tasks", "pr") or r[1] not in PLACES + ("merged", "closed"):
+            continue
+        target = REC / r[0] / r[1] / r[2]
+        if in_head(target):
+            continue                  # an existing task or request: a normal write
+        number = r[2].split("-")[0]
+        moved = [d for d in (REC / r[0]).glob(f"*/{number}-*")
+                 if d.is_dir() and d != target and in_head(d)]
+        need(not moved, f"{p.relative_to(REC)}: {number} is now {moved[0].relative_to(REC)} "
+             "(moved by a decision); write there instead, and remove this stray copy" if moved
+             else "")
+    print("recorded" if record(a.message, add=paths) else "nothing to record")
+
+
+def cmd_tasks(a):
+    def waiting(i):
+        if i["holder"] is None:
+            return "waits for " + ", ".join(i["blocked_by"]) if i.get("blocked_by") else ""
+        return "leave asked" if i["leave_request"] else "done reported" if i["done"] else ""
+    rows = [(i["number"], i["kind"], i["state"],
+             i["holder"] or (f"({i['last_holder']})" if i["last_holder"] else "-"),
+             waiting(i), i["slug"]) for i in infos()
+            if a.all or i["state"] not in ("closed", "cancelled")]
+    loose = []
+    for line in git("status", "--porcelain", "--untracked-files=all", "--", "tasks", "roles",
+                    check=False).stdout.splitlines():
+        loose += line[3:].split(" -> ")
+    if loose:
+        print("warning: uncommitted in the records repository (an interrupted command, or a "
+              "write not yet recorded):")
+        for path in loose:
+            print(f"  {path}")
+        print("  inspect with `git -C <records> status`; to keep the change, record these "
+              "paths with `ptt record -m <message> <paths>`; to drop it, run "
+              "`git -C <records> reset -q -- <paths>` and `git -C <records> checkout -- <paths>`, "
+              "and delete what is untracked (see flows/tasks.md, Recovery)")
+    if not rows:
+        print("no tasks")
+        return
+    header = ("task", "kind", "state", "holder", "waiting", "name")
+    w = [max(len(str(r[k])) for r in rows + [header]) for k in range(len(header))]
+    for r in [header] + rows:
+        print("  ".join(str(c).ljust(x) for c, x in zip(r, w)).rstrip())
+
+
+def cmd_show(a):
+    d = find_task(a.task)[2]
+    for p in [d / "charter.md", d / "status.md"] + [e["path"] for e in events(d)]:
+        if p.exists():
+            print(f"\n==> {p.name} <==\n{p.read_text()}", end="")
+
+
+def cmd_who(a):
+    for role in ("designer", "integrator"):
+        print(f"{role:11} {role_state(role)[0] or '(free)'}")
+    for i in infos():
+        if i["holder"]:
+            print(f"task {i['number']:9} {i['holder']}  ({i['kind']}, {i['slug']})")
+
+
+def cmd_whoami(a):
+    held = held_by(a.name)
+    if not held:
+        print(f"{a.name} holds nothing; take a role or task with `ptt take`")
+        return
+    if held[0] == "role":
+        print(f"{a.name}: {held[1]}; supervisor: the user")
+    else:
+        i = held[1]
+        sup = supervisor(i["number"])
+        print(f"{a.name}: {i['kind']} of task {i['number']} ({i['slug']}); supervisor "
+              + (sup or "vacant (the user acts until it is taken)"))
+        print(f"charter: {(i['dir'] / 'charter.md').relative_to(REC.parent)}")
+        if i["leave_request"]:
+            print("waiting: your request to leave")
+        if i["done"]:
+            print("waiting: your done report")
+    for line in unclear(subtree(a.name)):
+        print("waits on you:", line)
+
+
+MUTATING = {"take", "leave", "approve-leave", "free", "mktask", "ready", "amend", "done",
+            "close", "reopen", "cancel", "record", "pr-move"}
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="ptt", description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    def add(name, *positional, as_=False, **options):
+        p = sub.add_parser(name)
+        for x in positional:
+            p.add_argument(x)
+        if as_:
+            p.add_argument("--as", dest="as_", required=True)
+        for opt, kw in options.items():
+            p.add_argument("--" + opt, **kw)
+        return p
+    add("who")
+    add("whoami", "name")
+    add("tasks", all=dict(action="store_true"))
+    add("show", "task")
+    add("take", "what")
+    add("leave", "name", status=dict())
+    add("approve-leave", "task", as_=True)
+    add("free", "what", as_=True, reason=dict(required=True), force=dict(action="store_true"))
+    add("mktask", "slug", as_=True, kind=dict(default="track"), depends=dict())
+    add("ready", "task", as_=True)
+    add("amend", "task", as_=True, text=dict(required=True), depends=dict())
+    add("done", "task", as_=True, requests=dict(), text=dict())
+    add("close", "task", as_=True)
+    add("reopen", "task", as_=True, reason=dict(required=True))
+    add("cancel", "task", as_=True, reason=dict(required=True))
+    p = sub.add_parser("pr-move")
+    p.add_argument("request")
+    p.add_argument("to", choices=("merged", "closed"))
+    p.add_argument("-m", "--message", required=True)
+    p = sub.add_parser("record")
+    p.add_argument("-m", "--message", required=True)
+    p.add_argument("paths", nargs="+")
+    a = ap.parse_args()
+    need((REC / ".git").exists(), f"{REC} is not the records repository (no .git)")
+    own = subprocess.run(["git", "-C", str(REC), "rev-parse", "--absolute-git-dir"],
+                         capture_output=True, text=True).stdout.strip()
+    need(Path(own).resolve() == git_dir(), "ptt runs only in the primary checkout of the "
+         "records repository, not in a linked worktree: all sessions must share one state")
+    run = globals()["cmd_" + a.cmd.replace("-", "_")]
+    if a.cmd in MUTATING:
+        with lock():
+            run(a)
+    else:
+        run(a)
+
+
+if __name__ == "__main__":
+    main()

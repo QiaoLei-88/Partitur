@@ -1,0 +1,269 @@
+#!/usr/bin/env python3
+"""Install Partitur for Claude Code, Codex, or both, for a user or a project.
+
+Usage:
+  install --tool {claude,codex,all} --scope user
+  install --tool {claude,codex,all} --scope project [PROJECT] [--update]
+          [--name NAME] [--records DIR] [--branch MAIN] [--repo NAME:CHECKOUT:MAIN ...]
+
+--scope user
+  Links this repository as the skill `partitur` in the user's skill
+  directories: ~/.claude/skills (Claude Code) and ~/.agents/skills (Codex).
+  Every session of this user can then find Partitur in any project.
+
+--scope project
+  Sets PROJECT (default: the current directory, the workspace root that
+  holds the code checkouts) up to work the Partitur way:
+    <records>/                Git repository (main branch --branch, default master)
+    <records>/CLAUDE.md       the rules file, from templates/rules.md
+    <records>/pr/             request directories, repos table, README
+    <records>/handoff/        designer.md (the root designer's charter and
+                              handover), integrator.md (the integrator's
+                              status), notes/ (temporary notes to the designer)
+    <records>/tasks/          tasks: open/, done/, cancelled/, charter template
+    <records>/roles/          designer/ and integrator/ role records
+    <records>/bin/            ptt, pr, and test-run, from project/bin/
+    <records>/skills/         the ptt-* skills
+  and, for each chosen tool, the links it reads in the workspace root:
+    Claude Code:  CLAUDE.md -> <records>/CLAUDE.md, .claude/skills/<skill>
+    Codex:        AGENTS.md -> <records>/CLAUDE.md, .agents/skills/<skill>
+  where <skill> is each ptt-* skill, and `partitur` (this repository)
+  unless the user scope already links it for that tool.
+  The name defaults to the directory's name and <records> to `workspace`.
+  Without --repo, the repository table lists every Git checkout directly in
+  PROJECT (name = directory, main branch = its checked-out branch), except
+  the records repository and Partitur itself; a checkout deeper down is
+  added later as a line in <records>/pr/repos.
+
+Both scopes are safe to rerun: nothing that exists is overwritten or
+removed, and nothing is committed. Every path is reported as created, kept,
+or differs. Files the project owns once created (the rules file, the
+designer's and integrator's files, the repository table) are kept as they
+are. Files
+Partitur maintains (bin/, skills/, pr/README.md) and links are compared:
+"differs" means the project's copy was changed or is older than this
+Partitur, so a rerun shows what an update would bring; --update replaces
+them (the project's own files are never replaced). Without --tool and
+--scope, nothing is changed and this text is printed.
+"""
+import argparse
+import filecmp
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent.parent
+URL = "https://github.com/QiaoLei-88/Partitur"
+SKILLS = ("ptt-take", "ptt-leave", "ptt-whoami", "ptt-mktask", "ptt-done", "ptt-close",
+          "ptt-pr-submit", "ptt-pr-review", "ptt-pr-cleanup")
+TOOLS = {"claude": ("CLAUDE.md", ".claude"), "codex": ("AGENTS.md", ".agents")}
+
+
+UPDATE = False                      # --update: replace Partitur-maintained files that differ
+
+
+class Report:
+    def __init__(self, base):
+        self.base, self.differs = base, 0
+
+    def __call__(self, kind, path):
+        self.differs += kind == "differs"
+        print(f"{kind:8} {os.path.relpath(path, self.base)}")
+
+
+def seed(path, text, report):
+    """Create a file the project owns from then on; never compare it."""
+    if path.exists() or path.is_symlink():
+        report("kept", path)
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    report("created", path)
+
+
+def write_new(path, text, report):
+    if path.exists() or path.is_symlink():
+        same = path.is_file() and path.read_text() == text
+        if same or not UPDATE or path.is_symlink():
+            report("kept" if same else "differs", path)
+            return
+        path.write_text(text)
+        report("updated", path)
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text)
+    report("created", path)
+
+
+def copy_new(src, dst, report):
+    if dst.exists() or dst.is_symlink():
+        same = dst.is_file() and filecmp.cmp(src, dst, shallow=False)
+        if same or not UPDATE or dst.is_symlink():
+            report("kept" if same else "differs", dst)
+            return
+        shutil.copyfile(src, dst)
+        dst.chmod(0o755)
+        report("updated", dst)
+        return
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, dst)
+    dst.chmod(0o755)
+    report("created", dst)
+
+
+def link_new(link, target, report):
+    if link.is_symlink() or link.exists():
+        same = link.is_symlink() and os.readlink(link) == str(target)
+        report("kept" if same else "differs", link)
+        return
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(target)
+    report("created", link)
+
+
+def detect(root, rec):
+    """Primary Git checkouts directly under root, as [name, checkout, main]."""
+    found = []
+    for d in sorted(p for p in root.iterdir() if p.is_dir()):
+        if d.resolve() in (rec.resolve(), HERE) or not (d / ".git").is_dir():
+            continue
+        if any(c.isspace() or c == ":" for c in d.name):
+            print(f"warning  {d.name}: name contains a space or colon; add it by hand")
+            continue
+        r = subprocess.run(["git", "-C", str(d), "symbolic-ref", "--short", "-q", "HEAD"],
+                           capture_output=True, text=True)
+        if r.returncode or not r.stdout.strip():
+            print(f"warning  {d.name}: no branch checked out; add it by hand")
+            continue
+        branch = r.stdout.strip()
+        found.append([d.name, d.name, branch])
+        print(f"found    {d.name} (main branch {branch})")
+        if branch not in ("main", "master"):
+            print(f"warning  {d.name}: is {branch} its main branch? if not, correct pr/repos")
+    return found
+
+
+def scope_user(tools, report):
+    for tool in tools:
+        link_new(Path.home() / TOOLS[tool][1] / "skills" / "partitur", HERE, report)
+
+
+def scope_project(a, tools, report):
+    root = a.project.resolve()
+    if not root.is_dir():
+        sys.exit(f"install: {root} is not a directory")
+    if "/" in a.records or a.records in ("", ".", ".."):
+        sys.exit("install: --records must be a directory name directly in the project")
+    repos = []
+    for spec in a.repo:
+        parts = spec.split(":")
+        if len(parts) != 3 or not all(parts) or any(c.isspace() for c in spec):
+            sys.exit(f"install: --repo {spec!r}: expected NAME:CHECKOUT:MAIN, "
+                     "no spaces or colons in a field")
+        repos.append(parts)
+    name = a.name or root.name
+    rec = root / a.records
+
+    if (rec / ".git").exists():
+        has_commits = not subprocess.run(["git", "-C", str(rec), "rev-parse", "-q", "--verify",
+                                          "HEAD"], capture_output=True).returncode
+        if has_commits and not (rec / "pr").exists():
+            sys.exit(f"install: {rec} is an existing repository that is not a records "
+                     "repository; choose another --records")
+        report("kept", rec / ".git")
+    else:
+        rec.mkdir(exist_ok=True)
+        subprocess.run(["git", "init", "-q", "-b", a.branch, str(rec)], check=True)
+        report("created", rec / ".git")
+
+    def fill(template):
+        text = (HERE / "templates" / template).read_text()
+        return (text.replace("{{PROJECT}}", name).replace("{{RECORDS}}", a.records)
+                .replace("{{PARTITUR}}", URL)
+                .replace("{{PROJECT_RULES}}", "(Rules specific to this project.)"))
+
+    seed(rec / "CLAUDE.md", fill("rules.md"), report)
+    write_new(rec / "pr" / "README.md", fill("pr-README.md"), report)
+    for state in ("open", "merged", "closed"):
+        write_new(rec / "pr" / state / ".gitkeep", "", report)
+    table = rec / "pr" / "repos"
+    if not table.exists() and not repos:
+        repos = detect(root, rec)
+    if table.exists() and repos:
+        print(f"warning  {os.path.relpath(table, root)} exists; --repo ignored, edit it by hand")
+    seed(table, "# name checkout main\n" + "".join(f"{n} {c} {m}\n" for n, c, m in repos),
+         report)
+    seed(rec / "handoff" / "designer.md", fill("designer.md"), report)
+    seed(rec / "handoff" / "integrator.md", fill("integrator.md"), report)
+    write_new(rec / "handoff" / "notes" / ".gitkeep", "", report)
+    for tool in ("ptt", "pr", "test-run"):
+        copy_new(HERE / "project" / "bin" / tool, rec / "bin" / tool, report)
+    for state in ("open", "done", "cancelled"):
+        write_new(rec / "tasks" / state / ".gitkeep", "", report)
+    write_new(rec / "tasks" / "charter-template.md", (HERE / "templates" / "charter.md").read_text(),
+              report)
+    for role in ("designer", "integrator"):
+        write_new(rec / "roles" / role / ".gitkeep", "", report)
+    for skill in SKILLS:
+        text = (HERE / "project" / "skills" / skill / "SKILL.md").read_text()
+        write_new(rec / "skills" / skill / "SKILL.md", text.replace("<records>", a.records),
+                  report)
+    for tool in tools:
+        entry, tool_dir = TOOLS[tool]
+        if (root / entry).exists() and not (root / entry).is_symlink():
+            print(f"warning  {entry} exists and is not the rules file, so the tool would not "
+                  f"read the rules: move its content into {a.records}/CLAUDE.md, delete it, "
+                  "and rerun")
+        link_new(root / entry, Path(a.records) / "CLAUDE.md", report)
+        for skill in SKILLS:
+            link_new(root / tool_dir / "skills" / skill,
+                     Path("..") / ".." / a.records / "skills" / skill, report)
+        if (Path.home() / tool_dir / "skills" / "partitur").exists():
+            print(f"skipped  {tool_dir}/skills/partitur (linked for the user already)")
+        else:
+            link_new(root / tool_dir / "skills" / "partitur", HERE, report)
+    for n, c, _ in repos:
+        if not (root / c / ".git").exists():
+            print(f"warning  repository {n}: no Git checkout at {c}")
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="install", description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--tool", choices=("claude", "codex", "all"))
+    ap.add_argument("--scope", choices=("user", "project"))
+    ap.add_argument("project", type=Path, nargs="?", default=Path("."))
+    ap.add_argument("--name", help="project name (default: the directory's name)")
+    ap.add_argument("--records", default="workspace", help="records repository directory")
+    ap.add_argument("--branch", default="master", help="records repository's main branch")
+    ap.add_argument("--update", action="store_true",
+                    help="replace Partitur-maintained files (bin/, skills/, pr/README.md, "
+                         "tasks/charter-template.md) that differ; never the project's own files")
+    ap.add_argument("--repo", action="append", default=[],
+                    help="NAME:CHECKOUT:MAIN, CHECKOUT relative to PROJECT; repeatable")
+    a = ap.parse_args()
+    global UPDATE
+    UPDATE = a.update
+    if not a.tool or not a.scope:
+        print(__doc__)
+        sys.exit(2)
+    tools = ("claude", "codex") if a.tool == "all" else (a.tool,)
+    base = a.project.resolve() if a.scope == "project" else Path.home()
+    report = Report(base)
+    if a.scope == "user":
+        scope_user(tools, report)
+    else:
+        scope_project(a, tools, report)
+    if report.differs:
+        print(f"\n{report.differs} path(s) differ from Partitur's version and were left"
+              " as they are; compare them, then rerun with --update to replace the files"
+              " Partitur maintains.")
+    if a.scope == "project":
+        print("\nNext: record the records repository's changes, from the workspace root:\n"
+              f"  {a.records}/bin/ptt record -m \"install Partitur\" {a.records}")
+
+
+if __name__ == "__main__":
+    main()

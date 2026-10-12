@@ -1,0 +1,136 @@
+# Roles and tasks *(Proposed, G1-G13)*
+
+How a session gets its role, how work is cut into tasks, and how both pass
+from session to session. Every step is a command the user runs in a
+session; the tool `<records>/bin/ptt` records it as a file and commits it at
+once, so the records always say who holds what.
+
+## Lifecycle
+
+```
+designer:  /ptt-take designer ─► /ptt-mktask ─► /ptt-mktask release N
+                                                        │
+any session:                         /ptt-take N ◄──────┘
+                                         │
+holder:     work ─► /ptt-pr-submit ─► (integrator reviews, user decides)
+                                         │
+holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
+```
+
+| State | Meaning | Next |
+| --- | --- | --- |
+| draft | made by the designer, editable | release (`/ptt-mktask release N`) |
+| ready | released, nobody holds it | take (`/ptt-take N`) |
+| blocked | released, but a task it depends on is not closed | waits |
+| held | a session holds it | work; done; leave (with approval) |
+| closed | the supervisor accepted the done report; the hold ends | moved to `tasks/done/` |
+| cancelled | no longer wanted, nobody held it | moved to `tasks/cancelled/` |
+
+## Rules
+
+1. **Take, never assume.** A session holds a role (designer, integrator) or
+   a task only by taking it; the tool prints its holder name (`designer-g2`,
+   `integrator-1`, `track-0007`), which is its `--as` name and its
+   `session:` in every message (G1, G2).
+2. **Conflicts are refused.** A held role or task cannot be taken; a second
+   simultaneous take loses. Nothing is overridden silently (G1).
+3. **Taking is not approval to work.** The user's command records the role;
+   writes still need the user's AtE (A2).
+4. **Supervision is a tree.** A top-level task's supervisor is the designer;
+   the holder of a `design` task is the designer of its subtasks
+   (`0007.1`, `0007.2`, ...); the designer's and integrator's supervisor is
+   the user (G3, G10).
+5. **Leaving needs the supervisor.** A task holder asks to leave; its
+   supervisor approves after reading `status.md`. A designer or integrator
+   leaves on the user's command (G4).
+6. **Nobody leaves while anything below them is unclear:** a leave request
+   or done report waiting, or a holder with no record for seven days,
+   anywhere in the subtree; the integrator also not with a recorded decision
+   not carried out. A design task with unfinished subtasks cannot be
+   cancelled (G5).
+7. **The leader repairs a gap.** A subordinate with no record for seven days
+   is listed by `/ptt-whoami` for its supervisor, who checks on it and, if it
+   is gone, frees the task; `status.md` shows where it stood. A holder
+   therefore commits `status.md` in the records repository at least once a day
+   while it works, also when the work itself is on a code branch. Only the
+   user frees the designer or integrator role, and the user acts (`--as user`)
+   for any task whose supervisor is vacant, for example after a sub-designer
+   left (G6, G7).
+8. **A charter is frozen once released**; changes are amendments, recorded
+   as events. The holder writes only `status.md` (G11, G12).
+9. **Clearing does not change the holder.** The role or task stays
+   recorded; after `/clear`, the user names the holder the fresh session
+   continues as (`/ptt-whoami <name>`), and it picks up from the records.
+   Leaving is for handing the work to another session (D16, G13).
+
+## Records
+
+```
+<records>/tasks/
+  charter-template.md
+  open/ done/ cancelled/
+    0007-wall-distance/
+      charter.md          the designer's, frozen at release
+      status.md           the holder's: done, open, where it stands
+      0001-release.md     events, each written once:
+      0002-take.md          release, take, leave-request, leave, done,
+      0003-leave-request.md reopen, amend, close, cancel
+      ...
+<records>/roles/designer/   0001-take.md (designer-g1), 0002-leave.md, ...
+<records>/roles/integrator/
+```
+
+A task's state is derived from its events, as a request's is from its
+messages; there is no state file to go stale (C2).
+
+## Commands
+
+| Command | Who | Runs |
+| --- | --- | --- |
+| `/ptt-take [designer\|integrator\|task]` | any session | `ptt take`; a task by number (`7`, `0007`, `0007.1`) or name; without argument `ptt tasks` |
+| `/ptt-whoami [name\|all]` | any session | `ptt whoami`; with a name, continue as that holder; `all`: `ptt who`, `ptt tasks` |
+| `/ptt-mktask`, `release N`, `amend N` | designer | `ptt mktask`, `ptt ready`, `ptt amend` |
+| `/ptt-done` | holder | `ptt done` |
+| `/ptt-close N`, `reopen N`, `cancel N` | supervisor | `ptt close`, `ptt reopen`, `ptt cancel` |
+| `/ptt-leave`, `approve N`, `free N\|ROLE` | holder; supervisor; supervisor or user | `ptt leave`, `ptt approve-leave`, `ptt free` |
+| `/ptt-pr-submit`, `/ptt-pr-review`, `/ptt-pr-cleanup` | holder; integrator | requests ([requests](requests.md)) |
+
+In Codex the commands start with `$` instead of `/`.
+
+## Limits
+
+- **Names are not authenticated.** `--as NAME` and `--as user` are taken at
+  their word; the records show who did what, and the user's commands are
+  the only authority (A2). This guards against mistakes, not against a
+  session lying.
+- **Continuing after `/clear` is not recorded.** If the user names the same
+  holder in two sessions, both act as it; naming one holder in one session
+  at a time is the user's part.
+- **Notices are pulled, not pushed.** A supervisor learns of a leave
+  request, a done report, or a silent holder when it runs `/ptt-whoami`;
+  the user carries the notice, as for all records (D12).
+- **One machine.** The lock that keeps concurrent commands consistent works
+  for sessions on the same machine sharing the records repository.
+- **One gate for the records repository.** Every write to it goes through
+  `ptt` (`ptt record` for request messages, `status.md`, and role files),
+  which commits exactly its paths under the lock all sessions share. Git
+  commands run by hand in the records repository while sessions work
+  (stash, checkout, a manual commit) are outside this guarantee and can mix
+  changes; do them only when no session is writing (F11).
+
+## Recovery
+
+A `ptt` command undoes its own change when it fails. If it is killed
+mid-way, files may be left changed but not recorded; `ptt tasks` then lists
+them under "uncommitted in the records repository". Look at them with
+`git -C <records> status` and decide:
+
+- **Keep the change** (the command had done its work, only the commit is
+  missing): record every listed path, both sides of a move:
+  `<records>/bin/ptt record -m "<what it was>" <paths>`.
+- **Drop the change**: restore the recorded state of the listed paths with
+  `git -C <records> reset -q -- <paths>` and
+  `git -C <records> checkout -- <paths>`, then delete what is still
+  untracked. Do this only while no session is writing (F11).
+
+Then run the command again if it is still wanted.
