@@ -27,9 +27,10 @@ task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
   ptt close TASK --as NAME         supervisor: accept the report; the hold ends
   ptt reopen TASK --as NAME --reason TEXT   supervisor: reject the report
   ptt cancel TASK --as NAME --reason TEXT   supervisor: cancel a task nobody holds
-  ptt pr-move N merged|closed -m MESSAGE
+  ptt pr-move N merged|closed -m MESSAGE [--as NAME]
                                    integrator: move a decided request, recorded at once
-  ptt record -m MESSAGE PATH...    commit exactly these paths of the records repository
+  ptt record -m MESSAGE [--as NAME] PATH...
+                                   commit exactly these paths of the records repository
                                    (request messages, status.md, handoff/integrator.md), under
                                    the same lock as every other change
 
@@ -871,10 +872,14 @@ def main():
     p.add_argument("request")
     p.add_argument("to", choices=("merged", "closed"))
     p.add_argument("-m", "--message", required=True)
+    p.add_argument("--as", dest="as_", help="the writer's holder name, added to the message")
     p = sub.add_parser("record")
     p.add_argument("-m", "--message", required=True)
+    p.add_argument("--as", dest="as_", help="the writer's holder name, added to the message")
     p.add_argument("paths", nargs="+")
     a = ap.parse_args()
+    if a.cmd in ("record", "pr-move") and a.as_:
+        a.message += f" (by {a.as_})"
     need((REC / ".git").exists(), f"{REC} is not the records repository (no .git)")
     own = subprocess.run(["git", "-C", str(REC), "rev-parse", "--absolute-git-dir"],
                          capture_output=True, text=True).stdout.strip()

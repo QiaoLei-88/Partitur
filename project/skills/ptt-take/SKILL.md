@@ -17,8 +17,10 @@ needs the user's AtE.
    `T0007.1`) or by name (`wall-distance`). If it is refused (held, draft,
    blocked), report why and stop; never work around a refusal.
 3. The tool prints this session's holder name, for example `designer-g2`,
-   `integrator-1`, or `track-T0007`. Remember it: it is your `--as NAME` for
-   every `ptt` command and your `session:` in every request message. A
+   `integrator-1`, or `track-T0007`. Remember it: it is your name in every later `ptt` command
+   (`--as NAME`; for `leave` and `whoami`, the NAME argument; optional for
+   `record` and `pr-move`, where it is added to the commit message) and
+   your `session:` in every request message. A
    cleared session continues as the same holder when the user names it
    (`/ptt-whoami <name>`); it does not take again.
 4. Read what the role starts from, and report to the user what you hold,

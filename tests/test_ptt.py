@@ -175,6 +175,16 @@ class Ptt(unittest.TestCase):
         self.ptt("record", "-m", "fill", str(charter.parent))
         self.assertEqual(self.ptt("take", "designer").stderr, "")
 
+    def test_record_and_pr_move_accept_as(self):
+        req = self.rec / "pr" / "open" / "000001-x"
+        req.mkdir(parents=True)
+        (req / "0001-request.md").write_text("x\n")
+        self.ptt("record", "-m", "pr 000001: submit", "--as", "track-T0001", str(req))
+        self.ptt("pr-move", "1", "merged", "-m", "pr 000001: merged", "--as", "integrator-1")
+        log = run("git", "-C", str(self.rec), "log", "--format=%s").stdout
+        self.assertIn("pr 000001: submit (by track-T0001)", log)
+        self.assertIn("pr 000001: merged (by integrator-1)", log)
+
     def test_root_task_has_no_dependencies(self):
         d = self.designer()
         self.assertIn("never closes", self.refused("mktask", "x", "--as", d, "--depends", "T0000"))
