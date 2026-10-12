@@ -147,7 +147,7 @@ project's development notes.
 | G8 | A task goes draft, ready, held, closed (or cancelled); states are derived from its events | Proposed |
 | G9 | A released task whose dependencies are not all closed is blocked | Proposed |
 | G10 | A design task opens a sub-scope; its holder is the sub-designer; the root scope is the design task `T0000`, never closed; a task ID is `T`, a number showing the tree, and a slug (`T0007.1-indexing`), its directory name, never changed; `T0000` has no dependencies and no task depends on it | Proposed |
-| G11 | A charter is frozen once released; changes are amendments recorded as events | Proposed |
+| G11 | A charter is frozen once released; changes are amendments recorded as events, also while the task is held; the holder sees those since its take in `ptt whoami` | Proposed |
 | G12 | Only the holder writes its task's `status.md`; the designer closes a task after the holder reports done, or reopens it | Proposed |
 | G13 | Clearing a session's context does not change what it holds; the user names the holder a fresh session continues as | Proposed |
 | G14 | When nobody holds the integrator role, the tool notes it on taking T0000 and on recording a new request, which waits; the review skill refuses to review without the role | Proposed |
