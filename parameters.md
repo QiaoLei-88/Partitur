@@ -4,7 +4,7 @@
 
 | Choice | Option | Default |
 | --- | --- | --- |
-| Agent tools | `--tool claude`, `codex`, or `all` | none; required |
+| Agent tools | `--tool auto`, `claude`, `codex`, or `all` | `auto`: the tools found on this machine |
 | Project name | `--name` | the workspace root's directory name |
 | Records repository | `--records` | `workspace`, directly in the workspace root |
 | Its main branch | `--branch` | `master` |

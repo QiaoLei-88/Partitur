@@ -14,78 +14,104 @@ It is abstracted from the working practice of a real research software
 project (the "origin project"), and it keeps track of which of its rules
 have actually been used there.
 
-## How it works
+## Principles
 
-Every session starts by taking a role or a task; the records say who holds
-what, so any session can be cleared or replaced and the next one continues.
+Six ideas decide everything else; when in doubt, ask which one applies.
 
-1. In one session: `/ptt-take designer`. It becomes the designer
-   (generation 1, or the next generation after a predecessor left).
-2. You discuss the work with the designer. `/ptt-mktask` turns the
-   discussion into a task draft; `/ptt-mktask release N` makes it ready.
-3. In another session: `/ptt-take N`. It becomes that task's holder (a
-   track for research, a worker for code, or a sub-designer with its own
-   tasks), and the designer is its supervisor.
-4. Nothing is changed until you say `AtE` ("approval to execute"), or
-   `AtEiYA` ("AtE if you agree") when the session should go ahead only if
-   it agrees with you.
-5. The holder works on a branch and submits a *request* (`/ptt-pr-submit`);
-   the integrator (`/ptt-take integrator`) reviews it (`/ptt-pr-review`);
-   you decide, and the decision is recorded before anything is merged.
-6. The holder reports the task done (`/ptt-done`); the designer closes it
-   (`/ptt-close N`). Leaving early needs the supervisor's approval
-   (`/ptt-leave`), and nobody leaves while something waits on them.
+1. **You decide.** Sessions discuss, propose, and review; nothing is
+   written until you say `AtE` ("approval to execute"), or `AtEiYA` ("AtE
+   if you agree") when the session should go ahead only if it agrees.
+   Running a `/ptt-*` command is your approval for that command's own
+   record, nothing more.
+2. **Take a role before working.** A session is the designer, the
+   integrator, or the holder of one task, and only because it took that
+   role with a command. A role someone holds cannot be taken.
+3. **Records, not memory.** What matters is in files in the records
+   repository, so a session can be cleared or replaced at any time and the
+   next one continues from them.
+4. **Review recommends, you decide.** Code reaches a main branch only
+   through a request: the integrator reviews it, you decide, and the
+   decision is recorded before the merge.
+5. **Supervisors answer for what is below them.** The designer supervises
+   the tasks it made; a holder leaves only with its supervisor's approval;
+   nobody leaves while something below them waits; a supervisor notices a
+   silent holder and frees its task.
+6. **Labels say how sure we are.** Decisions are Agreed, Proposed, or Open;
+   evidence is Source, Inferred, Tested, or Unknown; each of Partitur's own
+   rules says whether it has been used in practice ([rules index](rules.md)).
 
-`/ptt-whoami` tells a session what it holds and what waits on it, including
-any subordinate with no record for seven days (`PTT_STALE_DAYS` changes the
-threshold). Conflicts
-are refused: a role or task someone holds cannot be taken. The smallest
-setup is two sessions, one that works and an integrator
-([model](model.md#starting-small)).
+## Which command when
 
-Taking roles and tasks, the single install command, and Codex support are
-recent and marked *Proposed* in the [rules index](rules.md) until they have
-been used in a real project.
+| You want to... | In which session | Command |
+| --- | --- | --- |
+| start the design, or take it over | any free session | `/ptt-take designer` |
+| turn a discussion into a task | the designer | `/ptt-mktask`, then `/ptt-mktask release N` |
+| have a session work on a task | any free session | `/ptt-take N` (or the task's name) |
+| know what a session holds and what waits on it | any | `/ptt-whoami`; `/ptt-whoami all` for everyone |
+| continue a role after `/clear` | the cleared session | `/ptt-whoami <holder name>` |
+| submit finished work for review | the task holder | `/ptt-pr-submit` |
+| review and carry out your decision | the integrator (`/ptt-take integrator`) | `/ptt-pr-review` |
+| report a task done / accept it | holder / its supervisor | `/ptt-done` / `/ptt-close N` |
+| stop holding a role or task | that session | `/ptt-leave` (a task needs the supervisor's `/ptt-leave approve N`) |
+| clean up merged branches | the integrator | `/ptt-pr-cleanup` |
+
+In Codex, commands start with `$` instead of `/`. For anything not in this
+table, ask a session: it reads Partitur's documents and explains, for
+example "how does leaving a task work?" or "what does the integrator do?".
 
 ## Getting started
 
 Requirements: Git 2.28 or later, Python 3.8 or later, and a system with
-symbolic links (Linux or macOS; on Windows, WSL).
+symbolic links (Linux or macOS; on Windows, WSL); Claude Code, Codex, or
+both.
 
-1. Clone this repository.
-2. Make Partitur known to your agent tool, for all your projects:
+1. **Clone** this repository anywhere, for example `~/partitur`.
+2. **Once per machine**, make Partitur known to your agent tools:
+
    ```
-   bin/install --tool claude --scope user     # or codex, or all
+   ~/partitur/bin/install --scope user
    ```
-3. In a project's workspace root (the directory holding its code
-   checkouts), ask the agent: "install Partitur for this project". It runs
+
+   It detects Claude Code and Codex and reports what it found;
+   `--tool claude`, `codex`, or `all` chooses explicitly.
+3. **Once per project**, in its workspace root (the directory that holds
+   the project's code checkouts), start a session and ask: "install
+   Partitur for this project". The session runs
+
    ```
-   bin/install --tool claude --scope project  # or codex, or all
+   ~/partitur/bin/install --scope project
    ```
-   which sets up the records repository (`workspace/` by default), the
-   rules file, the task and request directories, the tools and skills, the
-   designer's and integrator's files, and the links your tool reads. It is
-   safe to rerun: existing files are kept, and files Partitur maintains are
-   reported if they differ, which shows what an update would bring.
-4. With the agent: fill in the rules file's "Project Rules" and the
-   placeholders (`{{...}}`) in `workspace/handoff/designer.md`, then record
-   the records repository; from then on, every write there goes through
-   `ptt`:
+
+   and reports what it created: the records repository `workspace/` with
+   the rules file, task and request directories, tools and skills, the
+   designer's and integrator's files, and the links your tools read. It
+   lists the code repositories it found; one deeper down is added as a line
+   in `workspace/pr/repos`.
+4. **Fill in two files** with the session: the "Project Rules" at the end
+   of `workspace/CLAUDE.md` (your domain's rules), and the placeholders in
+   `workspace/handoff/designer.md`. Then record them:
 
    ```
    workspace/bin/ptt record -m "install Partitur" workspace
    ```
 
-   A later Partitur version is brought in by rerunning the install with
-   `--update`, which replaces only the files Partitur maintains.
-5. Open sessions in the workspace root and let each take its role:
-   `/ptt-take designer` in one, `/ptt-take integrator` in another; then
-   tasks as the designer makes them ([roles and tasks](flows/tasks.md)).
+   From now on every write in `workspace/` goes through `ptt`.
+5. **Open sessions** in the workspace root and give each its role: in one,
+   `/ptt-take designer`; in another, `/ptt-take integrator`. Discuss the
+   first piece of work with the designer and make it a task; in a third
+   session, `/ptt-take` it.
 
-Start sessions in the workspace root: Codex reads `AGENTS.md` and skills
-only from the Git root of its starting directory downwards, and the
-workspace root is usually not inside a Git repository. Skills are invoked
-as `/ptt-take` in Claude Code and `$ptt-take` in Codex.
+Always start sessions in the workspace root: Codex reads `AGENTS.md` and
+skills only from the Git root of its starting directory downwards, and the
+workspace root is usually not inside a Git repository.
+
+To bring a project up to a newer Partitur, pull this repository and rerun
+step 3's command with `--update`; it replaces only the files Partitur
+maintains, never your rules or records.
+
+Taking roles and tasks, the install command, and Codex support are recent
+and marked *Proposed* in the [rules index](rules.md) until they have been
+used in a real project.
 
 ## Contents
 
@@ -103,7 +129,8 @@ as `/ptt-take` in Claude Code and `$ptt-take` in Codex.
   shown in use), or *Proposed* (Partitur's design, untested).
 - [Parameters](parameters.md): what you choose at install, and what is
   fixed.
-- `bin/install`: the one command you run.
+- `bin/install`: the one command you run (once per machine, once per
+  project).
 - `project/`: what a project receives (`bin/ptt` for roles and tasks,
   `bin/pr` for requests, `bin/test-run`, the `ptt-*` skills).
 - `templates/`: files filled in at install (rules file, request README,

@@ -384,11 +384,28 @@ class InstallProject(unittest.TestCase):
             self.assertNotEqual(r.returncode, 0, extra)
         self.assertFalse((self.root / "workspace").exists())
 
-    def test_missing_choices_change_nothing(self):
-        r = run("python3", str(INSTALL), "--scope", "project", str(self.root), check=False)
+    def test_missing_scope_changes_nothing(self):
+        r = run("python3", str(INSTALL), str(self.root), check=False, env=self.env)
         self.assertEqual(r.returncode, 2)
         self.assertIn("--scope user", r.stdout)
         self.assertEqual(sorted(p.name for p in self.root.iterdir()), ["code"])
+
+    def test_auto_detects_tools(self):
+        tools = self.home / "bin"
+        tools.mkdir()
+        for name in ("git", "python3"):
+            (tools / name).symlink_to(shutil.which(name))
+        env = dict(self.env, PATH=str(tools))
+        r = run(str(tools / "python3"), str(INSTALL), "--scope", "project", str(self.root),
+                check=False, env=env)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("found neither", r.stderr)
+        (self.home / ".codex").mkdir()
+        out = run(str(tools / "python3"), str(INSTALL), "--scope", "project", str(self.root),
+                  env=env).stdout
+        self.assertIn("detected Codex", out)
+        self.assertTrue((self.root / "AGENTS.md").is_symlink())
+        self.assertFalse((self.root / "CLAUDE.md").exists())
 
 
 class InstallUser(unittest.TestCase):

@@ -34,11 +34,12 @@ When the user asks for it (that request is the AtE), from the project's
 workspace root, the directory holding its code checkouts:
 
 ```
-<this repository>/bin/install --tool claude|codex|all --scope project
+<this repository>/bin/install --scope project
 ```
 
-Choose `--tool` for the agent tools the project uses; ask the user if it is
-not clear. The command is *Proposed* (F9, F10): report anything unexpected.
+It detects the agent tools on this machine and installs for those; if the
+project should serve a tool that is not installed here, add `--tool all` (ask
+the user). The command is *Proposed* (F9, F10): report anything unexpected.
 Everything else has a default (see [parameters](parameters.md)); `--repo` is
 needed only for checkouts not directly in the workspace root, which can also
 be added later as lines in `<records>/pr/repos`. Report the output to the

@@ -2,8 +2,8 @@
 """Install Partitur for Claude Code, Codex, or both, for a user or a project.
 
 Usage:
-  install --tool {claude,codex,all} --scope user
-  install --tool {claude,codex,all} --scope project [PROJECT] [--update]
+  install [--tool {auto,claude,codex,all}] --scope user
+  install [--tool {auto,claude,codex,all}] --scope project [PROJECT] [--update]
           [--name NAME] [--records DIR] [--branch MAIN] [--repo NAME:CHECKOUT:MAIN ...]
 
 --scope user
@@ -35,6 +35,11 @@ Usage:
   the records repository and Partitur itself; a checkout deeper down is
   added later as a line in <records>/pr/repos.
 
+--tool auto (the default) installs for the agent tools found on this machine:
+Claude Code if the `claude` command or ~/.claude exists, Codex if the `codex`
+command or ~/.codex exists. It reports what it found, and stops if it finds
+neither; --tool claude, codex, or all chooses explicitly.
+
 Both scopes are safe to rerun: nothing that exists is overwritten or
 removed, and nothing is committed. Every path is reported as created, kept,
 or differs. Files the project owns once created (the rules file, the
@@ -43,8 +48,8 @@ are. Files
 Partitur maintains (bin/, skills/, pr/README.md) and links are compared:
 "differs" means the project's copy was changed or is older than this
 Partitur, so a rerun shows what an update would bring; --update replaces
-them (the project's own files are never replaced). Without --tool and
---scope, nothing is changed and this text is printed.
+them (the project's own files are never replaced). Without --scope,
+nothing is changed and this text is printed.
 """
 import argparse
 import filecmp
@@ -232,7 +237,7 @@ def scope_project(a, tools, report):
 def main():
     ap = argparse.ArgumentParser(prog="install", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--tool", choices=("claude", "codex", "all"))
+    ap.add_argument("--tool", choices=("auto", "claude", "codex", "all"), default="auto")
     ap.add_argument("--scope", choices=("user", "project"))
     ap.add_argument("project", type=Path, nargs="?", default=Path("."))
     ap.add_argument("--name", help="project name (default: the directory's name)")
@@ -246,10 +251,21 @@ def main():
     a = ap.parse_args()
     global UPDATE
     UPDATE = a.update
-    if not a.tool or not a.scope:
+    if not a.scope:
         print(__doc__)
         sys.exit(2)
-    tools = ("claude", "codex") if a.tool == "all" else (a.tool,)
+    if a.tool == "auto":
+        found = {"claude": shutil.which("claude") or (Path.home() / ".claude").is_dir(),
+                 "codex": shutil.which("codex") or (Path.home() / ".codex").is_dir()}
+        tools = tuple(t for t in ("claude", "codex") if found[t])
+        if not tools:
+            sys.exit("install: found neither Claude Code nor Codex on this machine; "
+                     "choose with --tool claude, codex, or all")
+        print("detected " + " and ".join({"claude": "Claude Code", "codex": "Codex"}[t]
+                                          for t in tools) + "; installing for "
+              + ("both" if len(tools) == 2 else "it") + " (--tool chooses otherwise)")
+    else:
+        tools = ("claude", "codex") if a.tool == "all" else (a.tool,)
     base = a.project.resolve() if a.scope == "project" else Path.home()
     report = Report(base)
     if a.scope == "user":
