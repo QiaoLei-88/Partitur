@@ -98,7 +98,7 @@ class Report:
 
     def __call__(self, kind, path, note=""):
         self.counts[kind] = self.counts.get(kind, 0) + 1
-        print(f"{kind:9} {os.path.relpath(path, self.base)}" + (f"  ({note})" if note else ""))
+        print(f"{kind:10} {os.path.relpath(path, self.base)}" + (f"  ({note})" if note else ""))
 
 
 def sha(data):
@@ -278,6 +278,9 @@ def apply(root, plan, old, opts, report):
                 if e.get("mode"):
                     path.chmod(e["mode"])
                 report("updated" if untouched else "replaced", path)
+            elif before is None:
+                report("differs", path, "not installed by Partitur; --update --force replaces "
+                       "it, after a backup")
             else:
                 report("outdated" if untouched else "modified", path,
                        "--update replaces it" if untouched else
@@ -351,18 +354,18 @@ def detect(root, rec):
         if d.resolve() in (rec.resolve(), HERE) or not (d / ".git").is_dir():
             continue
         if any(c.isspace() or c == ":" for c in d.name):
-            print(f"warning  {d.name}: name contains a space or colon; add it by hand")
+            print(f"warning    {d.name}: name contains a space or colon; add it by hand")
             continue
         r = subprocess.run(["git", "-C", str(d), "symbolic-ref", "--short", "-q", "HEAD"],
                            capture_output=True, text=True)
         if r.returncode or not r.stdout.strip():
-            print(f"warning  {d.name}: no branch checked out; add it by hand")
+            print(f"warning    {d.name}: no branch checked out; add it by hand")
             continue
         branch = r.stdout.strip()
         found.append([d.name, d.name, branch])
-        print(f"found     {d.name} (main branch {branch})")
+        print(f"found      {d.name} (main branch {branch})")
         if branch not in ("main", "master"):
-            print(f"warning  {d.name}: is {branch} its main branch? if not, correct pr/repos")
+            print(f"warning    {d.name}: is {branch} its main branch? if not, correct pr/repos")
     return found
 
 
@@ -424,7 +427,7 @@ def project_plan(a, tools, repos, name, src, quiet=False):
                                                       target=f"../../{R}/skills/{skill}")
         if (Path.home() / tool_dir / "skills" / "partitur").exists():
             if not quiet:
-                print(f"skipped   {tool_dir}/skills/partitur (linked for the user already)")
+                print(f"skipped    {tool_dir}/skills/partitur (linked for the user already)")
         else:
             plan[f"{tool_dir}/skills/partitur"] = dict(kind="link", target=str(HERE))
     return plan
@@ -473,7 +476,7 @@ def set_repos(a, root, rec, table, repos, add_repos, report):
         current = current + new
     for n, c, _ in current:
         if not (root / c / ".git").exists():
-            print(f"warning   repository {n}: no Git checkout at {c}")
+            print(f"warning    repository {n}: no Git checkout at {c}")
     named = set()
     for req in rec.glob("pr/*/*/0001-request.md"):
         for line in req.read_text().splitlines():
@@ -481,7 +484,7 @@ def set_repos(a, root, rec, table, repos, add_repos, report):
                 named.add(line.split(":", 1)[1].strip())
     missing = sorted(named - {c[0] for c in current} - {"", "?"})
     for n in missing:
-        print(f"warning   requests name repository {n}, which pr/repos lacks; add it with "
+        print(f"warning    requests name repository {n}, which pr/repos lacks; add it with "
               f"--add-repo {n}:<checkout>:<main branch>")
 
 
@@ -507,7 +510,7 @@ def scope_project(a, tools, report):
     name = a.name or root.name
     before = read_stamp(stamp)
     if before and not known_commit(before):
-        print(f"warning   this Partitur clone does not have commit {before[:12]}, which "
+        print(f"warning    this Partitur clone does not have commit {before[:12]}, which "
               "installed the project; files no longer shipped cannot be found")
         before = None
     old = delivered(project_plan(a, tools, [], name, Source(before), quiet=True)) if before else None
@@ -558,7 +561,7 @@ def scope_project(a, tools, report):
     for tool in tools:
         entry = root / TOOLS[tool][0]
         if entry.exists() and not entry.is_symlink():
-            print(f"warning   {entry.name} exists and is not the rules file, so the tool would "
+            print(f"warning    {entry.name} exists and is not the rules file, so the tool would "
                   f"not read the rules: move its content into {a.records}/CLAUDE.md, delete "
                   "it, and rerun")
     plan = project_plan(a, tools, merge_repos(repos, add_repos), name, Source())
@@ -574,8 +577,9 @@ def scope_project(a, tools, report):
               "files it no longer ships. Install from a committed Partitur.")
     if pending and not a.update:
         print("\nThis Partitur is newer: rerun with --update to bring the project up to it.")
-    if c.get("modified"):
-        print("\nFiles changed here were left alone; --update --force replaces them.")
+    if c.get("modified") or c.get("differs"):
+        print("\nFiles changed here, or not installed by Partitur, were left alone; "
+              "--update --force replaces them after a backup.")
     if a.backup_dir:
         print(f"\nBackups of replaced or removed files: {a.backup_dir}")
     if c.get("not merged"):

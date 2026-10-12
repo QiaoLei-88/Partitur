@@ -303,7 +303,7 @@ class InstallProject(unittest.TestCase):
         self.assertNotIn("created", out)
         self.assertRegex(out, r"kept\s+workspace/CLAUDE\.md")
         self.assertRegex(out, r"kept\s+workspace/pr/repos")
-        self.assertRegex(out, r"modified\s+workspace/bin/pr")
+        self.assertRegex(out, r"(differs|modified)\s+workspace/bin/pr")
         self.assertIn("project rule", rules.read_text())
         self.assertIn("# local change", tool.read_text())
 
@@ -473,7 +473,7 @@ class InstallProject(unittest.TestCase):
         other.mkdir()
         git(other, "init", "-q", "-b", "main")
         out = self.install(tool="claude", cwd=self.root).stdout
-        self.assertIn("found     code (main branch master)", out)
+        self.assertIn("found      code (main branch master)", out)
         self.assertNotIn("warning  code", out)
         table = (self.root / "workspace" / "pr" / "repos").read_text().splitlines()
         self.assertEqual(table[1:], ["code code master", "lib lib main"])
