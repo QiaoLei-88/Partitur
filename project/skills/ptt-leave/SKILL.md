@@ -5,8 +5,8 @@ description: Leave this session's role or task, approve a subordinate's leave re
 
 # Leave, approve leaving, or free
 
-The command approves only the records this skill writes; other work needs
-AtE (rules file). `<name>` is your holder name.
+The command, or an AtE naming these records, approves the records this skill
+writes; other work needs AtE (rules file). `<name>` is your holder name.
 
 ## Leave (no argument)
 

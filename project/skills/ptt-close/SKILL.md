@@ -5,9 +5,10 @@ description: As a supervisor (designer or sub-designer), close a task reported d
 
 # Close, reopen, or cancel a task
 
-The command approves only the records this skill writes; other work needs
-AtE (rules file). You must supervise the task (`--as <name>`, your holder
-name); when its supervisor is vacant, the user acts with `--as user`.
+The command, or an AtE naming these records, approves the records this skill
+writes; other work needs AtE (rules file). You must supervise the task
+(`--as <name>`, your holder name); when its supervisor is vacant, the user
+acts with `--as user`.
 
 ## Close (`N`)
 

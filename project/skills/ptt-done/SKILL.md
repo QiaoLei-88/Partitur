@@ -5,8 +5,8 @@ description: As a task's holder, report its acceptance criteria met so that the 
 
 # Report a task done
 
-The command approves only the records this skill writes; other work needs
-AtE (rules file).
+The command, or an AtE naming these records, approves the records this skill
+writes; other work needs AtE (rules file).
 
 1. Check each acceptance criterion of the charter
    (`<records>/bin/ptt show <N>`) against records: merged requests with merge

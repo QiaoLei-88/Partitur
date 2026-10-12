@@ -5,10 +5,10 @@ description: As a designer, draft a task from the agreed discussion, release a d
 
 # Make a task
 
-The command approves only the records this skill writes; other work needs
-AtE (rules file). Only a designer makes tasks: the holder of `T0000` the
-top-level tasks, the holder of a `design` task the subtasks of its scope.
-`<name>` is your holder name.
+The command, or an AtE naming these records, approves the records this skill
+writes; other work needs AtE (rules file). Only a designer makes tasks: the
+holder of `T0000` the top-level tasks, the holder of a `design` task the
+subtasks of its scope. `<name>` is your holder name.
 
 ## Draft (no argument)
 

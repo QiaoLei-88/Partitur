@@ -29,7 +29,7 @@ project's development notes.
 | A8 | A standing authorization may cover one repository for one session | Adopted |
 | A9 | Without authorization a session works read-only and creates no caches or artifacts | Adopted |
 | A10 | A request states the authorization it was made under | Exercised |
-| A12 | A `/ptt-*` command the user runs is the approval for that command's own record (claim, draft, release, done report, close, leave, request message) and nothing more; agreement in conversation without the command is not approval | Proposed |
+| A12 | A record (draft, release, done report, close, leave, request message) needs the user's approval: the `/ptt-*` command, which approves its own record and nothing more, or an AtE naming the records, several at once; taking a role or task only by `/ptt-take` in the taking session; agreement without either is not approval | Proposed |
 | A13 | A session asks for a decision with a numbered list, its recommendation first, always ending with `No decision, discuss further`; a decision is an option number with AtE, anything else is discussion | Proposed |
 
 ## Roles

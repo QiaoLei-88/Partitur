@@ -5,10 +5,10 @@ description: As the integrator, list, show, or review local pull requests, and c
 
 # Review local requests
 
-The command approves only the records this skill writes; other work needs
-AtE (rules file). `<records>/pr/repos` maps a request's `repo` to its
-primary checkout `<repo>` and main branch `<main>`. Request numbers may be
-short (`4`, `pr-4`, `000004`).
+The command, or an AtE naming these records, approves the records this skill
+writes; other work needs AtE (rules file). `<records>/pr/repos` maps a
+request's `repo` to its primary checkout `<repo>` and main branch `<main>`.
+Request numbers may be short (`4`, `pr-4`, `000004`).
 
 Listing and showing need no role. Reviewing and what follows need the
 integrator role; your holder name (`integrator-N`) is `session:` in your

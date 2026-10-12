@@ -5,12 +5,12 @@ description: Submit the current branch as a local pull request for review and in
 
 # Submit or reply to a local request
 
-The command approves only the records this skill writes; other work, such
-as changing the branch, needs AtE (rules file). `<records>/pr/repos` maps a
-`repo` name to its primary checkout and main branch `<main>`. Request
-numbers may be short (`4`, `pr-4`, `000004`) and are never reused. You
-write only your own new message files: never edit a message or move a
-request.
+The command, or an AtE naming these records, approves the records this skill
+writes; other work, such as changing the branch, needs AtE (rules file).
+`<records>/pr/repos` maps a `repo` name to its primary checkout and main
+branch `<main>`. Request numbers may be short (`4`, `pr-4`, `000004`) and
+are never reused. You write only your own new message files: never edit a
+message or move a request.
 
 | Argument | Action |
 | --- | --- |

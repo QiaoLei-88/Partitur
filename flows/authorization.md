@@ -8,7 +8,7 @@
 | `AtE` | Approval to Execute: the explicit authorization for the task it is attached to (A2). |
 | `AtEiYA` | AtE if you agree: form an independent view first; execute only if you agree, otherwise explain and keep discussing (A3). |
 | standing AtE | Authorization for a whole scope or repository, given to one session *(Adopted, A8)*. |
-| a `/ptt-*` command | The user's approval for that command's own record (claim, draft, release, done report, close, leave, request message), nothing more *(Proposed, A12)*. |
+| a `/ptt-*` command, or AtE naming records | The user's approval for a record (draft, release, done report, close, leave, request message): the command approves its own record and nothing more; an AtE approves the records it names, several at once. Taking a role or task only by `/ptt-take` in the taking session *(Proposed, A12)*. |
 
 ## Rules
 

@@ -5,8 +5,9 @@ description: Take a role or task for this session; conflicts are refused. Argume
 
 # Take a role or a task
 
-Taking is the user's choice, so the command approves recording it; the
-work itself needs AtE (rules file).
+Taking is the user's choice: only this command, typed in the session that
+takes, approves recording it (an AtE does not); the work itself needs AtE
+(rules file).
 
 1. No argument: `<records>/bin/ptt tasks`; show the `ready` tasks and ask
    which one. Stop.

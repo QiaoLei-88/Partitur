@@ -5,8 +5,9 @@ description: As the integrator, remove the worktrees, branches, and recovery tag
 
 # Clean up decided requests
 
-The command approves only the records this skill writes; running the
-removal needs AtE (rules file). Cleanup belongs to the integrator.
+The command, or an AtE naming these records, approves the records this skill
+writes; running the removal needs AtE (rules file). Cleanup belongs to the
+integrator.
 
 ## What is removed
 

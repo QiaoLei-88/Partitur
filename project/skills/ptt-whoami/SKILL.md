@@ -5,8 +5,8 @@ description: Show what this session holds and what waits on it; with a holder na
 
 # Who am I
 
-The command approves only the records this skill writes; other work needs
-AtE (rules file).
+The command, or an AtE naming these records, approves the records this skill
+writes; other work needs AtE (rules file).
 
 - No argument, with the holder name this session got from `/ptt-take`:
   `<records>/bin/ptt whoami <name>`; report the role or task, supervisor,

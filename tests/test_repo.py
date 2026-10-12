@@ -29,6 +29,20 @@ class Repo(unittest.TestCase):
             self.assertEqual(fields["name"], f.parent.name if f.parent != ROOT else "partitur")
             self.assertLessEqual(len(fields["description"]), 1024, f)
 
+    def test_record_approval_wording_agrees(self):
+        """Rule A12: a command or an AtE naming the records approves them;
+        taking only by /ptt-take. Every skill must say the same."""
+        rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
+        self.assertIn("or an AtE naming the records", rules)
+        self.assertIn("Taking a role or task (`/ptt-take`) is approved only by the command", rules)
+        for skill in sorted((ROOT / "project" / "skills").glob("ptt-*/SKILL.md")):
+            text = " ".join(skill.read_text().split())
+            if skill.parent.name == "ptt-take":
+                self.assertIn("only this command, typed in the session that takes", text)
+            else:
+                self.assertIn("The command, or an AtE naming these records, approves", text,
+                              skill.parent.name)
+
     def test_markdown_links_resolve(self):
         for f in tracked():
             if f.suffix != ".md":
