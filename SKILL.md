@@ -63,7 +63,9 @@ Then, with the user:
      (the project's names, paths, repositories, conventions): it stays,
      unchanged, under "## Project Rules"; do not ask.
    - **Conflict**, where the project's rule says otherwise than the block:
-     ask, one question per conflict, with your recommendation (usually the
+     ask, one question per conflict, as a numbered list (`1. Partitur's
+     rule`, `2. Keep the project's rule as a stated deviation`, `3. No
+     decision, discuss further`), your recommendation first (usually the
      block's rule). If the user keeps the project's way, it goes under
      "## Project Rules" as a stated deviation ("Partitur's rule on ... does
      not apply here: ..."), because install maintains the block and it is

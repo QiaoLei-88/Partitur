@@ -98,8 +98,18 @@ housekeeping left by earlier sessions.
    another file has the same number, the later writer renumbers: if the other
    file is already recorded, rename yours to the next free number. Record only
    this file: `<records>/bin/ptt record -m "pr NNNNNN: review MMMM" <file>`.
-   Report the analysis, comments, and recommendation to the user, and stop.
-7. When the user decides with AtE (merge, request changes, reject, or
+   Report the analysis, comments, and recommendation to the user, end with
+   the decision as a numbered list (the rules file's form), your
+   recommendation first, and stop:
+
+   ```
+   Decide request NNNNNN:
+   1. Request changes (recommended): C1, C2
+   2. Merge anyway
+   3. Reject
+   4. No decision, discuss further
+   ```
+7. When the user decides with AtE, an option number with `AtE` (merge, request changes, reject, or
    withdraw, possibly with modified comments), write `MMMM-decision.md` from
    the template, recording the user's decision and any changed comments, and
    record it before anything else:

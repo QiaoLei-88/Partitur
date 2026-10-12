@@ -20,7 +20,10 @@ with `--as user`.
    they cite. Report your assessment to the user.
 2. If every criterion is met, close the task; the user's `/ptt-close N` is
    the approval. If a criterion is not met, report what is missing and do
-   not close; the user decides between reopening and waiting.
+   not close; ask the user with a numbered list (the rules file's form):
+   `1. Reopen` (with the missing criteria), `2. Wait` (the holder
+   completes it first), `3. No decision, discuss further`, your
+   recommendation first.
 
    ```
    <records>/bin/ptt close <N> --as <name>

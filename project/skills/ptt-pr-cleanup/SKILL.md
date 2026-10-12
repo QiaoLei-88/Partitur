@@ -49,8 +49,10 @@ main branches. Never use `--force` and never edit an existing message.
 
 1. Run `<records>/bin/pr gc [--days N]`. It is read-only and prints a table
    (remove, wait, or skip with a reason) and the exact commands, grouped by
-   request. Report the table and commands to the user, and stop. Without AtE
-   nothing further happens.
+   request. Report the table and commands to the user, end with a numbered
+   list (the rules file's form): `1. Run all listed commands`, `2. Run them
+   only for the requests or tags I name`, `3. No decision, discuss
+   further`, and stop. Without AtE nothing further happens.
 2. After the user's AtE, possibly limited to some requests or tags, run
    `<records>/bin/pr gc` again with the same `--days` and check that the plan
    is unchanged for the approved items; if it changed, report and stop.
