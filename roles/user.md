@@ -30,5 +30,3 @@ many sessions without holding their details.
 - Read every record. Reviews, labels, and reports are there so that the
   user can decide from a summary and look deeper only when something is
   flagged.
-- Answer questions below the level the user works at: a session asks only
-  about what the user will see, decide, or use *(Proposed, A11)*.

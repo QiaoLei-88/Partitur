@@ -29,7 +29,6 @@ project's development notes.
 | A8 | A standing authorization may cover one repository for one session | Adopted |
 | A9 | Without authorization a session works read-only and creates no caches or artifacts | Adopted |
 | A10 | A request states the authorization it was made under | Exercised |
-| A11 | A session asks the user only about what the user will see, decide, or use, with a recommendation first; lower-level choices it makes itself and records with reasons | Proposed |
 | A12 | A `/ptt-*` command the user runs is the approval for that command's own record (claim, draft, release, done report, close, leave, request message) and nothing more; agreement in conversation without the command is not approval | Proposed |
 
 ## Roles
@@ -129,7 +128,7 @@ project's development notes.
 | F12 | A project records the Partitur commit that installed it; install rebuilds from Partitur's history what that commit delivered, so update replaces what is outdated and removes what is no longer shipped, and uninstall removes exactly that; files changed in the project and its records are kept without `--force` | Proposed |
 | F13 | Partitur's rules live in a marked block of the project's rules file; an existing rules file gets the block only on the user's approval (`--merge-rules`), after the agent lists every contradiction between the two rule sets for the user to decide; update and uninstall touch only the block | Proposed |
 | F14 | A forced update or uninstall copies every file it replaces or removes into a backup directory first | Proposed |
-| T1 | The rules template and request README include A11, B5b, D13, D16, and C19 (withdrawal) as defaults, although none is exercised yet; a project keeps or drops them | Proposed |
+| T1 | The rules template and request README include B5b, D13, D16, and C19 (withdrawal) as defaults, although none is exercised yet; a project keeps or drops them | Proposed |
 | T2 | Domain-specific rules go in the rules file's "Project Rules"; the template carries only generic rules (interface contracts, independent verification, tolerance-based comparison) | Proposed |
 
 ## Taking roles and tasks

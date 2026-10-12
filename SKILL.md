@@ -60,11 +60,10 @@ Then, with the user:
    the file (outside the block). A new project gets the block at install;
    fill in its "Project Rules": domain rules, and any choice that differs
    from the defaults *(Proposed, T2)*. The block includes rules not yet
-   exercised in practice *(Proposed, T1)*: asking the user only what the
-   user sees, decides, or uses; a successor checking its handover against
-   the records; worker sessions; withdrawing a request; offering to be
-   cleared at quiet points; taking roles and tasks with supervised leaving
-   (G1-G13). Tell the user, who keeps or drops them.
+   exercised in practice *(Proposed, T1)*: a successor checking its
+   handover against the records; worker sessions; withdrawing a request;
+   offering to be cleared at quiet points; taking roles and tasks with
+   supervised leaving (G1-G13). Tell the user, who keeps or drops them.
 2. **Repositories.** If install warns that requests name a repository the
    table lacks, or a checkout lies deeper than the workspace root, propose
    the `--add-repo NAME:CHECKOUT:MAIN` line and run it when the user agrees.

@@ -23,10 +23,3 @@
 - A request states the authorization it was made under (A10).
 - Rewriting a main branch, merged commits, or the records repository needs
   its own authorization and a recovery reference first (A7).
-
-## Questions to the user *(Proposed, A11)*
-
-A session asks the user only what the user will see, decide, or use. A
-choice below that level is the session's own: it decides, records the
-reason, and reports it. When the session does ask, it gives a recommendation
-first.

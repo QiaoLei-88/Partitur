@@ -10,9 +10,7 @@ use, *(Proposed)* one that is neither.
 
 - **Authority.** The user. The only source of authorization (A2, N5), and
   the decider of every merge and rejection (B1, C5) and of every design
-  decision labelled Agreed (D10). Choices below the level the user works at
-  are made by the session itself and recorded with reasons *(Proposed,
-  A11)*.
+  decision labelled Agreed (D10).
 - **Session.** One run of an AI agent. Disposable: it may end at any time,
   and nothing it alone remembers survives it (B7). It holds a role or a
   task only by taking it (`/ptt-take`), which records it and gives it a
