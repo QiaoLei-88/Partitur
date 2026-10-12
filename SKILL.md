@@ -43,7 +43,11 @@ the user). The command is *Proposed* (F9, F10): report anything unexpected.
 Everything else has a default (see [parameters](parameters.md)); `--repo` is
 needed only for checkouts not directly in the workspace root, which can also
 be added later as lines in `<records>/pr/repos`. Report the output to the
-user, including anything reported as differing.
+user, including anything reported as differing. Install also writes
+`partitur-install-report.md` in the workspace root: its output and the next
+steps below as they apply to this run. When the user ran install in a
+terminal and asks you to finish it, read that file and work through its
+steps; delete it, with the user's approval, when they are done.
 
 Then, with the user:
 

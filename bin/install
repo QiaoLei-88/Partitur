@@ -59,7 +59,8 @@ install rebuilds from that commit what it delivered then: "maintained" files
 rules file, the root design task's charter and status, the integrator's
 file, repository table, directory markers: the project's once created), and
 links. A seeded file an earlier Partitur used but this one no longer does is
-reported "superseded", with where its content goes; it is never removed. Compared with the project:
+reported "superseded", with where its content goes; it is never removed.
+Compared with the project:
   install            creates what is missing and reports the rest: "kept",
                      "outdated" (unchanged here, but this Partitur has a
                      newer version), "modified" (changed here), "obsolete"
@@ -76,6 +77,11 @@ reported "superseded", with where its content goes; it is never removed. Compare
 Install from a committed Partitur: with uncommitted changes there is no
 commit to stamp, and a later update cannot find what was dropped.
 Nothing is ever committed; the tool prints the `ptt record` command for it.
+Each project run except --uninstall also writes PROJECT/partitur-install-report.md:
+its output and the next steps, for an agent session to read ("Read
+partitur-install-report.md and help me finish the Partitur install"). It
+lies outside the records repository, is never committed, and is
+overwritten by the next run.
 The user scope is one link per tool, which --uninstall removes if it still
 points to this Partitur. Without --scope, nothing is changed and this text
 is printed.
@@ -97,10 +103,11 @@ TOOLS = {"claude": ("CLAUDE.md", ".claude"), "codex": ("AGENTS.md", ".agents")}
 
 class Report:
     def __init__(self, base):
-        self.base, self.counts = base, {}
+        self.base, self.counts, self.paths = base, {}, []
 
     def __call__(self, kind, path, note=""):
         self.counts[kind] = self.counts.get(kind, 0) + 1
+        self.paths.append((kind, os.path.relpath(path, self.base)))
         print(f"{kind:10} {os.path.relpath(path, self.base)}" + (f"  ({note})" if note else ""))
 
 
@@ -671,8 +678,103 @@ def main():
     report = Report(a.project.resolve() if a.scope == "project" else Path.home())
     if a.scope == "user":
         scope_user(a, tools, report)
-    else:
+    elif a.uninstall:
         scope_project(a, tools, report)
+    else:
+        out, sys.stdout = sys.stdout, Tee(sys.stdout)
+        try:
+            scope_project(a, tools, report)
+        finally:
+            output, sys.stdout = sys.stdout.text(), out
+        write_report(a, tools, report, output)
+
+
+class Tee:
+    """Standard output that is also kept, for the report file."""
+
+    def __init__(self, out):
+        self.out, self.parts = out, []
+
+    def write(self, text):
+        self.parts.append(text)
+        return self.out.write(text)
+
+    def flush(self):
+        self.out.flush()
+
+    def text(self):
+        return "".join(self.parts)
+
+
+REPORT = "partitur-install-report.md"
+
+
+def write_report(a, tools, report, output):
+    """Write what this run did and what is left to do, for an agent session to
+    read; a later run overwrites it. It lies outside the records repository so
+    that recording the records never commits it."""
+    root = a.project.resolve()
+    c, R = report.counts, a.records
+    steps = []
+    loose = [root / TOOLS[t][0] for t in tools
+             if (root / TOOLS[t][0]).exists() and not (root / TOOLS[t][0]).is_symlink()]
+    if c.get("not merged") or c.get("merged") or loose:
+        own = " and ".join(f"`{p.name}` in the workspace root" for p in loose) \
+            if loose else f"`{R}/CLAUDE.md`"
+        steps.append(
+            f"Rules. Compare Partitur's rules block (`{HERE / 'templates' / 'rules.md'}`, "
+            f"between the `partitur rules` markers) with the project's rules in {own}. "
+            f"List for the user: every contradiction, with a recommendation; rules of the "
+            f"block the project lacks (those labelled Proposed in `{HERE / 'rules.md'}` are "
+            f"not yet exercised in practice); and duplicates. The user decides each. "
+            + ("Then, on the user's approval, rerun this install with --merge-rules. "
+               if c.get("not merged") else "")
+            + f"Then write the project's rules into `{R}/CLAUDE.md` after the block, as "
+            "\"## Project Rules\": only domain rules and the project's deliberate "
+            "differences, as the user decided.")
+    for p in loose:
+        steps.append(f"`{p.name}` in the workspace root is a file, so the agent tool does not "
+                     f"read `{R}/CLAUDE.md`: once its rules are merged, delete it with the "
+                     "user's approval and rerun this install, which then links it.")
+    if any(line.startswith("warning") for line in output.splitlines()):
+        steps.append("Warnings: explain each line starting with `warning` in the output to "
+                     "the user, with what to do about it.")
+    for kind, rel in report.paths:
+        if kind == "superseded":
+            steps.append(f"Superseded: `{rel}` holds the project's content; move it as the "
+                         "report line says, with the user's approval, then delete it.")
+    if any(k == "created" and rel.endswith("T0000-design/charter.md")
+           for k, rel in report.paths):
+        steps.append(f"Root design task: fill in `{R}/tasks/open/T0000-design/charter.md` "
+                     "with the user (this first fill-in is a direct edit), and its "
+                     "`status.md` from the current design handover, if the project has one.")
+    if c.get("modified") or c.get("differs"):
+        steps.append("Files reported \"modified\" or \"differs\" were left alone: tell the "
+                     "user which matter, and whether `--update --force` (with a backup) or "
+                     "keeping them is better.")
+    if c.get("outdated") or c.get("obsolete"):
+        steps.append("Files reported \"outdated\" or \"obsolete\": `--update` brings them "
+                     "up to this Partitur; ask the user.")
+    if any(c.get(k) for k in ("created", "updated", "replaced", "removed", "merged")):
+        steps.append(f"When the steps above are done, record the records repository: "
+                     f"`{R}/bin/ptt record -m \"install Partitur\" {R}`.")
+    when = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
+    text = (f"# Partitur install report\n\n"
+            f"- When: {when}\n- Partitur: {partitur_commit() or 'uncommitted'}\n"
+            f"- Command: `{' '.join([Path(sys.argv[0]).name] + sys.argv[1:])}`\n"
+            f"- Project: `{root}`, records `{R}/`\n\n"
+            "Written by Partitur's install for the user and an agent session; not part of "
+            "the records, never committed, overwritten by the next install run. Delete it "
+            "when its steps are done.\n\n## Output\n\n```\n" + output.strip() + "\n```\n\n"
+            "## Next steps, for an agent session\n\n"
+            "Nothing here authorizes writes: each step that writes needs the user's "
+            "approval (AtE).\n\n"
+            + ("".join(f"{i}. {t}\n" for i, t in enumerate(steps, 1)) if steps
+               else "None: the project is up to date with this Partitur.\n"))
+    (root / REPORT).write_text(text)
+    print(f"\nThis report and the next steps are in {REPORT} (not committed). In an agent "
+          f"session started in {root}, say:\n\n"
+          f"    Read {REPORT} and help me finish the Partitur install.\n")
 
 
 if __name__ == "__main__":

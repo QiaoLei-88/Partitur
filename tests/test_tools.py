@@ -290,6 +290,10 @@ class InstallProject(unittest.TestCase):
             self.assertTrue((skills / "partitur" / "SKILL.md").is_file())
             self.assertTrue((skills / "ptt-pr-review" / "SKILL.md").is_file())
         self.assertNotIn("differs", out)
+        report = (self.root / "partitur-install-report.md").read_text()
+        self.assertIn("fill in `ws/tasks/open/T0000-design/charter.md`", report)
+        self.assertIn('ptt record -m "install Partitur" ws', report)
+        self.assertNotIn("partitur-install-report", git(ws, "status", "--porcelain"))
         listing = run("python3", str(ws / "bin" / "pr"), "list").stdout
         self.assertIn("no open requests", listing)
 
@@ -345,6 +349,10 @@ class InstallProject(unittest.TestCase):
         self.assertRegex(out, r"not merged\s+workspace/CLAUDE.md")
         self.assertIn("contradiction", out)
         self.assertNotIn("partitur rules begin", rules.read_text())
+        report = (self.root / "partitur-install-report.md").read_text()
+        self.assertIn("rerun this install with --merge-rules", report)
+        self.assertIn("not merged", report)                 # the output, kept
+        self.assertIn("Read partitur-install-report.md", out)
         out = self.install("--merge-rules").stdout
         self.assertRegex(out, r"merged\s+workspace/CLAUDE.md")
         text = rules.read_text()

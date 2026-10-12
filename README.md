@@ -87,7 +87,11 @@ both.
    root design task `T0000` (the designer's charter and handover), the
    integrator's file, and the links your tools read. It lists the code
    repositories it found; one deeper down is added as a line in
-   `workspace/pr/repos`.
+   `workspace/pr/repos`. If you ran install yourself in a terminal, start
+   a session in the workspace root and say "Read
+   partitur-install-report.md and help me finish the Partitur install":
+   install leaves its output and the next steps in that file (not
+   committed; delete it when done).
 4. **Fill in two files** with the session: the "Project Rules" at the end
    of `workspace/CLAUDE.md` (your domain's rules; Partitur's own rules sit
    in a marked block above them), and the placeholders in
