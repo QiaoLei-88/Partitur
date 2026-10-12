@@ -60,6 +60,10 @@ authorization; submitting and replying are writes and need it.
    <records>/bin/ptt record -m "pr NNNNNN: submit <title>" <records>/pr/open/NNNNNN-name
    ```
 
+   Report the request number to the user, and any `note:` the tool
+   printed: if no session holds the integrator role, the request waits
+   until the user opens one (`/ptt-take integrator`, in a fresh session).
+
 ## Replying to a review
 
 Reply whenever the branch changes or a review needs an answer, without

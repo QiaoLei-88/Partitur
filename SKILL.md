@@ -84,13 +84,20 @@ Then, with the user:
 2. **Repositories.** If install warns that requests name a repository the
    table lacks, or a checkout lies deeper than the workspace root, propose
    the `--add-repo NAME:CHECKOUT:MAIN` line and run it when the user agrees.
-3. Fill in `<records>/tasks/open/T0000-design/charter.md`, the root
-   designer's charter, with the user (this first fill-in is a direct edit;
-   later changes are the user's amendments), then record the records
-   repository: `<records>/bin/ptt record -m "install Partitur" <records>`.
+3. **Root design task.** Fill in `<records>/tasks/open/T0000-design/charter.md`,
+   the root designer's charter, with the user (this first fill-in is a
+   direct edit; later changes are the user's amendments). If the project
+   has its own design handover, the user may leave this to the designer,
+   who proposes it on taking T0000. Anything about the design agreed
+   during the setup goes into T0000's charter or `status.md`.
 4. **Superseded files.** If install reports a file "superseded", move its
-   content as the note says, with the user's approval, delete it, and
-   record the change.
+   content as the note says, with the user's approval, delete it.
+5. **Record and end.** Record the records repository:
+   `<records>/bin/ptt record -m "install Partitur" <records>`. You are the
+   installation session: you take no role. Tell the user to open fresh
+   sessions for the roles (`/ptt-take designer`, `/ptt-take integrator`),
+   which start from the records, and that requests wait until a session
+   holds the integrator role.
 
 ## Reading map
 

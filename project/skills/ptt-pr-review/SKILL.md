@@ -23,6 +23,13 @@ Every write to the records repository is committed with
 `<records>/bin/ptt record -m "<message>" <paths>`, never with plain Git: it
 commits exactly those paths under the lock all sessions share.
 
+Listing and showing need no role. Reviewing and everything after it are
+the integrator's: this session must hold the integrator role, and its
+holder name (`integrator-N`) is its `session:` in every message. If it
+holds none, run `<records>/bin/ptt who`: if the role is free, ask the user
+to run `/ptt-take integrator` in this session (or, better, in a fresh one)
+and stop; if another session holds it, tell the user and stop.
+
 The read-only helper `<records>/bin/pr` lists and shows requests. Request
 numbers may be given short: `4`, `0004`, `pr-4`, and `000004` are the same
 request.

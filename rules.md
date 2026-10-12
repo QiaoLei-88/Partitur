@@ -128,6 +128,7 @@ project's development notes.
 | F12 | A project records the Partitur commit that installed it; install rebuilds from Partitur's history what that commit delivered, so update replaces what is outdated and removes what is no longer shipped, and uninstall removes exactly that; files changed in the project and its records are kept without `--force` | Proposed |
 | F13 | Partitur's rules live in a marked block of the project's rules file; an existing rules file gets the block only on the user's approval (`--merge-rules`), after the agent sorts the project's rules: duplicates removed and domain rules kept without asking, one question per real conflict (a kept one becomes a stated deviation outside the block), and one question for adopting the block; update and uninstall touch only the block | Proposed |
 | F14 | A forced update or uninstall copies every file it replaces or removes into a backup directory first | Proposed |
+| F15 | The installation session takes no role: it sets up, records, and ends; the roles start in fresh sessions from the records, and design agreements made during the setup go into T0000 first | Proposed |
 | T1 | The rules template and request README include B5b, D13, D16, and C19 (withdrawal) as defaults, although none is exercised yet; a project keeps or drops them | Proposed |
 | T2 | Domain-specific rules go in the rules file's "Project Rules"; the template carries only generic rules (interface contracts, independent verification, tolerance-based comparison) | Proposed |
 
@@ -148,6 +149,8 @@ project's development notes.
 | G11 | A charter is frozen once released; changes are amendments recorded as events | Proposed |
 | G12 | Only the holder writes its task's `status.md`; the designer closes a task after the holder reports done, or reopens it | Proposed |
 | G13 | Clearing a session's context does not change what it holds; the user names the holder a fresh session continues as | Proposed |
+| G14 | When nobody holds the integrator role, the tool notes it on taking T0000 and on recording a new request, which waits; the review skill refuses to review without the role | Proposed |
+| G15 | Taking T0000 notes an unfilled charter or status; the designer then proposes one plan to fill them from what the project already has (earlier handover, briefs), and drafts tasks from existing briefs only by the user's `/ptt-mktask` | Proposed |
 
 ## Nesting rules
 

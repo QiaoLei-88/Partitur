@@ -151,6 +151,30 @@ class Ptt(unittest.TestCase):
         self.assertIn("does not supervise", self.refused("amend", "T0000", "--as", d,
                                                          "--text", "x"))
 
+    def test_notes_on_unfilled_root_and_missing_integrator(self):
+        r = self.ptt("take", "designer")
+        self.assertEqual(r.stdout.strip(), "designer-g1")
+        self.assertIn("T0000 is not filled in yet (charter.md", r.stderr)
+        self.assertIn("no session holds the integrator role", r.stderr)
+        req = self.rec / "pr" / "open" / "000001-x"
+        req.mkdir(parents=True)
+        (req / "0001-request.md").write_text("x\n")
+        r = self.ptt("record", "-m", "submit", str(req))
+        self.assertIn("request 000001-x waits", r.stderr)
+        (req / "0002-reply.md").write_text("x\n")
+        self.assertNotIn("integrator", self.ptt("record", "-m", "reply", str(req)).stderr)
+        self.ptt("take", "integrator")
+        req2 = self.rec / "pr" / "open" / "000002-y"
+        req2.mkdir()
+        (req2 / "0001-request.md").write_text("x\n")
+        self.assertEqual(self.ptt("record", "-m", "submit", str(req2)).stderr, "")
+        self.ptt("leave", "designer-g1")
+        charter = self.rec / "tasks" / "open" / "T0000-design" / "charter.md"
+        self.fill(charter)
+        self.fill(charter.parent / "status.md")
+        self.ptt("record", "-m", "fill", str(charter.parent))
+        self.assertEqual(self.ptt("take", "designer").stderr, "")
+
     def test_root_task_has_no_dependencies(self):
         d = self.designer()
         self.assertIn("never closes", self.refused("mktask", "x", "--as", d, "--depends", "T0000"))

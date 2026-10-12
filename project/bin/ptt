@@ -471,6 +471,14 @@ def cmd_take(a):
     add_event(i["dir"], "take", dict(by=name), "", f"task {tid(i['number'])}: taken by {name}",
               also=extra)
     print(name)
+    if i["number"] == ROOT:
+        unfilled = [f for f in ("charter.md", "status.md")
+                    if "{{" in (i["dir"] / f).read_text()]
+        if unfilled:
+            note(f"{tid(ROOT)} is not filled in yet ({' and '.join(unfilled)} still have "
+                 "{{...}} placeholders); the designer's first step is to fill them in")
+        if not role_state("integrator")[0]:
+            note("no session holds the integrator role; requests wait until one takes it")
 
 
 def cmd_leave(a):
@@ -713,8 +721,11 @@ def cmd_record(a):
         need(p == REC or REC in p.parents, f"{x} is outside the records repository")
         paths.append(p)
     need(paths, "name the paths to record")
+    new_requests = set()
     for p in paths:
         r = p.relative_to(REC).parts
+        if len(r) >= 3 and r[:2] == ("pr", "open") and not in_head(REC / "pr" / "open" / r[2]):
+            new_requests.add(r[2])
         if len(r) < 3 or r[0] not in ("tasks", "pr") or r[1] not in PLACES + ("merged", "closed"):
             continue
         target = REC / r[0] / r[1] / r[2]
@@ -727,6 +738,15 @@ def cmd_record(a):
              "(moved by a decision); write there instead, and remove this stray copy" if moved
              else "")
     print("recorded" if record(a.message, add=paths) else "nothing to record")
+    if new_requests and not role_state("integrator")[0]:
+        note(f"no session holds the integrator role: request {', '.join(sorted(new_requests))} "
+             "waits until one takes it (/ptt-take integrator, in a fresh session)")
+
+
+def note(text):
+    """A notice for the user, on standard error so that standard output stays
+    what scripts read (a holder name, a path)."""
+    print(f"note: {text}", file=sys.stderr)
 
 
 def cmd_tasks(a):

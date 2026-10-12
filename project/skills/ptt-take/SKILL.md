@@ -30,7 +30,19 @@ needs the user's AtE.
      `<records>/bin/ptt whoami <name>` for what waits on you. A `design`
      task makes you the designer of its scope: you make and close its
      subtasks. The root designer (`T0000`) makes the top-level tasks.
-5. While holding a task, record `status.md` (`<records>/bin/ptt record`) at
+
+   Report every `note:` line the tool printed to the user.
+5. If the tool notes that `T0000` is not filled in (a project just set
+   up), find what the project already has: earlier handover files in
+   `<records>/handoff/` (other than `integrator.md` and `notes/`), lines
+   reported "superseded" in `partitur-install-report.md` in the workspace
+   root, the design document, and earlier work briefs. Propose one plan to
+   the user: fill in the charter's placeholders, move the earlier handover
+   into `status.md`, and record both; then, for each piece of work already
+   briefed, a draft task (`/ptt-mktask`, naming the brief as its source).
+   Carry out the first part on the user's AtE; each draft task is the
+   user's `/ptt-mktask`.
+6. While holding a task, record `status.md` (`<records>/bin/ptt record`) at
    least once a day of work, also when the work itself is on a code branch:
    a supervisor treats a holder with no record for seven days as possibly
    gone.

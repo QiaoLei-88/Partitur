@@ -292,6 +292,7 @@ class InstallProject(unittest.TestCase):
         self.assertNotIn("differs", out)
         report = (self.root / "partitur-install-report.md").read_text()
         self.assertIn("fill in `ws/tasks/open/T0000-design/charter.md`", report)
+        self.assertIn("it takes no role", report)
         self.assertIn('ptt record -m "install Partitur" ws', report)
         self.assertNotIn("partitur-install-report", git(ws, "status", "--porcelain"))
         listing = run("python3", str(ws / "bin" / "pr"), "list").stdout

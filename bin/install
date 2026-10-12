@@ -751,8 +751,10 @@ def write_report(a, tools, report, output):
     if any(k == "created" and rel.endswith("T0000-design/charter.md")
            for k, rel in report.paths):
         steps.append(f"Root design task: fill in `{R}/tasks/open/T0000-design/charter.md` "
-                     "with the user (this first fill-in is a direct edit), and its "
-                     "`status.md` from the current design handover, if the project has one.")
+                     "with the user (this first fill-in is a direct edit). If the project has "
+                     "its own design handover, the user may leave this to the designer, who "
+                     "proposes it on taking T0000. Anything about the design agreed during "
+                     "the setup goes into T0000's charter or `status.md`.")
     if c.get("modified") or c.get("differs"):
         steps.append("Files reported \"modified\" or \"differs\" were left alone: tell the "
                      "user which matter, and whether `--update --force` (with a backup) or "
@@ -763,6 +765,11 @@ def write_report(a, tools, report, output):
     if any(c.get(k) for k in ("created", "updated", "replaced", "removed", "merged")):
         steps.append(f"When the steps above are done, record the records repository: "
                      f"`{R}/bin/ptt record -m \"install Partitur\" {R}`.")
+    if c.get("created"):
+        steps.append("This is the installation session: it takes no role. Tell the user to open "
+                     "fresh sessions in the workspace root for the roles (`/ptt-take designer`, "
+                     "`/ptt-take integrator`), which start from the records, and that requests "
+                     "wait until a session holds the integrator role.")
     when = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
     text = (f"# Partitur install report\n\n"
             f"- When: {when}\n- Partitur: {partitur_commit() or 'uncommitted'}\n"

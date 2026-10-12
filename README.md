@@ -75,24 +75,26 @@ both.
    It detects Claude Code and Codex and reports what it found;
    `--tool claude`, `codex`, or `all` chooses explicitly.
 3. **Once per project**, in its workspace root (the directory that holds
-   the project's code checkouts), start a session and ask: "install
-   Partitur for this project". The session runs
+   the project's code checkouts), start a session, the *installation
+   session*, and ask: "install Partitur for this project". The session runs
 
    ```
    ~/partitur/bin/install --scope project
    ```
 
-   and reports what it created: the records repository `workspace/` with
+   (or run it yourself inside the session, so that it sees the output: in
+   Claude Code, `! ~/partitur/bin/install --scope project`) and reports
+   what it created: the records repository `workspace/` with
    the rules file, task and request directories, tools and skills, the
    root design task `T0000` (the designer's charter and handover), the
    integrator's file, and the links your tools read. It lists the code
    repositories it found; one deeper down is added as a line in
-   `workspace/pr/repos`. If you ran install yourself in a terminal, start
-   a session in the workspace root and say "Read
+   `workspace/pr/repos`. If you ran install in a plain terminal instead,
+   start the installation session in the workspace root and say "Read
    partitur-install-report.md and help me finish the Partitur install":
    install leaves its output and the next steps in that file (not
    committed; delete it when done).
-4. **Fill in two files** with the session: the "Project Rules" at the end
+4. **Fill in two files** with the installation session: the "Project Rules" at the end
    of `workspace/CLAUDE.md` (your domain's rules; Partitur's own rules sit
    in a marked block above them), and the placeholders in
    `workspace/tasks/open/T0000-design/charter.md` (the root designer's
@@ -108,11 +110,18 @@ both.
    workspace/bin/ptt record -m "install Partitur" workspace
    ```
 
-   From now on every write in `workspace/` goes through `ptt`.
-5. **Open sessions** in the workspace root and give each its role: in one,
-   `/ptt-take designer`; in another, `/ptt-take integrator`. Discuss the
+   From now on every write in `workspace/` goes through `ptt`. Anything
+   about the design agreed during the setup belongs in T0000's charter or
+   `status.md` before you record. The installation session then ends; it
+   takes no role.
+5. **Open fresh sessions** in the workspace root for the roles: in one,
+   `/ptt-take designer`; in another, `/ptt-take integrator`. Each starts
+   from the records, not from the setup conversation. If T0000 is not
+   filled in yet (an existing project whose handover lives elsewhere), the
+   designer proposes how to fill it from what the project has. Discuss the
    first piece of work with the designer and make it a task; in a third
-   session, `/ptt-take` it.
+   session, `/ptt-take` it. Requests wait until a session holds the
+   integrator role; `ptt` notes it when one is submitted without.
 
 Always start sessions in the workspace root: Codex reads `AGENTS.md` and
 skills only from the Git root of its starting directory downwards, and the
