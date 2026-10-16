@@ -50,6 +50,7 @@ Six ideas decide everything else; when in doubt, ask which one applies.
 | know what a session holds and what waits on it | any | `/ptt-whoami`; `/ptt-whoami all` for everyone |
 | continue a role after `/clear` | the cleared session | `/ptt-whoami <holder name>` |
 | submit finished work for review | the task holder | `/ptt-pr-submit` |
+| answer a review | the task holder | `/ptt-pr-submit reply N` (`draft-reply N` to check it first; `draft` likewise before submitting) |
 | review and carry out your decision | the integrator (`/ptt-take integrator`) | `/ptt-pr-review` |
 | report a task done / accept it | holder / its supervisor | `/ptt-done` / `/ptt-close N` |
 | stop holding a role or task | that session | `/ptt-leave` (a task needs the supervisor's `/ptt-leave approve N`) |
