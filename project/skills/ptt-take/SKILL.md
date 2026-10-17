@@ -18,9 +18,11 @@ takes, approves recording it (an AtE does not); the work itself needs AtE
 3. The tool prints your holder name (`designer-g2`, `integrator-1`,
    `track-T0007`). It is your name from now on: `--as NAME` (the NAME
    argument for `leave` and `whoami`; optional for `record` and `pr-move`,
-   added to the commit message), and `session:` in request messages. After
-   `/clear` the user names it (`/ptt-whoami <name>`): the cleared session
-   continues as that holder and does not take again.
+   added to the commit message), and `session:` in request messages. The
+   tool binds it to this session where the agent tool gives a session ID;
+   one session holds one role or task. After `/clear` the user continues it
+   with `/ptt-resume <name>`: the cleared session does not take again, and
+   its writes are refused until it has resumed.
 4. Read what you start from, then report what you hold, your supervisor,
    the next step, and every `note:` the tool printed:
    - integrator: `<records>/handoff/integrator.md`, `<records>/bin/pr list`;

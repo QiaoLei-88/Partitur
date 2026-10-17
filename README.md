@@ -48,7 +48,7 @@ Six ideas decide everything else; when in doubt, ask which one applies.
 | turn a discussion into a task | the designer | `/ptt-mktask`, then `/ptt-mktask release N` |
 | have a session work on a task | any free session | `/ptt-take N` (or the task's name) |
 | know what a session holds and what waits on it | any | `/ptt-whoami`; `/ptt-whoami all` for everyone |
-| continue a role after `/clear` | the cleared session | `/ptt-whoami <holder name>` |
+| continue a role after `/clear` | the cleared session | `/ptt-resume <holder name>` |
 | submit finished work for review | the task holder | `/ptt-pr-submit` |
 | answer a review | the task holder | `/ptt-pr-submit reply N` (`draft-reply N` to check it first; `draft` likewise before submitting) |
 | review and carry out your decision | the integrator (`/ptt-take integrator`) | `/ptt-pr-review` |

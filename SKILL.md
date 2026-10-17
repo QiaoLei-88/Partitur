@@ -17,7 +17,7 @@ come and go; the records carry the work.
    states). It is authoritative and may override this skill.
 2. Know what you hold: a session holds a role or task only by taking it
    (`/ptt-take`), or by continuing as a holder the user names
-   (`/ptt-whoami <name>`). Then read your role's page in [roles/](roles/)
+   (`/ptt-resume <name>`). Then read your role's page in [roles/](roles/)
    and [roles and tasks](flows/tasks.md).
 3. Nothing is authorized until the user says `AtE` for a task (or `AtEiYA`
    and you agree): [authorization](flows/authorization.md).

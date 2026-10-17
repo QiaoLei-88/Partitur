@@ -69,7 +69,7 @@ agreements: none. Clear now if you like (/clear).
 The user's `/clear` (the same command in Claude Code and Codex) is the
 approval; ignoring the offer means continue. Clearing does not change what
 the session holds: afterwards the user names the holder it continues as
-(`/ptt-whoami <name>`) *(Proposed, G13)*. A session never clears in the
+(`/ptt-resume <name>`) *(Proposed, G13, G16)*. A session never clears in the
 middle of a multi-round review or a design discussion only to save tokens:
 re-reading costs too.
 

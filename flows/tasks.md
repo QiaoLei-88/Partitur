@@ -66,8 +66,15 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
    as events. The holder writes only `status.md` (G11, G12).
 9. **Clearing does not change the holder.** The role or task stays
    recorded; after `/clear`, the user names the holder the fresh session
-   continues as (`/ptt-whoami <name>`), and it picks up from the records.
+   continues as (`/ptt-resume <name>`), and it picks up from the records.
    Leaving is for handing the work to another session (D16, G13).
+10. **A holder is bound to one session.** Where the agent tool gives a
+    session ID (Claude Code does; Codex and a terminal do not), taking and
+    resuming record it with the holder name. A write as a holder bound to
+    another session is refused, and so is any write from a session whose
+    holder has resumed elsewhere; one session holds one role or task. An
+    unbound holder (taken without a session ID, or before Partitur bound
+    holders) is not checked until it resumes (G16).
 
 ## Records
 
@@ -82,7 +89,7 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
       status.md           the holder's: done, open, where it stands
       0001-release.md     events, each written once:
       0002-take.md          release, take, leave-request, leave, done,
-      0003-leave-request.md reopen, amend, close, cancel
+      0003-leave-request.md reopen, amend, resume, close, cancel
       ...
 <records>/roles/integrator/ 0001-take.md (integrator-1), 0002-leave.md, ...
 ```
@@ -100,7 +107,8 @@ messages; there is no state file to go stale (C2).
 | Command | Who | Runs |
 | --- | --- | --- |
 | `/ptt-take [designer\|integrator\|task]` | any session | `ptt take`; a task by ID (`T0007`, `0007`, `7`, `T0007.1`), full name (`T0007-wall-distance`), or slug; without argument `ptt tasks` |
-| `/ptt-whoami [name\|all]` | any session | `ptt whoami`; with a name, continue as that holder; `all`: `ptt who`, `ptt tasks` |
+| `/ptt-whoami [name\|all]` | any session | `ptt whoami` (reads only); `all`: `ptt who`, `ptt tasks` |
+| `/ptt-resume NAME` | a cleared or fresh session | `ptt resume`: continue as NAME, bound to this session |
 | `/ptt-mktask`, `release N`, `amend N` | designer | `ptt mktask`, `ptt ready`, `ptt amend` |
 | `/ptt-done` | holder | `ptt done` |
 | `/ptt-close N`, `reopen N`, `cancel N` | supervisor | `ptt close`, `ptt reopen`, `ptt cancel` |
@@ -115,9 +123,10 @@ In Codex the commands start with `$` instead of `/`.
   their word; the records show who did what, and the user's commands are
   the only authority (A2). This guards against mistakes, not against a
   session lying.
-- **Continuing after `/clear` is not recorded.** If the user names the same
-  holder in two sessions, both act as it; naming one holder in one session
-  at a time is the user's part.
+- **Sessions are bound only where the tool gives an ID.** Claude Code does;
+  in Codex or a terminal, holders are unbound, and naming one holder in one
+  session at a time is the user's part. The binding, like names, guards
+  against mistakes, not against a session lying about its ID.
 - **Notices are pulled, not pushed.** A supervisor learns of a leave
   request, a done report, or a silent holder when it runs `/ptt-whoami`;
   the user carries the notice, as for all records (D12).

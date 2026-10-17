@@ -41,14 +41,24 @@ class Ptt(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.root)
 
-    def ptt(self, *args, check=True, env=None):
+    def env(self, base=None, session=None):
+        """The environment of a session with the given ID (none by default)."""
+        env = dict(os.environ if base is None else base)
+        env.pop("CLAUDE_CODE_SESSION_ID", None)
+        env.pop("PTT_SESSION_ID", None)
+        if session:
+            env["PTT_SESSION_ID"] = session
+        return env
+
+    def ptt(self, *args, check=True, env=None, session=None):
+        env = self.env(env, session)
         return run("python3", str(self.rec / "bin" / "ptt"), *args, check=check, env=env)
 
     def fill(self, charter):
         charter.write_text(re.sub(r"\{\{[^}]*\}\}", "filled", charter.read_text()))
 
-    def refused(self, *args):
-        r = self.ptt(*args, check=False)
+    def refused(self, *args, session=None):
+        r = self.ptt(*args, check=False, session=session)
         self.assertNotEqual(r.returncode, 0, args)
         return r.stderr
 
@@ -173,7 +183,7 @@ class Ptt(unittest.TestCase):
         self.fill(charter)
         self.fill(charter.parent / "status.md")
         self.ptt("record", "-m", "fill", str(charter.parent))
-        self.assertEqual(self.ptt("take", "designer").stderr, "")
+        self.assertEqual(self.ptt("take", "designer", session="S").stderr, "")
 
     def test_record_and_pr_move_accept_as(self):
         req = self.rec / "pr" / "open" / "000001-x"
@@ -288,7 +298,8 @@ class Ptt(unittest.TestCase):
         d = self.designer()
         n = self.task("race", d)
         procs = [subprocess.Popen(["python3", str(self.rec / "bin" / "ptt"), "take", n],
-                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                  env=self.env())
                  for _ in range(4)]
         codes = [p.communicate() and p.returncode for p in procs]
         self.assertEqual(codes.count(0), 1, codes)
@@ -297,7 +308,8 @@ class Ptt(unittest.TestCase):
 
     def test_concurrent_role_take_has_one_winner(self):
         procs = [subprocess.Popen(["python3", str(self.rec / "bin" / "ptt"), "take", "designer"],
-                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                  env=self.env())
                  for _ in range(4)]
         codes = [p.communicate() and p.returncode for p in procs]
         self.assertEqual(codes.count(0), 1, codes)
@@ -307,7 +319,8 @@ class Ptt(unittest.TestCase):
         for k in range(6):
             n = self.task(f"r{k}", d)
             ptt = str(self.rec / "bin" / "ptt")
-            procs = [subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            procs = [subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                      env=self.env())
                      for cmd in (["python3", ptt, "take", n],
                                  ["python3", ptt, "cancel", n, "--as", d, "--reason", "x"])]
             codes = [p.communicate() and p.returncode for p in procs]
@@ -467,6 +480,48 @@ class Ptt(unittest.TestCase):
         (req / "0004-reply.md").write_text("late\n")
         self.assertIn("now pr/merged/000001-x", self.refused("record", "-m", "reply",
                                                              str(req / "0004-reply.md")))
+
+
+    def test_sessions_bind_holders(self):
+        d = self.ptt("take", "designer", session="A").stdout.strip()
+        n = self.task("wall-distance", d)
+        self.assertIn("this session is designer-g1", self.refused("take", n, session="A"))
+        self.assertEqual(self.ptt("whoami", session="A").stdout.split(":")[0], d)
+        self.assertIn("session: this one", self.ptt("whoami", d, session="A").stdout)
+        self.assertIn("holds nothing", self.ptt("whoami", session="B").stdout)
+        # after /clear the session has a new ID: writes as d are refused until resumed
+        self.assertIn("bound to another session", self.refused(
+            "mktask", "x", "--as", d, session="B"))
+        self.assertIn("another one", self.ptt("whoami", d, session="B").stdout)
+        r = self.ptt("resume", d, session="B")
+        self.assertIn(f"this session is {d}", r.stdout)
+        self.assertIn("must no longer be used", r.stderr)
+        self.ptt("mktask", "x", "--as", d, session="B")
+        # the old session is refused, also for a plain record without --as
+        self.assertIn("continued in another session", self.refused(
+            "mktask", "y", "--as", d, session="A"))
+        status = self.rec / "tasks" / "open" / "T0000-design" / "status.md"
+        status.write_text("x\n")
+        self.assertIn("continued in another session", self.refused(
+            "record", "-m", "s", str(status), session="A"))
+        self.ptt("record", "-m", "s", str(status), session="B")
+        # resume refuses a name that holds nothing and a session that holds another
+        self.assertIn("holds nothing", self.refused("resume", "worker-T0999", session="C"))
+        w = self.ptt("take", n, session="C").stdout.strip()
+        self.assertIn(f"this session is {w}", self.refused("resume", d, session="C"))
+        self.assertIn("already", self.ptt("resume", w, session="C").stdout)
+        # the user, and sessions without an ID, are not checked
+        self.ptt("mktask", "z", "--as", d)
+        self.assertIn("holds nothing that ptt can see", self.ptt("whoami").stdout)
+
+    def test_unbound_holder_not_checked(self):
+        d = self.ptt("take", "designer").stdout.strip()
+        self.assertIn("not bound", self.ptt("take", "integrator").stderr)
+        self.ptt("mktask", "x", "--as", d, session="B")
+        self.ptt("resume", d, session="B")
+        self.assertIn("bound to another session", self.refused(
+            "mktask", "y", "--as", d, session="C"))
+        self.assertTrue(list((self.rec / "tasks" / "open" / "T0000-design").glob("*-resume.md")))
 
 
 if __name__ == "__main__":

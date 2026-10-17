@@ -5,12 +5,14 @@ Usage (NAME is the holder name a session received when it took its role or
 task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
 `T0007.1`, by its full name `T0007-slug`, or by its slug):
   ptt who                          who holds which role and task
-  ptt whoami NAME                  what NAME holds, and what waits on it
+  ptt whoami [NAME]                what NAME (default: the holder bound to this
+                                   session) holds, and what waits on it
   ptt tasks [--all]                tasks and their states
   ptt show TASK                    a task's charter, status, and events
   ptt take designer|integrator|TASK   take the root design task T0000 (designer),
                                    the integrator role, or a ready task; prints the
                                    holder name
+  ptt resume NAME                  continue as NAME in this session (after /clear)
   ptt leave NAME [--status TEXT]   give up the integrator role or T0000 (designer), or
                                    ask to give up any other task
   ptt approve-leave TASK --as NAME   supervisor: accept a holder's request to leave
@@ -61,6 +63,13 @@ leaves a task only with its supervisor's approval. Nobody leaves, and no
 design task is cancelled, while anything below it is unclear: a leave
 request or done report waiting, or a holder with no record for STALE_DAYS.
 Names given with --as are not authenticated: the records show who did what.
+
+Sessions: where the agent tool gives a session ID (Claude Code's
+CLAUDE_CODE_SESSION_ID; PTT_SESSION_ID overrides it), `take` and `resume`
+bind the holder name to it. A write acting as a bound holder (--as NAME, the
+NAME of `leave`) from another session is refused, and so is any write from a
+session whose holder has since been resumed elsewhere. Without a session ID
+(a terminal, Codex), nothing is bound or checked.
 """
 import argparse
 import fcntl
@@ -202,14 +211,20 @@ def add_event(d, kind, fields, body, message, also=()):
 
 # --- roles ------------------------------------------------------------------
 
-def role_state(role):
-    holder, gen = None, 0
+def role_info(role):
+    holder, gen, sessions = None, 0, []
     for e in events(ROLES / role):
         if e["kind"] == "take":
-            holder, gen = e["by"], gen + 1
+            holder, gen, sessions = e["by"], gen + 1, [e.get("session_id")]
+        elif e["kind"] == "resume":
+            sessions.append(e.get("session_id"))
         elif e["kind"] == "leave":
-            holder = None
-    return holder, gen
+            holder, sessions = None, []
+    return holder, gen, sessions
+
+
+def role_state(role):
+    return role_info(role)[:2]
 
 
 def role_name(role, gen):
@@ -288,7 +303,7 @@ def raw_info(place, d):
                 kind=charter.get("kind", "track"),
                 depends=parse_ids(charter.get("depends", "")),
                 state="ready" if number == ROOT else "draft", holder=None, last_holder=None,
-                takes=0,
+                takes=0, sessions=[],
                 leave_request=None, done=None, amended=[])
     for e in events(d):
         k = e["kind"]
@@ -300,19 +315,23 @@ def raw_info(place, d):
             if info["holder"]:
                 info["amended"].append(e["path"].name)
         elif k == "take":
-            info.update(state="held", holder=e["by"], leave_request=None, done=None, amended=[])
+            info.update(state="held", holder=e["by"], leave_request=None, done=None, amended=[],
+                        sessions=[e.get("session_id")])
             info["takes"] += 1
+        elif k == "resume":
+            info["sessions"].append(e.get("session_id"))
         elif k == "leave-request":
             info["leave_request"] = e
         elif k == "leave":
-            info.update(state="ready", holder=None, leave_request=None, done=None)
+            info.update(state="ready", holder=None, leave_request=None, done=None, sessions=[])
         elif k == "done":
             info["done"] = e
         elif k == "reopen":
             info["done"] = None
         elif k in ("close", "cancel"):
             info.update(state="closed" if k == "close" else "cancelled",
-                        last_holder=info["holder"], holder=None, leave_request=None)
+                        last_holder=info["holder"], holder=None, leave_request=None,
+                        sessions=[])
     return info
 
 
@@ -394,6 +413,48 @@ def held_by(name):
     return None
 
 
+def session_id():
+    """This session's ID, if the agent tool gives one."""
+    return os.environ.get("PTT_SESSION_ID") or os.environ.get("CLAUDE_CODE_SESSION_ID") or None
+
+
+def holdings():
+    """(holder name, directory of its events, sessions bound since the take,
+    the last one being the current binding) for every current holder."""
+    out = []
+    holder, _, sessions = role_info("integrator")
+    if holder:
+        out.append((holder, ROLES / "integrator", sessions))
+    out += [(i["holder"], i["dir"], i["sessions"]) for i in infos() if i["holder"]]
+    return out
+
+
+def bound_here():
+    """The holder bound to this session, or None."""
+    sid = session_id()
+    for name, _, sessions in holdings():
+        if sid and sessions[-1] == sid:
+            return name
+    return None
+
+
+def check_session(name):
+    """Refuse a write from this session that would act as a holder bound to
+    another session, or that comes from a session its holder has left by a
+    resume elsewhere."""
+    sid = session_id()
+    if not sid:
+        return
+    for holder, _, sessions in holdings():
+        if sid in sessions[:-1] and sessions[-1] != sid:
+            die(f"this session was {holder}, which has since continued in another session "
+                f"(ptt resume); this session must no longer write. If it should be {holder} "
+                f"again, run `ptt resume {holder}` here (/ptt-resume {holder})")
+        if holder == name and sessions[-1] and sessions[-1] != sid:
+            die(f"{name} is bound to another session; if this session continues {name} "
+                f"(after /clear), run `ptt resume {name}` first (/ptt-resume {name})")
+
+
 def subtree(name):
     """Tasks below `name`, the holder of a design task: every task for the
     root designer, the descendants of its design task for a sub-designer."""
@@ -450,15 +511,50 @@ def need(cond, msg):
 
 # --- commands -----------------------------------------------------------------
 
+def bind():
+    """The session field of a take or resume event; refuses a session that
+    already holds something."""
+    here = bound_here()
+    need(not here, f"this session is {here}; one session holds one role or task (to work on "
+         "another, use a fresh session, or leave first)")
+    sid = session_id()
+    return dict(session_id=sid) if sid else {}
+
+
+def bind_note(name):
+    if not session_id():
+        note(f"no session ID (only some agent tools give one): {name} is not bound to this "
+             "session, and its writes are not checked")
+
+
+def cmd_resume(a):
+    hits = [h for h in holdings() if h[0] == a.name]
+    need(hits, f"{a.name} holds nothing; nothing to continue (`ptt who` lists the holders)")
+    _, d, sessions = hits[0]
+    sid = session_id()
+    if sid and sessions[-1] == sid:
+        print(f"this session is already {a.name}")
+        return
+    fields = dict(by=a.name, **bind())
+    what = f"role {d.name}" if d.parent == ROLES else f"task {tid(TASK_DIR.match(d.name).group(1))}"
+    add_event(d, "resume", fields, "", f"{what}: {a.name} continues in a new session")
+    print(f"this session is {a.name}")
+    bind_note(a.name)
+    if sid:
+        note(f"the session that was {a.name} before must no longer be used: its writes are "
+             "refused from now on")
+
+
 def cmd_take(a):
     if a.what == "integrator":
         holder, gen = role_state(a.what)
         need(not holder, f"{a.what} is held by {holder}; it must leave first "
              "(or the user frees it)")
         name = role_name(a.what, gen + 1)
-        add_event(ROLES / a.what, "take", dict(by=name, generation=gen + 1), "",
+        add_event(ROLES / a.what, "take", dict(by=name, generation=gen + 1, **bind()), "",
                   f"role {a.what}: taken by {name}")
         print(name)
+        bind_note(name)
         return
     i = get(a.what)
     detail = (f" (held by {i['holder']})" if i["holder"] else "") + \
@@ -472,9 +568,10 @@ def cmd_take(a):
                           "done (request numbers and merge commits), what is open, where it "
                           "stands. No review states.\n")
         extra = [status]
-    add_event(i["dir"], "take", dict(by=name), "", f"task {tid(i['number'])}: taken by {name}",
-              also=extra)
+    add_event(i["dir"], "take", dict(by=name, **bind()), "",
+              f"task {tid(i['number'])}: taken by {name}", also=extra)
     print(name)
+    bind_note(name)
     if i["number"] == ROOT:
         unfilled = [f for f in ("charter.md", "status.md")
                     if "{{" in (i["dir"] / f).read_text()]
@@ -800,6 +897,12 @@ def cmd_who(a):
 
 
 def cmd_whoami(a):
+    if not a.name:
+        a.name = bound_here()
+        if not a.name:
+            print("this session holds nothing" + ("" if session_id() else
+                  " that ptt can see (no session ID); name the holder: ptt whoami NAME"))
+            return
     held = held_by(a.name)
     if not held:
         print(f"{a.name} holds nothing; take a role or task with `ptt take`")
@@ -822,9 +925,14 @@ def cmd_whoami(a):
                   f"`ptt show {tid(i['number'])}`")
     for line in unclear(subtree(a.name)):
         print("waits on you:", line)
+    sessions = [h[2] for h in holdings() if h[0] == a.name][0]
+    sid = session_id()
+    if sessions[-1]:
+        print("session: " + ("this one" if sessions[-1] == sid else
+                             f"another one; continue here with `ptt resume {a.name}`"))
 
 
-MUTATING = {"take", "leave", "approve-leave", "free", "mktask", "ready", "amend", "done",
+MUTATING = {"take", "resume", "leave", "approve-leave", "free", "mktask", "ready", "amend", "done",
             "close", "reopen", "cancel", "record", "pr-move"}
 
 
@@ -860,10 +968,12 @@ def main():
             p.add_argument("--" + opt, **kw)
         return p
     add("who")
-    add("whoami", "name")
+    add("whoami")
+    sub.choices["whoami"].add_argument("name", nargs="?")
     add("tasks", all=dict(action="store_true"))
     add("show", "task")
     add("take", "what")
+    add("resume", "name")
     add("leave", "name", status=dict())
     add("approve-leave", "task", as_=True)
     add("free", "what", as_=True, reason=dict(required=True), force=dict(action="store_true"))
@@ -895,6 +1005,9 @@ def main():
     run = globals()["cmd_" + a.cmd.replace("-", "_")]
     if a.cmd in MUTATING:
         with lock():
+            if a.cmd not in ("take", "resume"):
+                actor = a.name if a.cmd == "leave" else a.as_
+                check_session(None if actor == "user" else actor)
             run(a)
     else:
         run(a)
