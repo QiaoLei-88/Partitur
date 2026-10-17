@@ -1,6 +1,6 @@
 ---
 name: ptt-pr-submit
-description: Submit the current branch as a local pull request for review and integration, reply to its review (reply [N]), draft either for the user to check first (draft, draft reply [N]), or list this branch's requests (list [BRANCH]). Use when branch work is ready for review or a review needs an answer.
+description: Submit a branch (the one named, or this task's worktree) as a local pull request for review and integration, reply to its review (reply [N]), draft either for the user to check first (draft, draft reply [N]), or list this branch's requests (list [BRANCH]). Use when branch work is ready for review or a review needs an answer.
 ---
 
 # Submit or reply to a local request
@@ -10,7 +10,13 @@ writes; other work, such as changing the branch, needs AtE (rules file) or a
 draft the user approves (below).
 `<records>/pr/repos` maps a `repo` name to its primary checkout and main
 branch `<main>`. Request numbers may be short (`4`, `pr-4`, `000004`) and
-are never reused. Without N, the request is this branch's one open request
+are never reused.
+
+The branch is the one the user names; otherwise the branch of the worktree
+this holder's task works in (`worktrees/<topic>`; if several, list them and
+ask). Run every git command from the workspace root with `git -C
+<worktree>`; never ask the user to change directory. Without N, the request
+is this branch's one open request
 waiting for its author; if there is none or several, list them and ask.
 With N, the request must be in `pr/open`: if `<records>/bin/pr list all`
 shows it merged or closed, report its state and decision and stop. A
@@ -20,11 +26,11 @@ files: never edit a message or move a request.
 
 | Argument | Action |
 | --- | --- |
-| `list [BRANCH]` | `<records>/bin/pr list all --branch BRANCH` (default: current branch): report each status; "waiting for author" means a reply is due. |
+| `list [BRANCH]` | `<records>/bin/pr list all --branch BRANCH` (default: the branch above): report each status; "waiting for author" means a reply is due. |
 | `draft reply [N]` | Read `<records>/bin/pr show N` and the code; show the planned change per comment (a diff where short) and the full reply text. Writes nothing. |
 | `reply [N]` | Read `<records>/bin/pr show N`, then reply (below). |
 | `draft` | Check the branch (Submit, steps 1-2) and show the full request text. Writes nothing. |
-| none | Submit the current branch (below). |
+| none | Submit the branch (below). |
 
 A draft is for the user to check: it writes no file and makes no commit,
 and planned code changes are described, not committed. After a draft in
@@ -45,7 +51,7 @@ No draft for request NNNNNN in this conversation. Decide:
 
 ## Submit
 
-1. In the worktree: the branch is committed and clean (`git status
+1. In the worktree (`git -C <worktree>`): the branch is committed and clean (`git status
    --porcelain` empty, `git diff --check <main> HEAD` clean) and its history
    atomic (`git log --stat <main>..HEAD`: fold fixups, drop WIP and
    reverted changes).
