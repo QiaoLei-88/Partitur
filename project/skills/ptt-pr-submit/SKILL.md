@@ -34,8 +34,9 @@ files: never edit a message or move a request.
 
 A draft is for the user to check: it writes no file and makes no commit,
 and planned code changes are described, not committed. Show the full
-message text in a fenced block (```` ```markdown ````) so that it displays as
-it will be written; the code plan and short diffs go outside it. Values that
+message text in a fenced block (```` ```markdown ````; with more backticks
+than any fence inside the message) so that it displays as it will be
+written; the code plan and short diffs go outside it. Values that
 exist only after carrying out the plan (commit SHAs, run ids, test counts)
 are `{fill: what}`, e.g. `{fill: commit SHA}`, with the expected result
 outside the block; carrying out fills every one, and nothing is recorded
