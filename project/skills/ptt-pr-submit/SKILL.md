@@ -33,7 +33,13 @@ files: never edit a message or move a request.
 | none | Submit the branch (below). |
 
 A draft is for the user to check: it writes no file and makes no commit,
-and planned code changes are described, not committed. After a draft in
+and planned code changes are described, not committed. Show the full
+message text in a fenced block (```` ```markdown ````) so that it displays as
+it will be written; the code plan and short diffs go outside it. Values that
+exist only after carrying out the plan (commit SHAs, run ids, test counts)
+are `{fill: what}`, e.g. `{fill: commit SHA}`, with the expected result
+outside the block; carrying out fills every one, and nothing is recorded
+while one remains. After a draft in
 this conversation, the user's `reply [N]` or submit command, or an AtE
 naming it, approves exactly the drafted plan with the user's changes: its
 commits, their tests, and recording the message. If carrying it out needs
