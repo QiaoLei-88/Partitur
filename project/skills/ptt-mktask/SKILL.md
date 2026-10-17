@@ -35,5 +35,6 @@ is committed and frozen; the task can be taken (`/ptt-take <N>`).
 
 A released charter is never edited; an agreed change is an amendment:
 `<records>/bin/ptt amend <N> --as <name> --text "<change>"`, with `--depends
-N,N` to replace its dependencies (checked for cycles). A holder sees it at
-its next `/ptt-whoami`; tell the user to notify it sooner if it matters now.
+N,N` to replace its dependencies (checked for cycles). A holder sees it in
+its inbox (in Claude Code with the user's next message to it, otherwise at
+its next `/ptt-inbox`).

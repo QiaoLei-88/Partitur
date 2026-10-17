@@ -6,7 +6,10 @@ task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
 `T0007.1`, by its full name `T0007-slug`, or by its slug):
   ptt who                          who holds which role and task
   ptt whoami [NAME]                what NAME (default: the holder bound to this
-                                   session) holds, and what waits on it
+                                   session) holds: role or task, supervisor, session
+  ptt inbox [NAME] [--quiet]       what is new for NAME since it last looked, and what
+                                   waits on it; --quiet prints only what is new, and
+                                   nothing on any error (for a prompt hook)
   ptt tasks [--all]                tasks and their states
   ptt show TASK                    a task's charter, status, and events
   ptt take designer|integrator|TASK   take the root design task T0000 (designer),
@@ -916,20 +919,133 @@ def cmd_whoami(a):
               f"{level(i['number'])}, generation {i['takes']}; supervisor "
               + (sup or "vacant (the user acts until it is taken)"))
         print(f"charter: {(i['dir'] / 'charter.md').relative_to(REC.parent)}")
-        if i["leave_request"]:
-            print("waiting: your request to leave")
-        if i["done"]:
-            print("waiting: your done report")
-        for name in i["amended"]:
-            print(f"amended since your take: {name}; read it with "
-                  f"`ptt show {tid(i['number'])}`")
-    for line in unclear(subtree(a.name)):
-        print("waits on you:", line)
     sessions = [h[2] for h in holdings() if h[0] == a.name][0]
     sid = session_id()
     if sessions[-1]:
         print("session: " + ("this one" if sessions[-1] == sid else
                              f"another one; continue here with `ptt resume {a.name}`"))
+
+
+def tree(rev):
+    """Records under tasks/, pr/, handoff/notes/ at `rev`: {(area, dir, file):
+    (place, blob)}, so that a task or request moved between places keeps its key."""
+    out = {}
+    for line in git("ls-tree", "-r", rev, "--", "tasks", "pr", "handoff/notes",
+                    check=False).stdout.splitlines():
+        meta, path = line.split("\t", 1)
+        parts = path.split("/")
+        if parts[0] in ("tasks", "pr") and len(parts) == 4:
+            out[(parts[0], parts[2], parts[3])] = (parts[1], meta.split()[2])
+        elif parts[:2] == ["handoff", "notes"] and len(parts) == 3 and parts[2] != ".gitkeep":
+            out[("notes", "", parts[2])] = ("", meta.split()[2])
+    return out
+
+
+def inbox_base(name, d):
+    """The records commit NAME last looked at, or else its take."""
+    mark = git_dir() / "ptt-inbox" / name
+    if mark.exists():
+        sha = mark.read_text().strip()
+        if git("cat-file", "-e", f"{sha}^{{commit}}", check=False).returncode == 0:
+            return sha
+    takes = [e for e in events(d) if e["kind"] == "take"]
+    rel = str(takes[-1]["path"].relative_to(REC)) if takes else "."
+    return git("log", "-1", "--format=%H", "--", rel, check=False).stdout.strip() or None
+
+
+def news(name, held, base):
+    """Lines for what changed since `base` that concerns NAME."""
+    if not base:
+        return []
+    old, new = tree(base), tree("HEAD")
+    changed = {k: v for k, v in new.items() if old.get(k, (None, None))[1] != v[1]}
+    moved = {k: v for k, v in new.items() if k in old and old[k][0] != v[0]}
+
+    def sha(area, d, f):
+        place = new[(area, d, f)][0]
+        path = f"{area}/{place}/{d}/{f}" if area != "notes" else f"handoff/notes/{f}"
+        return git("log", "-1", "--format=%h", f"{base}..HEAD", "--", path,
+                   check=False).stdout.strip()
+    out = []
+    mine = held[1] if held[0] == "task" else None
+    below = {i["dir"].name: i for i in subtree(name)}
+    for (area, d, f), (place, _) in sorted(changed.items()):
+        if area == "tasks" and d in below:
+            i = below[d]
+            if f == "status.md":
+                out.append(f"read {tid(i['number'])} status.md: updated by its holder "
+                           f"({sha(area, d, f)})")
+            elif EVENT.match(f) and EVENT.match(f).group(2) in ("done", "leave-request") \
+                    and i["holder"] and (i["done"] if "done" in f else i["leave_request"]):
+                kind = "a done report" if "done" in f else "a request to leave"
+                out.append(f"{tid(i['number'])}: {kind} waits on you ({sha(area, d, f)})")
+        elif area == "tasks" and mine and d == mine["dir"].name and EVENT.match(f):
+            kind = EVENT.match(f).group(2)
+            if kind in ("amend", "reopen"):
+                out.append(f"your task {tid(mine['number'])}: {kind} event {f}; read it with "
+                           f"`ptt show {tid(mine['number'])}` ({sha(area, d, f)})")
+        elif area == "notes" and mine and mine["number"] == ROOT:
+            out.append(f"read handoff/notes/{f}: a note to the designer ({sha(area, d, f)})")
+        elif area == "pr" and EVENT.match(f):
+            msg = REC / "pr" / place / d / f
+            first = REC / "pr" / place / d / "0001-request.md"
+            if not msg.exists() or not first.exists():
+                continue
+            fm = front_matter(msg)[0]
+            writer = fm.get("session") or fm.get("recorded_by")
+            requester = front_matter(first)[0].get("session")
+            kind = fm.get("kind", f.split("-", 1)[1].removesuffix(".md"))
+            if requester == name and writer != name:
+                out.append(f"request {d[:6]}: new {kind} {f[:4]} ({sha(area, d, f)})")
+            elif held == ("role", "integrator") and writer != name and kind in ("request", "reply"):
+                out.append(f"request {d[:6]}: new {kind} {f[:4]}, waiting for review "
+                           f"({sha(area, d, f)})")
+    for (area, d, f), (place, _) in sorted(moved.items()):
+        if area == "pr" and f == "0001-request.md" and \
+                front_matter(REC / "pr" / place / d / f)[0].get("session") == name:
+            out.append(f"request {d[:6]}: now {place}; record the outcome in your status")
+    return out
+
+
+def cmd_inbox(a):
+    name = a.name or bound_here()
+    if not name:
+        if not a.quiet:
+            print("this session holds nothing" + ("" if session_id() else
+                  " that ptt can see (no session ID); name the holder: ptt inbox NAME"))
+        return
+    held = held_by(name)
+    if not held:
+        if not a.quiet:
+            print(f"{name} holds nothing")
+        return
+    d = ROLES / held[1] if held[0] == "role" else held[1]["dir"]
+    head = git("rev-parse", "HEAD").stdout.strip()
+    new = news(name, held, inbox_base(name, d))
+    waits = []
+    if held[0] == "task":
+        i = held[1]
+        if i["leave_request"]:
+            waits.append("your request to leave waits on your supervisor")
+        if i["done"]:
+            waits.append("your done report waits on your supervisor")
+        for f in i["amended"]:
+            waits.append(f"amended since your take: {f}; read it with `ptt show {tid(i['number'])}`")
+    waits += unclear(subtree(name))
+    if a.quiet:
+        if new:
+            print(f"ptt inbox for {name} (new in the records since it last looked):")
+            for line in new:
+                print(f"- {line}")
+    else:
+        print(f"{name}, new since you last looked:" if new else f"{name}: nothing new")
+        for line in new:
+            print(f"- {line}")
+        for line in waits:
+            print(f"waits on you: {line}")
+    mark = git_dir() / "ptt-inbox" / name
+    mark.parent.mkdir(exist_ok=True)
+    mark.write_text(head + "\n")
 
 
 MUTATING = {"take", "resume", "leave", "approve-leave", "free", "mktask", "ready", "amend", "done",
@@ -954,6 +1070,17 @@ def check_format():
 
 
 def main():
+    if sys.argv[1:2] == ["inbox"] and "--quiet" in sys.argv:
+        try:                      # a prompt hook: never fail, never print an error
+            sys.stderr = open(os.devnull, "w")
+            run_main()
+        except BaseException:
+            pass
+        sys.exit(0)
+    run_main()
+
+
+def run_main():
     ap = argparse.ArgumentParser(prog="ptt", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -971,6 +1098,8 @@ def main():
     add("whoami")
     sub.choices["whoami"].add_argument("name", nargs="?")
     add("tasks", all=dict(action="store_true"))
+    add("inbox", quiet=dict(action="store_true"))
+    sub.choices["inbox"].add_argument("name", nargs="?")
     add("show", "task")
     add("take", "what")
     add("resume", "name")

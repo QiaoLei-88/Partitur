@@ -17,7 +17,7 @@ takes, approves recording it (an AtE does not); the work itself needs AtE
    it.
 3. The tool prints your holder name (`designer-g2`, `integrator-1`,
    `track-T0007`). It is your name from now on: `--as NAME` (the NAME
-   argument for `leave` and `whoami`; optional for `record` and `pr-move`,
+   argument for `leave`, `resume`, `whoami`, and `inbox`; optional for `record` and `pr-move`,
    added to the commit message), and `session:` in request messages. The
    tool binds it to this session where the agent tool gives a session ID;
    one session holds one role or task. After `/clear` the user continues it
@@ -28,7 +28,7 @@ takes, approves recording it (an AtE does not); the work itself needs AtE
    - integrator: `<records>/handoff/integrator.md`, `<records>/bin/pr list`;
    - a task (also `designer`): `<records>/bin/ptt show <N>` (charter,
      amendments, previous holder's `status.md`), then `<records>/bin/ptt
-     whoami <name>` for what waits on you. A `design` task makes you the
+     inbox <name>` for what waits on you. A `design` task makes you the
      designer of its scope: you make and close its subtasks; `T0000`'s
      holder makes the top-level tasks.
 5. If the tool notes that `T0000` is not filled in (a project just set up),

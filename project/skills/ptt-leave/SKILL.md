@@ -35,7 +35,7 @@ ready again). Otherwise tell the user what is missing; the holder adds it.
 
 ## Free (`free N|designer|integrator`)
 
-A supervisor frees a task whose holder is gone (`ptt whoami` lists holders
+A supervisor frees a task whose holder is gone (`ptt inbox` lists holders
 with no record for seven days):
 `<records>/bin/ptt free <N> --as <name> --reason "<why>"`; the task is ready
 again, its `status.md` shows where it stood. With recent records the tool

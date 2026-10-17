@@ -147,12 +147,13 @@ project's development notes.
 | G8 | A task goes draft, ready, held, closed (or cancelled); states are derived from its events | Proposed |
 | G9 | A released task whose dependencies are not all closed is blocked | Proposed |
 | G10 | A design task opens a sub-scope; its holder is the sub-designer; the root scope is the design task `T0000`, never closed; a task ID is `T`, a number showing the tree, and a slug (`T0007.1-indexing`), its directory name, never changed; `T0000` has no dependencies and no task depends on it | Proposed |
-| G11 | A charter is frozen once released; changes are amendments recorded as events, also while the task is held; the holder sees those since its take in `ptt whoami` | Proposed |
+| G11 | A charter is frozen once released; changes are amendments recorded as events, also while the task is held; the holder sees those since its take in `ptt inbox` | Proposed |
 | G12 | Only the holder writes its task's `status.md`; the designer closes a task after the holder reports done, or reopens it | Proposed |
 | G13 | Clearing a session's context does not change what it holds; the user names the holder a fresh session continues as | Proposed |
 | G14 | When nobody holds the integrator role, the tool notes it on taking T0000 and on recording a new request, which waits; the review skill refuses to review without the role | Proposed |
 | G15 | Taking T0000 notes an unfilled charter or status; the designer then proposes one plan to fill them from what the project already has (earlier handover, briefs), and drafts tasks from existing briefs only by the user's `/ptt-mktask` | Proposed |
 | G16 | Where the agent tool gives a session ID, taking and resuming (`/ptt-resume NAME`, after `/clear`) bind the holder name to the session; a write as a holder bound to another session, or from a session whose holder resumed elsewhere, is refused; one session holds one role or task; `/ptt-whoami` only reads | Proposed |
+| G17 | `ptt inbox` lists for a holder what changed in the records since it last looked (a subordinate's status, done report, or leave request; an amendment; a note to the designer; a review or decision on its request; for the integrator a new request or reply) and what waits on it; in Claude Code a prompt hook installed with the project runs it before each user message and adds only what is new; `ptt whoami` only says who a session is | Proposed |
 
 ## Nesting rules
 

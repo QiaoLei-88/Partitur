@@ -28,7 +28,10 @@ Usage:
     <records>/bin/            ptt, pr, and test-run, from project/bin/
     <records>/skills/         the ptt-* skills
   and, for each chosen tool, the links it reads in the workspace root:
-    Claude Code:  CLAUDE.md -> <records>/CLAUDE.md, .claude/skills/<skill>
+    Claude Code:  CLAUDE.md -> <records>/CLAUDE.md, .claude/skills/<skill>, and in
+                  .claude/settings.json a prompt hook running `ptt inbox --quiet`
+                  (it prints only when the records hold something new for the
+                  session's holder); other settings there are kept
     Codex:        AGENTS.md -> <records>/CLAUDE.md, .agents/skills/<skill>
   where <skill> is each ptt-* skill, and `partitur` (this repository)
   unless the user scope already links it for that tool.
@@ -90,6 +93,7 @@ import argparse
 import fcntl
 from datetime import datetime, timezone
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -209,6 +213,84 @@ def merge_block(text, block):
     return "\n".join(lines[:k] + ["", block, ""] + lines[k:]).replace("\n\n\n\n", "\n\n\n")
 
 
+HOOK_EVENT = "UserPromptSubmit"
+
+
+def hook_entries(settings):
+    return settings.setdefault("hooks", {}).setdefault(HOOK_EVENT, [])
+
+
+def is_ours(entry):
+    return any("bin/ptt inbox" in h.get("command", "") for h in entry.get("hooks", []))
+
+
+def read_settings(path):
+    """The settings file's JSON, {} if absent, None if unreadable."""
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text() or "{}")
+        return data if isinstance(data, dict) else None
+    except ValueError:
+        return None
+
+
+def write_settings(path, data):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2) + "\n")
+
+
+def apply_hook(root, rel, e, before, opts, report):
+    """Partitur's entry in a tool's settings file; everything else there stays."""
+    path = root / rel
+    want = json.loads(e["data"])
+    data = read_settings(path)
+    if data is None:
+        report("not merged", path, "not valid JSON; add the prompt hook by hand: "
+               + json.dumps(want))
+        return
+    existed = path.exists()
+    entries = hook_entries(data)
+    ours = [x for x in entries if is_ours(x)]
+    if ours == [want]:
+        report("kept", path, "Partitur's prompt hook")
+        return
+    untouched = not ours or (before is not None and before["sha"] == sha(json.dumps(ours[0])))
+    if ours and not (opts.update and (untouched or opts.force)):
+        report("outdated" if untouched else "modified", path, "Partitur's prompt hook; "
+               + ("--update replaces it" if untouched else "--update --force replaces it"))
+        return
+    if ours and not untouched:
+        backup(path, root, opts, report)
+    entries[:] = [x for x in entries if not is_ours(x)] + [want]
+    write_settings(path, data)
+    report("updated" if ours else "merged" if existed else "created", path,
+           "Partitur's prompt hook")
+
+
+def remove_hook(root, rel, e, opts, report):
+    path = root / rel
+    data = read_settings(path)
+    if not data:
+        return not path.exists()
+    entries = hook_entries(data)
+    if not any(is_ours(x) for x in entries):
+        return True
+    entries[:] = [x for x in entries if not is_ours(x)]
+    if not entries:
+        del data["hooks"][HOOK_EVENT]
+    if not data["hooks"]:
+        del data["hooks"]
+    if data:
+        write_settings(path, data)
+        report("removed", path, "Partitur's prompt hook; the other settings stay")
+    else:
+        path.unlink()
+        report("removed", path)
+        prune(path.parent, root)
+    return True
+
+
 def backup(path, root, opts, report):
     """Copy path into the backup directory before a forced change."""
     if not path.exists() or path.is_symlink():
@@ -265,6 +347,9 @@ def apply(root, plan, old, opts, report):
         path, before = root / rel, old.get(rel)
         if e["kind"] == "rules":
             apply_rules(root, rel, e, before, opts, report)
+            continue
+        if e["kind"] == "hook":
+            apply_hook(root, rel, e, before, opts, report)
             continue
         if e["kind"] == "link":
             if path.is_symlink() and os.readlink(path) == e["target"]:
@@ -350,6 +435,8 @@ def remove_entry(root, rel, e, opts, report):
         path.write_text(text.replace(cur + "\n", "").replace(cur, ""))
         report("removed", path, "Partitur's rules block; the project's rules stay")
         return False
+    if e["kind"] == "hook":
+        return remove_hook(root, rel, e, opts, report)
     if e["kind"] == "link":
         if path.is_symlink() and os.readlink(path) == e["target"]:
             path.unlink()
@@ -465,6 +552,10 @@ def project_plan(a, tools, repos, name, src, quiet=False):
                 print(f"skipped    {tool_dir}/skills/partitur (linked for the user already)")
         else:
             plan[f"{tool_dir}/skills/partitur"] = dict(kind="link", target=str(HERE))
+        if tool == "claude" and b"def cmd_inbox" in src.read("project/bin/ptt"):
+            hook = {"hooks": [{"type": "command",
+                               "command": f'"$CLAUDE_PROJECT_DIR"/{R}/bin/ptt inbox --quiet'}]}
+            add(".claude/settings.json", "hook", json.dumps(hook))
     return plan
 
 

@@ -101,7 +101,7 @@ class Ptt(unittest.TestCase):
         self.assertIn("supervisor designer-g1", me)
         self.assertIn("no done report", self.refused("close", "T0001", "--as", d))
         self.ptt("done", "T0001", "--as", holder, "--requests", "000003")
-        self.assertIn("reports done", self.ptt("whoami", d).stdout)
+        self.assertIn("reports done", self.ptt("inbox", d).stdout)
         self.assertIn("does not supervise", self.refused("close", "T0001", "--as", "integrator-1"))
         self.ptt("close", "T0001", "--as", d)
         self.assertTrue((self.rec / "tasks" / "done" / "T0001-wall-distance").is_dir())
@@ -122,8 +122,8 @@ class Ptt(unittest.TestCase):
         n = self.task("probe", d)
         holder = self.ptt("take", n).stdout.strip()
         self.ptt("leave", holder, "--status", "half done; see status.md")
-        self.assertIn("asks to leave", self.ptt("whoami", d).stdout)
-        self.assertIn("waiting: your request to leave", self.ptt("whoami", holder).stdout)
+        self.assertIn("asks to leave", self.ptt("inbox", d).stdout)
+        self.assertIn("your request to leave waits", self.ptt("inbox", holder).stdout)
         self.assertIn("already asked", self.refused("leave", holder))
         self.assertIn("asks to leave", self.refused("leave", d))
         self.ptt("approve-leave", n, "--as", d)
@@ -200,13 +200,13 @@ class Ptt(unittest.TestCase):
         n = self.task("probe", d)
         self.ptt("amend", n, "--as", d, "--text", "before the take")
         holder = self.ptt("take", n).stdout.strip()
-        self.assertNotIn("amended", self.ptt("whoami", holder).stdout)
+        self.assertNotIn("amended", self.ptt("inbox", holder).stdout)
         self.ptt("amend", n, "--as", d, "--text", "scope narrowed")
-        out = self.ptt("whoami", holder).stdout
+        out = self.ptt("inbox", holder).stdout
         self.assertRegex(out, r"amended since your take: \d{4}-amend.md; read it with `ptt show T0001`")
         self.ptt("leave", holder)
         self.ptt("approve-leave", n, "--as", d)
-        self.assertNotIn("amended", self.ptt("whoami", self.ptt("take", n).stdout.strip()).stdout)
+        self.assertNotIn("amended", self.ptt("inbox", self.ptt("take", n).stdout.strip()).stdout)
 
     def test_root_task_has_no_dependencies(self):
         d = self.designer()
@@ -280,7 +280,7 @@ class Ptt(unittest.TestCase):
         self.assertIn("free it first", self.refused("cancel", n, "--as", d, "--reason", "r"))
         self.ptt("done", n, "--as", h)
         self.ptt("reopen", n, "--as", d, "--reason", "acceptance 2 not met")
-        self.assertNotIn("reports done", self.ptt("whoami", d).stdout)
+        self.assertNotIn("reports done", self.ptt("inbox", d).stdout)
         self.ptt("free", n, "--as", d, "--reason", "rethink", "--force")
         self.ptt("cancel", n, "--as", d, "--reason", "superseded")
         self.assertTrue(any((self.rec / "tasks" / "cancelled").iterdir()))
@@ -354,7 +354,7 @@ class Ptt(unittest.TestCase):
         old = dict(os.environ, GIT_COMMITTER_DATE="2020-01-01T00:00:00",
                    GIT_AUTHOR_DATE="2020-01-01T00:00:00")
         h = self.ptt("take", n, env=old).stdout.strip()
-        self.assertIn(f"no record from {h}", self.ptt("whoami", d).stdout)
+        self.assertIn(f"no record from {h}", self.ptt("inbox", d).stdout)
         self.assertIn("no record", self.refused("leave", d))
         self.ptt("free", n, "--as", d, "--reason", "gone")
         self.ptt("leave", d)
@@ -513,6 +513,47 @@ class Ptt(unittest.TestCase):
         # the user, and sessions without an ID, are not checked
         self.ptt("mktask", "z", "--as", d)
         self.assertIn("holds nothing that ptt can see", self.ptt("whoami").stdout)
+
+    def test_inbox_shows_what_is_new_once(self):
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        n = self.task("probe", d)
+        w = self.ptt("take", n, session="W").stdout.strip()
+        i = self.ptt("take", "integrator", session="I").stdout.strip()
+        for who in (d, w, i):
+            self.ptt("inbox", who)                      # first look: sets the marker
+        status = next((self.rec / "tasks" / "open").glob("T0001-*")) / "status.md"
+        status.write_text("finding for the designer\n")
+        self.ptt("record", "-m", "T0001 status", str(status), session="W")
+        note = self.rec / "handoff" / "notes" / "t0001-x.md"
+        note.parent.mkdir(parents=True)
+        note.write_text("x\n")
+        self.ptt("record", "-m", "note", str(note), session="W")
+        req = self.rec / "pr" / "open" / "000001-x"
+        req.mkdir(parents=True)
+        (req / "0001-request.md").write_text(f"---\nkind: request\nsession: {w}\n---\n")
+        self.ptt("record", "-m", "pr 000001: submit", str(req), session="W")
+        out = self.ptt("inbox", session="D").stdout     # the holder bound to the session
+        self.assertIn("read T0001 status.md: updated by its holder", out)
+        self.assertIn("read handoff/notes/t0001-x.md", out)
+        self.assertNotIn("request 000001", out)
+        self.assertIn("nothing new", self.ptt("inbox", d).stdout)
+        self.assertIn("request 000001: new request 0001, waiting for review",
+                      self.ptt("inbox", i).stdout)
+        (req / "0002-review.md").write_text(f"---\nkind: review\nsession: {i}\n---\n")
+        self.ptt("record", "-m", "pr 000001: review", str(req), session="I")
+        self.assertNotIn("0002", self.ptt("inbox", i).stdout)
+        quiet = self.ptt("inbox", "--quiet", session="W").stdout
+        self.assertIn(f"ptt inbox for {w}", quiet)
+        self.assertIn("request 000001: new review 0002", quiet)
+        self.assertEqual(self.ptt("inbox", "--quiet", session="W").stdout, "")
+        self.ptt("pr-move", "1", "merged", "-m", "pr 000001: merged", session="I")
+        self.assertIn("request 000001: now merged", self.ptt("inbox", w).stdout)
+
+    def test_inbox_quiet_never_fails(self):
+        self.assertEqual(self.ptt("inbox", "--quiet").stdout, "")
+        shutil.rmtree(self.rec / ".git")
+        r = self.ptt("inbox", "--quiet", session="X", check=False)
+        self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""))
 
     def test_unbound_holder_not_checked(self):
         d = self.ptt("take", "designer").stdout.strip()

@@ -47,7 +47,8 @@ Six ideas decide everything else; when in doubt, ask which one applies.
 | start the design, or take it over | any free session | `/ptt-take designer` |
 | turn a discussion into a task | the designer | `/ptt-mktask`, then `/ptt-mktask release N` |
 | have a session work on a task | any free session | `/ptt-take N` (or the task's name) |
-| know what a session holds and what waits on it | any | `/ptt-whoami`; `/ptt-whoami all` for everyone |
+| know who a session is | any | `/ptt-whoami`; `/ptt-whoami all` for everyone |
+| know what is new for a session and what waits on it | any holder | `/ptt-inbox` (in Claude Code it also arrives by itself with your next message) |
 | continue a role after `/clear` | the cleared session | `/ptt-resume <holder name>` |
 | submit finished work for review | the task holder | `/ptt-pr-submit` |
 | answer a review | the task holder | `/ptt-pr-submit draft reply`, then `/ptt-pr-submit reply` (`draft` likewise before submitting) |

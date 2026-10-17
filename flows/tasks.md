@@ -54,7 +54,7 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
    not carried out. A design task with unfinished subtasks cannot be
    cancelled (G5).
 7. **The leader repairs a gap.** A subordinate with no record for seven days
-   is listed by `/ptt-whoami` for its supervisor, who checks on it and, if it
+   is listed by `/ptt-inbox` for its supervisor, who checks on it and, if it
    is gone, frees the task; `status.md` shows where it stood. A holder
    therefore commits `status.md` in the records repository at least once a day
    while it works, also when the work itself is on a code branch. Only the
@@ -107,7 +107,8 @@ messages; there is no state file to go stale (C2).
 | Command | Who | Runs |
 | --- | --- | --- |
 | `/ptt-take [designer\|integrator\|task]` | any session | `ptt take`; a task by ID (`T0007`, `0007`, `7`, `T0007.1`), full name (`T0007-wall-distance`), or slug; without argument `ptt tasks` |
-| `/ptt-whoami [name\|all]` | any session | `ptt whoami` (reads only); `all`: `ptt who`, `ptt tasks` |
+| `/ptt-whoami [name\|all]` | any session | `ptt whoami`: who this session is (reads only); `all`: `ptt who`, `ptt tasks` |
+| `/ptt-inbox [name]` | any holder | `ptt inbox`: what is new since the holder last looked, and what waits on it |
 | `/ptt-resume NAME` | a cleared or fresh session | `ptt resume`: continue as NAME, bound to this session |
 | `/ptt-mktask`, `release N`, `amend N` | designer | `ptt mktask`, `ptt ready`, `ptt amend` |
 | `/ptt-done` | holder | `ptt done` |
@@ -127,9 +128,15 @@ In Codex the commands start with `$` instead of `/`.
   in Codex or a terminal, holders are unbound, and naming one holder in one
   session at a time is the user's part. The binding, like names, guards
   against mistakes, not against a session lying about its ID.
-- **Notices are pulled, not pushed.** A supervisor learns of a leave
-  request, a done report, or a silent holder when it runs `/ptt-whoami`;
-  the user carries the notice, as for all records (D12).
+- **Notices are pulled, except through the prompt hook.** `ptt inbox`
+  lists what changed in the records for a holder since it last looked: a
+  subordinate's `status.md`, done report, or leave request, an amendment, a
+  note to the designer, a new review or decision on its request, and for the
+  integrator a new request or reply. In Claude Code, install's prompt hook
+  runs it before each user message, so a bound holder sees it with the
+  user's next message; elsewhere the holder runs `/ptt-inbox`, and the user
+  carries the notice as before (D12, G17). A session that receives no
+  message sees nothing until it does.
 - **One machine.** The lock that keeps concurrent commands consistent works
   for sessions on the same machine sharing the records repository.
 - **One gate for the records repository.** Every write to it goes through

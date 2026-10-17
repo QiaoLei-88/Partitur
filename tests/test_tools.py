@@ -3,6 +3,7 @@ each in a temporary directory.
 
 Run: python3 -m unittest discover -s tests   (from the repository root)
 """
+import json
 import os
 import sys
 import shutil
@@ -506,6 +507,35 @@ class InstallProject(unittest.TestCase):
         self.assertTrue((task / "charter.md").exists())
         self.assertTrue(mine.exists())
         self.assertFalse((ws / ".partitur-version").exists())
+
+    def test_prompt_hook_merged_kept_and_removed(self):
+        settings = self.root / ".claude" / "settings.json"
+        settings.parent.mkdir()
+        mine = {"type": "command", "command": "echo mine"}
+        settings.write_text(json.dumps({"permissions": {"allow": ["Bash(ls)"]},
+                                        "hooks": {"UserPromptSubmit": [{"hooks": [mine]}]}}))
+        clone = self.partitur_clone()
+        out = self.install_from(clone).stdout
+        self.assertRegex(out, r"merged\s+\.claude/settings\.json")
+        data = json.loads(settings.read_text())
+        self.assertEqual(data["permissions"], {"allow": ["Bash(ls)"]})
+        hooks = [h for e in data["hooks"]["UserPromptSubmit"] for h in e["hooks"]]
+        self.assertIn(mine, hooks)
+        self.assertIn('"$CLAUDE_PROJECT_DIR"/workspace/bin/ptt inbox --quiet',
+                      [h["command"] for h in hooks])
+        self.assertRegex(self.install_from(clone).stdout, r"kept\s+\.claude/settings\.json")
+        out = self.install_from(clone, "--uninstall").stdout
+        self.assertRegex(out, r"removed\s+\.claude/settings\.json")
+        data = json.loads(settings.read_text())
+        self.assertEqual(data["hooks"]["UserPromptSubmit"], [{"hooks": [mine]}])
+
+    def test_prompt_hook_alone_is_removed_with_its_file(self):
+        clone = self.partitur_clone()
+        self.install_from(clone)
+        settings = self.root / ".claude" / "settings.json"
+        self.assertIn("ptt inbox --quiet", settings.read_text())
+        self.install_from(clone, "--uninstall")
+        self.assertFalse(settings.exists())
 
     def test_uninstall_without_stamp(self):
         r = self.install("--uninstall", check=False)
