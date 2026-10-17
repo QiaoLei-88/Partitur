@@ -1,29 +1,44 @@
 ---
 name: ptt-pr-submit
-description: Submit the current branch as a local pull request for review and integration, reply to its review (reply N), draft either for the user to check first (draft, draft-reply N), or list this branch's requests (list [BRANCH]). Use when branch work is ready for review or a review needs an answer.
+description: Submit the current branch as a local pull request for review and integration, reply to its review (reply [N]), draft either for the user to check first (draft, draft reply [N]), or list this branch's requests (list [BRANCH]). Use when branch work is ready for review or a review needs an answer.
 ---
 
 # Submit or reply to a local request
 
 The command, or an AtE naming these records, approves the records this skill
-writes; other work, such as changing the branch, needs AtE (rules file).
+writes; other work, such as changing the branch, needs AtE (rules file) or a
+draft the user approves (below).
 `<records>/pr/repos` maps a `repo` name to its primary checkout and main
 branch `<main>`. Request numbers may be short (`4`, `pr-4`, `000004`) and
-are never reused. You write only your own new message files: never edit a
-message or move a request.
+are never reused. Without N, the request is this branch's one open request
+waiting for its author; if there is none or several, list them and ask. You
+write only your own new message files: never edit a message or move a
+request.
 
 | Argument | Action |
 | --- | --- |
 | `list [BRANCH]` | `<records>/bin/pr list all --branch BRANCH` (default: current branch): report each status; "waiting for author" means a reply is due. |
-| `draft-reply N` | Read `<records>/bin/pr show N`; show the planned change per comment (a diff where short) and the full reply text. Writes nothing. |
-| `reply N` | Read `<records>/bin/pr show N`, then reply (below). |
+| `draft reply [N]` | Read `<records>/bin/pr show N` and the code; show the planned change per comment (a diff where short) and the full reply text. Writes nothing. |
+| `reply [N]` | Read `<records>/bin/pr show N`, then reply (below). |
 | `draft` | Check the branch (Submit, steps 1-2) and show the full request text. Writes nothing. |
 | none | Submit the current branch (below). |
 
 A draft is for the user to check: it writes no file and makes no commit,
-and planned code changes are described, not committed. The user's `reply N`
-or submit command, or an AtE naming it, then carries out the draft with the
-user's changes.
+and planned code changes are described, not committed. After a draft in
+this conversation, the user's `reply [N]` or submit command, or an AtE
+naming it, approves exactly the drafted plan with the user's changes: its
+commits, their tests, and recording the message. If carrying it out needs
+more than the plan, stop and ask.
+
+`reply [N]` with no draft of it in this conversation (also after `/clear`)
+does nothing yet; ask:
+
+```
+No draft for request NNNNNN in this conversation. Decide:
+1. Draft first (recommended): show the code plan and reply text; nothing written
+2. Do the whole chain: change the code per the comments, commit, record the reply
+3. No decision, discuss further
+```
 
 ## Submit
 

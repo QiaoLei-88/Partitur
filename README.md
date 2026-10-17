@@ -22,7 +22,7 @@ Six ideas decide everything else; when in doubt, ask which one applies.
    written until you say `AtE` ("approval to execute"), or `AtEiYA` ("AtE
    if you agree") when the session should go ahead only if it agrees.
    Running a `/ptt-*` command is your approval for that command's own
-   record, nothing more.
+   record, nothing more, unless it carries out a draft you have seen.
 2. **Take a role before working.** A session is the designer, the
    integrator, or the holder of one task, and only because it took that
    role with a command. A role someone holds cannot be taken.
@@ -50,7 +50,7 @@ Six ideas decide everything else; when in doubt, ask which one applies.
 | know what a session holds and what waits on it | any | `/ptt-whoami`; `/ptt-whoami all` for everyone |
 | continue a role after `/clear` | the cleared session | `/ptt-resume <holder name>` |
 | submit finished work for review | the task holder | `/ptt-pr-submit` |
-| answer a review | the task holder | `/ptt-pr-submit reply N` (`draft-reply N` to check it first; `draft` likewise before submitting) |
+| answer a review | the task holder | `/ptt-pr-submit draft reply`, then `/ptt-pr-submit reply` (`draft` likewise before submitting) |
 | review and carry out your decision | the integrator (`/ptt-take integrator`) | `/ptt-pr-review` |
 | report a task done / accept it | holder / its supervisor | `/ptt-done` / `/ptt-close N` |
 | stop holding a role or task | that session | `/ptt-leave` (a task needs the supervisor's `/ptt-leave approve N`) |
