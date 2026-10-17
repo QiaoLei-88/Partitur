@@ -11,9 +11,12 @@ draft the user approves (below).
 `<records>/pr/repos` maps a `repo` name to its primary checkout and main
 branch `<main>`. Request numbers may be short (`4`, `pr-4`, `000004`) and
 are never reused. Without N, the request is this branch's one open request
-waiting for its author; if there is none or several, list them and ask. You
-write only your own new message files: never edit a message or move a
-request.
+waiting for its author; if there is none or several, list them and ask.
+With N, the request must be in `pr/open`: if `<records>/bin/pr list all`
+shows it merged or closed, report its state and decision and stop. A
+decided request takes no draft and no reply, and a pending draft of it
+lapses; a follow-up is a new request. You write only your own new message
+files: never edit a message or move a request.
 
 | Argument | Action |
 | --- | --- |
