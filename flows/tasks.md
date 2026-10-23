@@ -136,7 +136,9 @@ In Codex the commands start with `$` instead of `/`.
   runs it before each user message, so a bound holder sees it with the
   user's next message; elsewhere the holder runs `/ptt-inbox`, and the user
   carries the notice as before (D12, G17). A session that receives no
-  message sees nothing until it does.
+  message sees nothing until it does. Holder changes are not in it, so a
+  session that names who holds a role or task, or who acts next, runs
+  `ptt who` at that moment rather than trusting an earlier answer (G18).
 - **One machine.** The lock that keeps concurrent commands consistent works
   for sessions on the same machine sharing the records repository.
 - **One gate for the records repository.** Every write to it goes through

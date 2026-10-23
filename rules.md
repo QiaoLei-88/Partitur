@@ -154,6 +154,7 @@ project's development notes.
 | G15 | Taking T0000 notes an unfilled charter or status; the designer then proposes one plan to fill them from what the project already has (earlier handover, briefs), and drafts tasks from existing briefs only by the user's `/ptt-mktask` | Proposed |
 | G16 | Where the agent tool gives a session ID, taking and resuming (`/ptt-resume NAME`, after `/clear`) bind the holder name to the session; a write as a holder bound to another session, or from a session whose holder resumed elsewhere, is refused; one session holds one role or task; `/ptt-whoami` only reads | Proposed |
 | G17 | `ptt inbox` lists for a holder what changed in the records since it last looked (a subordinate's status, done report, or leave request; an amendment; a note to the designer; a review or decision on its request; for the integrator a new request or reply) and what waits on it; in Claude Code a prompt hook installed with the project runs it before each user message and adds only what is new; `ptt whoami` only says who a session is | Proposed |
+| G18 | Before telling the user who holds a role or task, or who acts next, a session runs `ptt who` at that moment; a view from earlier in the session may be stale | Proposed |
 
 ## Nesting rules
 

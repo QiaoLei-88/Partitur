@@ -84,7 +84,9 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    - **Reject** or **withdraw**: `<records>/bin/ptt pr-move NNNNNN closed -m
      "pr NNNNNN: <rejected|withdrawn>"`.
 8. Before the session ends, or when the user asks: open concerns and pending
-   housekeeping go into `<records>/handoff/integrator.md`, recorded. After a
+   housekeeping go into `<records>/handoff/integrator.md`, recorded. When you
+   name who acts next (the designer, a worker), run `<records>/bin/ptt who`
+   first; what it said earlier in the session may be stale (G18). After a
    recorded decision, or when nothing waits, offer once to be cleared if
    nothing is uncommitted, your concerns are in `integrator.md`, and nothing
    was agreed only in conversation; state these three checks.
