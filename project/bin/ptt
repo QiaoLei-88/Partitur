@@ -580,7 +580,8 @@ def cmd_take(a):
                     if "{{" in (i["dir"] / f).read_text()]
         if unfilled:
             note(f"{tid(ROOT)} is not filled in yet ({' and '.join(unfilled)} still have "
-                 "{{...}} placeholders); the designer's first step is to fill them in")
+                 "{{...}} placeholders); the designer's first step is to fill them in place "
+                 "(the first fill-in is a direct edit, not an amendment)")
         if not role_state("integrator")[0]:
             note("no session holds the integrator role; requests wait until one takes it")
 

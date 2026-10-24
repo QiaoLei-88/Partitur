@@ -165,6 +165,7 @@ class Ptt(unittest.TestCase):
         r = self.ptt("take", "designer")
         self.assertEqual(r.stdout.strip(), "designer-g1")
         self.assertIn("T0000 is not filled in yet (charter.md", r.stderr)
+        self.assertIn("fill them in place", r.stderr)
         self.assertIn("no session holds the integrator role", r.stderr)
         req = self.rec / "pr" / "open" / "000001-x"
         req.mkdir(parents=True)

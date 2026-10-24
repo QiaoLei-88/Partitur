@@ -31,14 +31,15 @@ takes, approves recording it (an AtE does not); the work itself needs AtE
      inbox <name>` for what waits on you. A `design` task makes you the
      designer of its scope: you make and close its subtasks; `T0000`'s
      holder makes the top-level tasks.
-5. If the tool notes that `T0000` is not filled in (a project just set up),
-   find what exists: earlier handover files in `<records>/handoff/` (not
-   `integrator.md`, `notes/`), "superseded" lines in
-   `partitur-install-report.md` in the workspace root, the design document,
-   earlier briefs. Propose one plan: fill in the charter's placeholders, move
-   the earlier handover into `status.md`, record both (on the user's AtE);
-   then a draft task per briefed piece of work, each by the user's
-   `/ptt-mktask`, naming the brief as its source.
+5. If the tool notes that `T0000` is not filled in (a project just set up,
+   or a placeholder left since), find what exists: earlier handover files
+   in `<records>/handoff/` (not `integrator.md`, `notes/`), "superseded"
+   lines in `partitur-install-report.md` in the workspace root, the design
+   document, earlier briefs. Propose one plan: fill in the charter's
+   placeholders in place (the first fill-in is a direct edit, not an
+   amendment), move the earlier handover into `status.md`, record both (on
+   the user's AtE); then a draft task per briefed piece of work, each by
+   the user's `/ptt-mktask`, naming the brief as its source.
 6. While holding a task, record `status.md` (`<records>/bin/ptt record`) at
    least once a day of work, also when the work is on a code branch: a
    supervisor treats seven days without a record as possibly gone.
