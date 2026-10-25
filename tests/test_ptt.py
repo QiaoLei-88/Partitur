@@ -550,6 +550,31 @@ class Ptt(unittest.TestCase):
         self.ptt("pr-move", "1", "merged", "-m", "pr 000001: merged", session="I")
         self.assertIn("request 000001: now merged", self.ptt("inbox", w).stdout)
 
+    def test_inbox_tells_the_last_session_its_hold_ended(self):
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        a, b, c = (self.task(x, d) for x in ("a", "b", "c"))
+        wa = self.ptt("take", a, session="A").stdout.strip()
+        self.ptt("done", a, "--as", wa, session="A")
+        self.ptt("close", a, "--as", d, session="D")
+        quiet = self.ptt("inbox", "--quiet", session="A").stdout
+        self.assertIn(f"T0001 was closed by {d} (records ", quiet)
+        self.assertIn(f"{wa} holds nothing now; record nothing more as {wa}", quiet)
+        self.assertEqual(self.ptt("inbox", "--quiet", session="A").stdout, "")
+        self.assertIn(f"T0001 was closed by {d}; {wa} holds nothing now",
+                      self.ptt("inbox", session="A").stdout)
+        wb = self.ptt("take", b, session="B").stdout.strip()
+        self.ptt("leave", wb, session="B")
+        self.ptt("approve-leave", b, "--as", d, session="D")
+        self.assertIn(f"{d} approved {wb}'s leaving T0002",
+                      self.ptt("inbox", "--quiet", session="B").stdout)
+        wc = self.ptt("take", c, session="C").stdout.strip()
+        self.ptt("free", c, "--as", d, "--force", "--reason", "gone", session="D")
+        self.assertIn(f"{wc} was freed from T0003 by {d}", self.ptt("inbox", wc).stdout)
+        i = self.ptt("take", "integrator", session="I").stdout.strip()
+        self.ptt("leave", i, session="I")               # its own leave: nothing to tell
+        self.assertEqual(self.ptt("inbox", "--quiet", session="I").stdout, "")
+        self.assertIn("this session holds nothing", self.ptt("inbox", session="X").stdout)
+
     def test_inbox_quiet_never_fails(self):
         self.assertEqual(self.ptt("inbox", "--quiet").stdout, "")
         shutil.rmtree(self.rec / ".git")

@@ -21,7 +21,9 @@ writes; other work needs AtE (rules file). `<name>` is your holder name.
      decision is not carried out: settle that first.
    - A task holder only asks: tell the user to run `/ptt-leave approve <N>`
      in the supervisor's session (`ptt whoami <name>` names it), or to
-     approve `--as user` when it is vacant. Until then you hold the task.
+     approve `--as user` when it is vacant. Until then you hold the task;
+     the approval reaches this session through its inbox (`/ptt-inbox`, in
+     Claude Code with the user's next message).
    - The designer and the integrator leave at once: the user supervises
      them, and the command is the approval.
 3. After leaving, offer the user to clear this session.

@@ -1,6 +1,6 @@
 ---
 name: ptt-inbox
-description: Show what is new in the records for this session's holder since it last looked (a subordinate's status or done report, an amendment, a note, a review or decision on its request) and what waits on it. Use for: anything new, what needs me, before starting a step. Argument: none or a holder name.
+description: Show what is new in the records for this session's holder since it last looked (a subordinate's status or done report, an amendment, a note, a review or decision on its request, the close of its own task) and what waits on it. Use for: anything new, what needs me, before starting a step. Argument: none or a holder name.
 ---
 
 # Inbox
@@ -18,6 +18,10 @@ writes (it writes none); other work needs AtE (rules file).
    decided request's outcome in your status; settle what waits on you
    (`/ptt-close`, `/ptt-leave approve`). Act only with the user's command or
    AtE.
+3. When the hold has ended (closed, leave approved, or freed by the
+   supervisor), the inbox says so once to the session last bound to it:
+   record nothing more as that holder, and offer the user to clear the
+   session.
 
 In Claude Code a prompt hook runs `ptt inbox --quiet` before each user
 message and adds what is new to the conversation; treat such lines like this

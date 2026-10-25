@@ -1008,16 +1008,85 @@ def news(name, held, base):
     return out
 
 
+def ended_holds():
+    """Holds that someone else ended (a close, an approved leave, a freeing):
+    dicts with the holder's name, its sessions, the ending event, and a line
+    saying so. A holder's own leave is not listed; it ran the command."""
+    out = []
+    dirs = [("the integrator role", ROLES / "integrator")]
+    dirs += [(tid(n), d) for _, n, d in all_tasks()]
+    for what, d in dirs:
+        name, sessions = None, []
+        for e in events(d):
+            k = e["kind"]
+            if k == "take":
+                name, sessions = e["by"], [e.get("session_id")]
+            elif k == "resume":
+                sessions.append(e.get("session_id"))
+            elif k in ("leave", "close") and name:
+                who = lambda f: "the user" if e.get(f) == "user" else e.get(f)
+                if k == "close":
+                    line = f"{what} was closed by {who('by')}"
+                elif e.get("freed_by"):
+                    line = f"{name} was freed from {what} by {who('freed_by')}"
+                elif e.get("approved_by"):
+                    line = f"{who('approved_by')} approved {name}'s leaving {what}"
+                else:
+                    line = None
+                if line:
+                    out.append(dict(name=name, sessions=sessions, path=e["path"], line=line))
+                name, sessions = None, []
+    return out
+
+
+def ended_note(end, mark):
+    """The notice that END's hold has ended, or None if the marker has it."""
+    commit = end["commit"]
+    if not commit or (mark and git("merge-base", "--is-ancestor", commit, mark,
+                                    check=False).returncode == 0):
+        return None
+    return (f"{end['line']} (records {commit[:7]}): {end['name']} holds nothing now; "
+            f"record nothing more as {end['name']}. This session may be cleared.")
+
+
+def inbox_ended(name, quiet):
+    """For a NAME that holds nothing, or the session last bound to a hold
+    that ended: say once that it ended, and move the marker."""
+    sid = session_id()
+    ends = [e for e in ended_holds()
+            if (e["name"] == name if name else sid and e["sessions"][-1] == sid)]
+    if not ends:
+        return False
+    for e in ends:
+        e["commit"], _, when = git("log", "-1", "--format=%H %ct", "--",
+                                   str(e["path"].relative_to(REC)),
+                                   check=False).stdout.strip().partition(" ")
+        e["when"] = int(when or 0)
+    end = max(ends, key=lambda e: e["when"])
+    mark_file = git_dir() / "ptt-inbox" / end["name"]
+    mark = mark_file.read_text().strip() if mark_file.exists() else None
+    line = ended_note(end, mark)
+    if line:
+        print(f"ptt inbox for {end['name']}: {line}" if quiet else line)
+    elif quiet:
+        return True
+    else:
+        print(f"{end['line']}; {end['name']} holds nothing now")
+    mark_file.parent.mkdir(exist_ok=True)
+    mark_file.write_text(git("rev-parse", "HEAD").stdout.strip() + "\n")
+    return True
+
+
 def cmd_inbox(a):
     name = a.name or bound_here()
     if not name:
-        if not a.quiet:
+        if not inbox_ended(None, a.quiet) and not a.quiet:
             print("this session holds nothing" + ("" if session_id() else
                   " that ptt can see (no session ID); name the holder: ptt inbox NAME"))
         return
     held = held_by(name)
     if not held:
-        if not a.quiet:
+        if not inbox_ended(name, a.quiet) and not a.quiet:
             print(f"{name} holds nothing")
         return
     d = ROLES / held[1] if held[0] == "role" else held[1]["dir"]

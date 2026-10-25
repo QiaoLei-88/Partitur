@@ -132,7 +132,9 @@ In Codex the commands start with `$` instead of `/`.
   lists what changed in the records for a holder since it last looked: a
   subordinate's `status.md`, done report, or leave request, an amendment, a
   note to the designer, a new review or decision on its request, and for the
-  integrator a new request or reply. In Claude Code, install's prompt hook
+  integrator a new request or reply; and, once, to the session last bound
+  to a holder whose hold someone else ended (a close, an approved leave, a
+  freeing). In Claude Code, install's prompt hook
   runs it before each user message, so a bound holder sees it with the
   user's next message; elsewhere the holder runs `/ptt-inbox`, and the user
   carries the notice as before (D12, G17). A session that receives no
