@@ -3,6 +3,7 @@ in a temporary records repository.
 
 Run: python3 -m unittest discover -s tests   (from the repository root)
 """
+import json
 import os
 import re
 import shutil
@@ -14,8 +15,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent
 
 
-def run(*args, cwd=None, check=True, env=None):
-    r = subprocess.run(args, cwd=cwd, capture_output=True, text=True, env=env)
+def run(*args, cwd=None, check=True, env=None, input=None):
+    r = subprocess.run(args, cwd=cwd, capture_output=True, text=True, env=env, input=input)
     if check and r.returncode:
         raise AssertionError(f"{args} failed: {r.stderr}")
     return r
@@ -560,6 +561,38 @@ class Ptt(unittest.TestCase):
                 run(*ptt, "leave", holder, env=env)
                 if key is not None:
                     env[key] = ""
+
+    def test_inbox_hook_uses_event_identity_and_keeps_override(self):
+        holder = self.ptt("take", "designer", session="D").stdout.strip()
+        task = self.task("hook", holder)
+        worker = self.ptt("take", task, session="W").stdout.strip()
+        self.ptt("amend", task, "--as", holder, "--text", "new requirement", session="D")
+
+        def hook(payload, env=None, quiet=True):
+            return run("python3", str(self.rec / "bin" / "ptt"), "inbox", "--hook",
+                       *(["--quiet"] if quiet else []), input=payload, check=False,
+                       env=self.env() if env is None else env)
+
+        event = json.dumps(dict(hook_event_name="UserPromptSubmit", session_id="W"))
+        for bad in ("not json", "[]", "{}", '{"session_id":"W"}',
+                    '{"hook_event_name":"UserPromptSubmit","session_id":123}',
+                    '{"hook_event_name":"UserPromptSubmit","session_id":""}'):
+            result = hook(bad)
+            self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
+        self.assertIn("expected", hook("{}", quiet=False).stderr)
+        env = dict(self.env(), CODEX_THREAD_ID="wrong", CODEX_SESSION_ID="wrong")
+        result = hook(event, env=env)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn(f"ptt inbox for {worker}", result.stdout)
+        self.assertIn("amend event", result.stdout)
+        self.assertEqual(hook(event).stdout, "")
+        self.ptt("amend", task, "--as", holder, "--text", "another requirement", session="D")
+        wrong = json.dumps(dict(hook_event_name="UserPromptSubmit", session_id="wrong"))
+        self.assertIn("amend event", hook(wrong, env=self.env(session="W")).stdout)
+        self.ptt("done", task, "--as", worker, session="W")
+        self.ptt("close", task, "--as", holder, session="D")
+        self.assertIn("was closed", hook(event).stdout)
+        self.assertEqual(hook(event).stdout, "")
 
     def test_inbox_shows_what_is_new_once(self):
         d = self.ptt("take", "designer", session="D").stdout.strip()

@@ -134,10 +134,10 @@ In Codex the commands start with `$` instead of `/`.
   note to the designer, a new review or decision on its request, and for the
   integrator a new request or reply; and, once, to the session last bound
   to a holder whose hold someone else ended (a close, an approved leave, a
-  freeing). In Claude Code, install's prompt hook
+  freeing). In Claude Code and Codex (once trusted), install's prompt hook
   runs it before each user message, so a bound holder sees it with the
-  user's next message; elsewhere the holder runs `/ptt-inbox`, and the user
-  carries the notice as before (D12, G17). A session that receives no
+  user's next message; without the hook the holder runs `/ptt-inbox`, and
+  the user carries the notice as before (D12, G17). A session that receives no
   message sees nothing until it does. Holder changes are not in it, so a
   session that names who holds a role or task, or who acts next, runs
   `ptt who` at that moment rather than trusting an earlier answer (G18).

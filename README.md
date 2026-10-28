@@ -48,7 +48,7 @@ Six ideas decide everything else; when in doubt, ask which one applies.
 | turn a discussion into a task | the designer | `/ptt-mktask`, then `/ptt-mktask release N` |
 | have a session work on a task | any free session | `/ptt-take N` (or the task's name) |
 | know who a session is | any | `/ptt-whoami`; `/ptt-whoami all` for everyone |
-| know what is new for a session and what waits on it | any holder | `/ptt-inbox` (in Claude Code it also arrives by itself with your next message) |
+| know what is new for a session and what waits on it | any holder | `/ptt-inbox` (with an active prompt hook, it also arrives with your next message) |
 | continue a role after `/clear` or in a fresh session | the continuing session | `/ptt-resume <holder name>` |
 | submit finished work for review | the task holder | `/ptt-pr-submit` |
 | answer a review | the task holder | `/ptt-pr-submit draft reply`, then `/ptt-pr-submit reply` (`draft` likewise before submitting) |
@@ -128,6 +128,16 @@ both.
 Always start sessions in the workspace root: Codex reads `AGENTS.md` and
 skills only from the Git root of its starting directory downwards, and the
 workspace root is usually not inside a Git repository.
+
+For Codex, install also adds `.codex/hooks.json`. Review and trust the
+project and its hook in Codex (`/hooks` in the CLI); until then, or on a
+client without prompt hooks, use `$ptt-inbox` manually. The hook reads the
+session ID from Codex's event and reports new records with the next user
+message. It does not wake an idle session. See the
+[official hook documentation](https://learn.chatgpt.com/docs/hooks).
+The hook uses the workspace's absolute path so it also works when the
+session changes directory; if the workspace moves, update that path and
+review/trust the hook again.
 
 Codex shell commands bind holders using `CODEX_THREAD_ID`, with
 `CODEX_SESSION_ID` as a fallback. Claude Code continues to use

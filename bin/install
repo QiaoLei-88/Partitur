@@ -32,7 +32,9 @@ Usage:
                   .claude/settings.json a prompt hook running `ptt inbox --quiet`
                   (it prints only when the records hold something new for the
                   session's holder); other settings there are kept
-    Codex:        AGENTS.md -> <records>/CLAUDE.md, .agents/skills/<skill>
+    Codex:        AGENTS.md -> <records>/CLAUDE.md, .agents/skills/<skill>, and
+                  .codex/hooks.json running `ptt inbox --quiet --hook`
+                  (review and trust it in Codex before it runs)
   where <skill> is each ptt-* skill, and `partitur` (this repository)
   unless the user scope already links it for that tool.
   The name defaults to the directory's name and <records> to `workspace`.
@@ -95,6 +97,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -577,6 +580,10 @@ def project_plan(a, tools, repos, name, src, quiet=False):
             hook = {"hooks": [{"type": "command",
                                "command": f'"$CLAUDE_PROJECT_DIR"/{R}/bin/ptt inbox --quiet'}]}
             add(".claude/settings.json", "hook", json.dumps(hook))
+        if tool == "codex" and b"def read_hook_session" in src.read("project/bin/ptt"):
+            command = shlex.quote(str(a.project.resolve() / R)) + "/bin/ptt inbox --quiet --hook"
+            hook = {"hooks": [{"type": "command", "command": command}]}
+            add(".codex/hooks.json", "hook", json.dumps(hook))
     return plan
 
 
@@ -856,6 +863,12 @@ def write_report(a, tools, report, output):
     if any(line.startswith("warning") for line in output.splitlines()):
         steps.append("Warnings: explain each line starting with `warning` in the output to "
                      "the user, with what to do about it.")
+    if "codex" in tools:
+        steps.append("Codex: start in the workspace root and review/trust "
+                     "`.codex/hooks.json` in Codex (`/hooks` in the CLI). The prompt hook "
+                     "delivers inbox updates only after it is trusted. Use `$ptt-inbox` "
+                     "manually if hooks are unavailable. After moving this workspace, "
+                     "update the hook's absolute path and review/trust it again.")
     for kind, rel in report.paths:
         if kind == "superseded":
             steps.append(f"Superseded: `{rel}` holds the project's content; move it as the "

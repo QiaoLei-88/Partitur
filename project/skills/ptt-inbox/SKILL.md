@@ -23,7 +23,10 @@ writes (it writes none); other work needs AtE (rules file).
    record nothing more as that holder, and offer the user to clear the
    session.
 
-In Claude Code a prompt hook runs `ptt inbox --quiet` before each user
-message and adds what is new to the conversation; treat such lines like this
-report. A holder that is not bound to the session (`/ptt-resume`) gets
-nothing from the hook.
+The installed prompt hook runs before each user message in Claude Code
+and, once trusted, Codex. It adds what is new to the conversation; treat
+such lines like this report. In Codex, review/trust `.codex/hooks.json`
+(`/hooks` in the CLI); use `$ptt-inbox` manually if the hook is unavailable.
+A holder that is not bound to the session (`/ptt-resume`, `$ptt-resume` in
+Codex) gets nothing from the hook. An idle session gets no notification
+until its next user message.

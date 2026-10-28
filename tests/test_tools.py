@@ -545,9 +545,36 @@ class InstallProject(unittest.TestCase):
         self.install_from(clone, "--uninstall")
         self.assertFalse(settings.exists())
 
+    def test_codex_hook_installs_runs_and_uninstalls(self):
+        moved = self.root.with_name(self.root.name + " space's $project")
+        self.root.rename(moved)
+        self.root = moved
+        clone = self.partitur_clone()
+        self.install_from(clone, "--records", "records", tool="codex")
+        settings = self.root / ".codex" / "hooks.json"
+        command = json.loads(settings.read_text())["hooks"]["UserPromptSubmit"][0]["hooks"][0]["command"]
+        rec = self.root / "records"
+        git(rec, "config", "user.name", "t")
+        git(rec, "config", "user.email", "t@x")
+        ptt = ["python3", str(rec / "bin" / "ptt")]
+        env = dict(self.env, CODEX_THREAD_ID="codex-A")
+        holder = run(*ptt, "take", "integrator", env=env).stdout.strip()
+        run(*ptt, "free", "integrator", "--as", "user", "--reason", "test", env=self.env)
+        event = json.dumps(dict(hook_event_name="UserPromptSubmit", session_id="codex-A"))
+        result = subprocess.run(["sh", "-c", command], input=event, cwd=self.home,
+                                capture_output=True, text=True, env=self.env)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"{holder} was freed", result.stdout)
+        out = self.install_from(clone, "--records", "records", tool="codex").stdout
+        self.assertRegex(out, r"kept\s+\.codex/hooks\.json")
+        self.assertIn("review/trust", (self.root / "partitur-install-report.md").read_text())
+        self.install_from(clone, "--records", "records", "--uninstall", tool="codex")
+        self.assertFalse(settings.exists())
+        self.assertFalse((self.root / ".claude").exists())
+
     def test_hooks_keep_user_config_on_update_and_uninstall(self):
         clone = self.partitur_clone()
-        for tool, rel in (("claude", ".claude/settings.json"),):
+        for tool, rel in (("claude", ".claude/settings.json"), ("codex", ".codex/hooks.json")):
             with self.subTest(tool=tool):
                 settings = self.root / rel
                 settings.parent.mkdir(exist_ok=True)
@@ -580,7 +607,7 @@ class InstallProject(unittest.TestCase):
                 self.assertEqual(json.loads(settings.read_text()), user)
 
     def test_invalid_hook_settings_are_preserved(self):
-        for tool, rel in (("claude", ".claude/settings.json"),):
+        for tool, rel in (("claude", ".claude/settings.json"), ("codex", ".codex/hooks.json")):
             settings = self.root / rel
             settings.parent.mkdir(exist_ok=True)
             for value in ('{broken', '[]', '{"hooks": []}',
@@ -592,6 +619,24 @@ class InstallProject(unittest.TestCase):
                     self.assertEqual(settings.read_text(), value)
                     self.assertIn("not merged", self.install("--uninstall", tool=tool).stdout)
                     self.assertEqual(settings.read_text(), value)
+
+    def test_update_adds_codex_hook_to_previous_install(self):
+        clone = self.partitur_clone()
+        ptt = clone / "project" / "bin" / "ptt"
+        current = ptt.read_text()
+        ptt.write_text(current.replace("read_hook_session", "previous_hook_session"))
+        self.commit_clone(clone, "before Codex hooks")
+        self.install_from(clone, tool="all")
+        settings = self.root / ".codex" / "hooks.json"
+        self.assertFalse(settings.exists())
+        claude = (self.root / ".claude" / "settings.json").read_bytes()
+        ptt.write_text(current)
+        self.commit_clone(clone, "Codex hooks")
+        self.install_from(clone, "--update", tool="all")
+        self.assertTrue(settings.is_file())
+        self.assertEqual((self.root / ".claude" / "settings.json").read_bytes(), claude)
+        self.install_from(clone, "--uninstall", tool="all")
+        self.assertFalse(settings.exists())
 
     def test_uninstall_without_stamp(self):
         r = self.install("--uninstall", check=False)

@@ -52,6 +52,9 @@ steps below as they apply to this run. When the user ran install in a
 terminal and asks you to finish it, read that file and work through its
 steps; delete it, with the user's approval, when they are done.
 
+For Codex, explain the hook trust step in the install report. Until the
+project and `.codex/hooks.json` are trusted, use `$ptt-inbox` manually.
+
 Then, with the user:
 
 1. **Rules.** If install reports the rules file "not merged" (an existing

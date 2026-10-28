@@ -18,6 +18,6 @@ writes; other work needs AtE (rules file).
    "<one-line summary>"`.
 4. Tell the user that the supervisor (named by `<records>/bin/ptt whoami
    <name>`) closes it with `/ptt-close <N>` or reopens it; you hold the task
-   until then. The close reaches this session through its inbox (in Claude
-   Code with the user's next message; otherwise `/ptt-inbox`), never
-   through your own `status.md`, which you wrote before it.
+   until then. The close reaches this session through its inbox (with an
+   active prompt hook, at the user's next message; otherwise `/ptt-inbox`),
+   never through your own `status.md`, which you wrote before it.
