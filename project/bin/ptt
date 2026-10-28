@@ -67,12 +67,12 @@ design task is cancelled, while anything below it is unclear: a leave
 request or done report waiting, or a holder with no record for STALE_DAYS.
 Names given with --as are not authenticated: the records show who did what.
 
-Sessions: where the agent tool gives a session ID (Claude Code's
-CLAUDE_CODE_SESSION_ID; PTT_SESSION_ID overrides it), `take` and `resume`
+Sessions: PTT_SESSION_ID overrides the tool's ID: CLAUDE_CODE_SESSION_ID,
+then CODEX_THREAD_ID, then CODEX_SESSION_ID. `take` and `resume`
 bind the holder name to it. A write acting as a bound holder (--as NAME, the
 NAME of `leave`) from another session is refused, and so is any write from a
 session whose holder has since been resumed elsewhere. Without a session ID
-(a terminal, Codex), nothing is bound or checked.
+(for example a plain terminal), nothing is bound or checked.
 """
 import argparse
 import fcntl
@@ -418,7 +418,8 @@ def held_by(name):
 
 def session_id():
     """This session's ID, if the agent tool gives one."""
-    return os.environ.get("PTT_SESSION_ID") or os.environ.get("CLAUDE_CODE_SESSION_ID") or None
+    return (os.environ.get("PTT_SESSION_ID") or os.environ.get("CLAUDE_CODE_SESSION_ID")
+            or os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID") or None)
 
 
 def holdings():

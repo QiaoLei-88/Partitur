@@ -44,8 +44,9 @@ class Ptt(unittest.TestCase):
     def env(self, base=None, session=None):
         """The environment of a session with the given ID (none by default)."""
         env = dict(os.environ if base is None else base)
-        env.pop("CLAUDE_CODE_SESSION_ID", None)
-        env.pop("PTT_SESSION_ID", None)
+        for key in ("PTT_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID",
+                    "CODEX_SESSION_ID"):
+            env.pop(key, None)
         if session:
             env["PTT_SESSION_ID"] = session
         return env
@@ -514,6 +515,51 @@ class Ptt(unittest.TestCase):
         # the user, and sessions without an ID, are not checked
         self.ptt("mktask", "z", "--as", d)
         self.assertIn("holds nothing that ptt can see", self.ptt("whoami").stdout)
+
+    def test_native_sessions_bind_resume_and_refuse_old_writes(self):
+        for key in ("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+            with self.subTest(key=key):
+                env_a = dict(self.env(), **{key: key + "-A"})
+                env_b = dict(self.env(), **{key: key + "-B"})
+
+                def native(*args, env=env_a, check=True):
+                    return run("python3", str(self.rec / "bin" / "ptt"), *args,
+                               env=env, check=check)
+
+                holder = native("take", "integrator").stdout.strip()
+                self.assertIn(holder, native("whoami").stdout)
+                self.assertIn("one session holds one", native(
+                    "take", "designer", check=False).stderr)
+                self.assertIn("bound to another session", native(
+                    "leave", holder, env=env_b, check=False).stderr)
+                self.assertIn("already", native("resume", holder).stdout)
+                native("resume", holder, env=env_b)
+                self.assertIn("continued in another session", native(
+                    "leave", holder, check=False).stderr)
+                status = self.rec / "handoff" / "integrator.md"
+                status.parent.mkdir(exist_ok=True)
+                status.write_text(key + "\n")
+                self.assertIn("continued in another session", native(
+                    "record", "-m", "handover", str(status), check=False).stderr)
+                native("record", "-m", "handover", str(status), env=env_b)
+                native("leave", holder, env=env_b)
+
+    def test_session_environment_precedence(self):
+        keys = ("PTT_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID",
+                "CODEX_SESSION_ID")
+        env = dict(self.env(), **{key: key for key in keys})
+        ptt = ["python3", str(self.rec / "bin" / "ptt")]
+        for key in (*keys, None):
+            with self.subTest(key=key):
+                holder = run(*ptt, "take", "integrator", env=env).stdout.strip()
+                take = sorted((self.rec / "roles" / "integrator").glob("*-take.md"))[-1]
+                if key is None:
+                    self.assertNotIn("session_id:", take.read_text())
+                else:
+                    self.assertIn(f"\nsession_id: {key}\n", take.read_text())
+                run(*ptt, "leave", holder, env=env)
+                if key is not None:
+                    env[key] = ""
 
     def test_inbox_shows_what_is_new_once(self):
         d = self.ptt("take", "designer", session="D").stdout.strip()

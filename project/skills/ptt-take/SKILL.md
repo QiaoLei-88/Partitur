@@ -20,9 +20,11 @@ takes, approves recording it (an AtE does not); the work itself needs AtE
    argument for `leave`, `resume`, `whoami`, and `inbox`; optional for `record` and `pr-move`,
    added to the commit message), and `session:` in request messages. The
    tool binds it to this session where the agent tool gives a session ID;
-   one session holds one role or task. After `/clear` the user continues it
-   with `/ptt-resume <name>`: the cleared session does not take again, and
-   its writes are refused until it has resumed.
+   one session holds one role or task. In Claude Code, `/clear` starts a
+   fresh session ID: continue with `/ptt-resume <name>`. In Codex, a fresh
+   chat or fork continues with `$ptt-resume <name>`. Continue by resuming,
+   not by taking again. A different session ID cannot write as the bound
+   holder until it has resumed; continuing the same ID keeps the binding.
 4. Read what you start from, then report what you hold, your supervisor,
    the next step, and every `note:` the tool printed:
    - integrator: `<records>/handoff/integrator.md`, `<records>/bin/pr list`;

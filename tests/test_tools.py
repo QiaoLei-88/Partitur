@@ -18,6 +18,11 @@ INSTALL = HERE / "bin" / "install"
 
 
 def run(*args, cwd=None, check=True, env=None):
+    if env is None:
+        env = dict(os.environ)
+        for key in ("PTT_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID",
+                    "CODEX_SESSION_ID"):
+            env.pop(key, None)
     r = subprocess.run(args, cwd=cwd, capture_output=True, text=True, env=env)
     if check and r.returncode:
         raise AssertionError(f"{args} failed: {r.stderr}")
@@ -250,6 +255,9 @@ class InstallProject(unittest.TestCase):
         self.root = Path(tempfile.mkdtemp())
         self.home = Path(tempfile.mkdtemp())
         self.env = dict(os.environ, HOME=str(self.home))
+        for key in ("PTT_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID",
+                    "CODEX_SESSION_ID"):
+            self.env.pop(key, None)
         code = self.root / "code"
         code.mkdir()
         git(code, "init", "-q", "-b", "master")

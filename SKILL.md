@@ -9,6 +9,9 @@ A partitur is the full score from which every player reads. Here the score
 is the project's records: rules, charters, requests, run records. Sessions
 come and go; the records carry the work.
 
+Command examples use Claude Code's `/ptt-*` notation; in Codex invoke the
+same skills as `$ptt-*` (for example `$ptt-take designer`).
+
 ## If you are a session in a Partitur project
 
 1. Read the project's rules file. The workspace root links to it as

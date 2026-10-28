@@ -6,6 +6,9 @@ Subsequent explicit decisions by the user take precedence.
 <!-- partitur rules begin: maintained by Partitur's install; write project rules outside this block -->
 The rules between these markers follow Partitur ({{PARTITUR}}).
 
+Skill commands below use Claude Code's `/ptt-*` notation; in Codex invoke
+the same skills as `$ptt-*`, for example `$ptt-take designer`.
+
 ## Authorization and Scope
 
 - Discussion is the default; agreement, praise, or planning discussion does not authorize implementation. Form and defend independent technical opinions; challenge the user's proposals when evidence warrants rather than deferring to stated preferences.

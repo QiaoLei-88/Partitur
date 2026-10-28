@@ -49,7 +49,7 @@ Six ideas decide everything else; when in doubt, ask which one applies.
 | have a session work on a task | any free session | `/ptt-take N` (or the task's name) |
 | know who a session is | any | `/ptt-whoami`; `/ptt-whoami all` for everyone |
 | know what is new for a session and what waits on it | any holder | `/ptt-inbox` (in Claude Code it also arrives by itself with your next message) |
-| continue a role after `/clear` | the cleared session | `/ptt-resume <holder name>` |
+| continue a role after `/clear` or in a fresh session | the continuing session | `/ptt-resume <holder name>` |
 | submit finished work for review | the task holder | `/ptt-pr-submit` |
 | answer a review | the task holder | `/ptt-pr-submit draft reply`, then `/ptt-pr-submit reply` (`draft` likewise before submitting) |
 | review and carry out your decision | the integrator (`/ptt-take integrator`) | `/ptt-pr-review` |
@@ -128,6 +128,14 @@ both.
 Always start sessions in the workspace root: Codex reads `AGENTS.md` and
 skills only from the Git root of its starting directory downwards, and the
 workspace root is usually not inside a Git repository.
+
+Codex shell commands bind holders using `CODEX_THREAD_ID`, with
+`CODEX_SESSION_ID` as a fallback. Claude Code continues to use
+`CLAUDE_CODE_SESSION_ID`; `PTT_SESSION_ID` overrides either tool. A fresh
+chat or fork continues a holder only with `$ptt-resume <holder name>`;
+the previous session then loses write access through `ptt`. Continuing or
+compacting the same thread does not release the holder. Run `$ptt-whoami`
+to check the binding, and resume to reload the handover when needed.
 
 To bring a project up to a newer Partitur, pull this repository and rerun
 step 3's command with `--update`. The project remembers which Partitur

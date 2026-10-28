@@ -66,12 +66,14 @@ Committed: yes. Open concerns: in handoff/integrator.md. Unrecorded
 agreements: none. Clear now if you like (/clear).
 ```
 
-The user's `/clear` (the same command in Claude Code and Codex) is the
-approval; ignoring the offer means continue. Clearing does not change what
-the session holds: afterwards the user names the holder it continues as
-(`/ptt-resume <name>`) *(Proposed, G13, G16)*. A session never clears in the
-middle of a multi-round review or a design discussion only to save tokens:
-re-reading costs too.
+The user's `/clear` is approval of the offer; ignoring it means continue.
+Clearing does not release the holder. In Claude Code, `/clear` starts a
+fresh session ID: continue with `/ptt-resume <name>`. In Codex, a fresh chat
+or fork continues with `$ptt-resume <name>`; continuing or compacting the
+same thread keeps its binding. Resuming with a different session ID moves
+the binding and prevents the earlier session from writing *(Proposed,
+G13, G16)*. A session never clears in the middle of a multi-round review or
+a design discussion only to save tokens: re-reading costs too.
 
 ## Stage close
 
