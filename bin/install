@@ -12,6 +12,8 @@ Usage:
   Links this repository as the skill `partitur` in the user's skill
   directories: ~/.claude/skills (Claude Code) and ~/.agents/skills (Codex).
   Every session of this user can then find Partitur in any project.
+  Command templates are named SKILL.md.in; only their installed SKILL.md
+  files are discoverable as command skills.
 
 --scope project
   Sets PROJECT (default: the current directory, the workspace root that
@@ -35,7 +37,7 @@ Usage:
     Codex:        AGENTS.md -> <records>/CLAUDE.md, .agents/skills/<skill>, and
                   .codex/hooks.json running `ptt inbox --quiet --hook`
                   (review and trust it in Codex before it runs)
-  where <skill> is each ptt-* skill, and `partitur` (this repository)
+  where <skill> is each ptt-* skill, and the `partitur` entry skill
   unless the user scope already links it for that tool.
   The name defaults to the directory's name and <records> to `workspace`.
   The repository table (<records>/pr/repos) starts with every Git checkout
@@ -563,7 +565,10 @@ def project_plan(a, tools, repos, name, src, quiet=False):
     add(f"{R}/tasks/charter-template.md", "maintained", src.read("templates/charter.md"))
     skills = src.names("project/skills")
     for skill in skills:
-        text = src.read(f"project/skills/{skill}/SKILL.md").decode()
+        template = f"project/skills/{skill}/SKILL.md.in"
+        if not src.has(template):  # installed versions before templates were renamed
+            template = f"project/skills/{skill}/SKILL.md"
+        text = src.read(template).decode()
         add(f"{R}/skills/{skill}/SKILL.md", "maintained", text.replace("<records>", R))
     for tool in tools:
         entry, tool_dir = TOOLS[tool]

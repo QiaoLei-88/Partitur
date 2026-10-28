@@ -157,6 +157,11 @@ after copying each into a backup directory).
 `--scope user --uninstall` covers the detected tools; add `--tool all` if
 you installed for both.
 
+Both tools link `partitur` to this repository for its entry skill and
+documents. Command templates in `project/skills/` are named `SKILL.md.in`;
+install fills in the records directory and writes each project's `SKILL.md`.
+The templates themselves are not discoverable command skills.
+
 Taking roles and tasks, the install command, and Codex support are recent
 and marked *Proposed* in the [rules index](rules.md) until they have been
 used in a real project.

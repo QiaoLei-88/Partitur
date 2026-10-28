@@ -21,7 +21,7 @@ def tracked():
 
 class Repo(unittest.TestCase):
     def test_skill_frontmatter(self):
-        for f in [ROOT / "SKILL.md", *sorted((ROOT / "project" / "skills").glob("*/SKILL.md"))]:
+        for f in [ROOT / "SKILL.md", *sorted((ROOT / "project" / "skills").glob("*/SKILL.md.in"))]:
             text = f.read_text()
             self.assertTrue(text.startswith("---\n"), f)
             head = text[4:text.index("\n---\n", 4)].split("\n")
@@ -41,7 +41,7 @@ class Repo(unittest.TestCase):
         rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
         self.assertIn("or an AtE naming the records", rules)
         self.assertIn("Taking a role or task (`/ptt-take`) is approved only by the command", rules)
-        for skill in sorted((ROOT / "project" / "skills").glob("ptt-*/SKILL.md")):
+        for skill in sorted((ROOT / "project" / "skills").glob("ptt-*/SKILL.md.in")):
             text = " ".join(skill.read_text().split())
             if skill.parent.name == "ptt-take":
                 self.assertIn("only this command, typed in the session that takes", text)
@@ -51,7 +51,7 @@ class Repo(unittest.TestCase):
 
     def test_markdown_links_resolve(self):
         for f in tracked():
-            if f.suffix != ".md":
+            if not f.name.endswith((".md", ".md.in")):
                 continue
             for target in re.findall(r"\]\(([^)#]+)(?:#[^)]*)?\)", f.read_text()):
                 if not target.startswith(("http://", "https://")):

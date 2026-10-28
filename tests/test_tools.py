@@ -5,6 +5,7 @@ Run: python3 -m unittest discover -s tests   (from the repository root)
 """
 import json
 import os
+import re
 import sys
 import shutil
 import subprocess
@@ -31,6 +32,13 @@ def run(*args, cwd=None, check=True, env=None):
 
 def git(repo, *args):
     return run("git", "-C", str(repo), *args).stdout.strip()
+
+
+def skill_files(root):
+    """Include nested skills reached through directory symlinks."""
+    return [Path(directory) / "SKILL.md"
+            for directory, _, files in os.walk(root, followlinks=True)
+            if "SKILL.md" in files]
 
 
 def message(path, **fields):
@@ -314,6 +322,30 @@ class InstallProject(unittest.TestCase):
         self.assertFalse((self.root / "CLAUDE.md").exists())
         self.assertFalse((self.root / ".claude").exists())
 
+    def test_both_tools_discover_only_installed_skills(self):
+        self.install("--records", "partitur-records", tool="all")
+        skills = self.root / ".agents" / "skills"
+        expected = ["partitur", *[p.name for p in (HERE / "project/skills").iterdir()]]
+        for directory in (".agents", ".claude"):
+            found = skill_files(self.root / directory / "skills")
+            self.assertEqual(sorted(p.parent.name for p in found), sorted(expected))
+            for path in found:
+                if path.parent.name.startswith("ptt-"):
+                    self.assertNotIn("<records>", path.read_text())
+                    self.assertIn("partitur-records/bin/ptt", path.read_text())
+        entry = skills / "partitur"
+        for directory, _, files in os.walk(entry, followlinks=True):
+            for name in files:
+                path = Path(directory) / name
+                if path.suffix == ".md":
+                    for target in re.findall(r"\]\(([^)#]+)(?:#[^)]*)?\)", path.read_text()):
+                        if not target.startswith(("http://", "https://")):
+                            self.assertTrue((path.parent / target).exists(), (path, target))
+        self.assertEqual((entry / "bin/install").resolve(), INSTALL)
+        self.assertEqual(entry.resolve(), HERE)
+        self.assertEqual((self.root / ".claude/skills/partitur").resolve(), HERE)
+        self.assertNotIn("created", self.install("--records", "partitur-records").stdout)
+
     def test_rerun_keeps_and_reports(self):
         self.install()
         rules = self.root / "workspace" / "CLAUDE.md"
@@ -370,10 +402,11 @@ class InstallProject(unittest.TestCase):
         self.assertIn("- keep units SI", text)
         self.assertRegex(self.install().stdout, r"kept\s+workspace/CLAUDE.md")
 
-    def partitur_clone(self):
+    def partitur_clone(self, name="partitur"):
         """A committed copy of Partitur, to install from and then change."""
-        clone = self.home / "partitur"
-        shutil.copytree(HERE, clone, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+        clone = self.home / name
+        shutil.copytree(HERE, clone, symlinks=True,
+                        ignore=shutil.ignore_patterns(".git", "__pycache__"))
         for args in (["init", "-q", "-b", "master"], ["add", "-A"],
                      ["-c", "user.name=t", "-c", "user.email=t@x", "commit", "-qm", "v1"]):
             git(clone, *args)
@@ -386,6 +419,56 @@ class InstallProject(unittest.TestCase):
     def install_from(self, clone, *extra, check=True, tool="claude"):
         return run("python3", str(clone / "bin" / "install"), "--tool", tool, "--scope",
                    "project", str(self.root), *extra, check=check, env=self.env)
+
+    def test_update_from_skill_files(self):
+        clone = self.partitur_clone()
+        for path in (clone / "project/skills").glob("*/SKILL.md.in"):
+            path.rename(path.with_name("SKILL.md"))
+        self.commit_clone(clone, "skill files before template rename")
+        self.install_from(clone, "--records", "partitur-records", tool="all")
+        link = self.root / ".agents/skills/partitur"
+        self.assertEqual(len(skill_files(link.parent)), 23)
+        installed = {p: p.read_bytes() for p in link.parent.glob("ptt-*/SKILL.md")}
+        claude_link = os.readlink(self.root / ".claude/skills/partitur")
+        claude_hook = (self.root / ".claude/settings.json").read_bytes()
+        for path in (clone / "project/skills").glob("*/SKILL.md"):
+            path.rename(path.with_name("SKILL.md.in"))
+        self.commit_clone(clone, "explicit skill templates")
+        self.install_from(clone, "--records", "partitur-records", "--update", tool="all")
+        self.assertEqual(link.resolve(), clone)
+        self.assertEqual(len(skill_files(link.parent)), 12)
+        self.assertEqual({p: p.read_bytes() for p in installed}, installed)
+        self.assertEqual(os.readlink(self.root / ".claude/skills/partitur"), claude_link)
+        self.assertEqual((self.root / ".claude/settings.json").read_bytes(), claude_hook)
+        self.assertEqual(git(clone, "status", "--porcelain"), "")
+        self.install_from(clone, "--records", "partitur-records", "--uninstall", tool="all")
+        self.assertFalse(link.is_symlink())
+        self.assertEqual(skill_files(link.parent), [])
+        self.assertTrue((self.root / "partitur-records/tasks/open/T0000-design/charter.md").is_file())
+        self.assertEqual(git(clone, "status", "--porcelain"), "")
+
+    def test_codex_preserves_replaced_entry(self):
+        clone = self.partitur_clone()
+        self.install_from(clone, tool="codex")
+        link = self.root / ".agents/skills/partitur"
+        link.unlink()
+        custom = self.home / "custom-skill"
+        custom.mkdir()
+        (custom / "SKILL.md").write_text("my skill\n")
+        for symlink in (True, False):
+            with self.subTest(symlink=symlink):
+                if symlink:
+                    link.symlink_to(custom)
+                else:
+                    shutil.copytree(custom, link)
+                self.install_from(clone, "--update", tool="codex")
+                self.install_from(clone, "--uninstall", tool="codex")
+                self.assertEqual((link / "SKILL.md").read_text(), "my skill\n")
+                if symlink:
+                    self.assertEqual(link.resolve(), custom)
+                    link.unlink()
+                else:
+                    shutil.rmtree(link)
 
     def test_update_from_designer_role_layout(self):
         """A project installed when the designer was a role (handoff/designer.md)
@@ -660,7 +743,7 @@ class InstallProject(unittest.TestCase):
     def test_installed_skills_match_partitur(self):
         self.install()
         for skill in [p.name for p in (HERE / "project" / "skills").iterdir()]:
-            src = (HERE / "project" / "skills" / skill / "SKILL.md").read_text()
+            src = (HERE / "project" / "skills" / skill / "SKILL.md.in").read_text()
             got = (self.root / "workspace" / "skills" / skill / "SKILL.md").read_text()
             self.assertEqual(got, src.replace("<records>", "workspace"))
         self.assertIn("https://github.com/", (self.root / "workspace" / "CLAUDE.md").read_text())
@@ -695,6 +778,19 @@ class InstallProject(unittest.TestCase):
         self.assertRegex(out, r"skipped\s+\.claude/skills/partitur")
         self.assertFalse((self.root / ".claude" / "skills" / "partitur").exists())
         self.assertTrue((self.root / ".agents" / "skills" / "partitur").is_symlink())
+
+    def test_codex_user_and_project_skills_do_not_overlap(self):
+        run("python3", str(INSTALL), "--scope", "user", "--tool", "codex", env=self.env)
+        self.install("--records", "partitur-records", tool="codex")
+        project = self.root / ".agents/skills"
+        user = self.home / ".agents/skills"
+        found = skill_files(project) + skill_files(user)
+        self.assertEqual(len(found), 12)
+        self.assertEqual(len({p.parent.name for p in found}), 12)
+        self.assertFalse((project / "partitur").exists())
+        self.install("--records", "partitur-records", "--uninstall", tool="codex")
+        self.assertEqual(skill_files(project), [])
+        self.assertEqual(len(skill_files(user)), 1)
 
     def test_bad_arguments(self):
         for extra in (["--repo", "code:code"], ["--repo", "c:my code:main"],
@@ -736,6 +832,7 @@ class InstallUser(unittest.TestCase):
                       env=env).stdout
             self.assertIn("created", out)
             self.assertTrue((home / ".agents" / "skills" / "partitur" / "SKILL.md").is_file())
+            self.assertEqual(len(skill_files(home / ".agents/skills")), 1)
             self.assertFalse((home / ".claude").exists())
             out = run("python3", str(INSTALL), "--tool", "all", "--scope", "user",
                       env=env).stdout
@@ -754,7 +851,6 @@ class InstallUser(unittest.TestCase):
             self.assertFalse((home / ".claude" / "skills" / "partitur").is_symlink())
         finally:
             shutil.rmtree(home)
-
 
 if __name__ == "__main__":
     unittest.main()
