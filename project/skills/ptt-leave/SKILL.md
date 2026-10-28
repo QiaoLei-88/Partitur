@@ -1,6 +1,6 @@
 ---
 name: ptt-leave
-description: Leave this session's role or task, approve a subordinate's leave request, or free a role or task whose holder is gone. Arguments: none, approve N, free N|designer|integrator.
+description: "Leave this session's role or task, approve a subordinate's leave request, or free a role or task whose holder is gone. Arguments: none, approve N, free N|designer|integrator."
 ---
 
 # Leave, approve leaving, or free

@@ -1,6 +1,6 @@
 ---
 name: ptt-pr-submit
-description: Submit a branch (the one named, or this task's worktree) as a local pull request for review and integration, reply to its review (reply [N]), draft either for the user to check first (draft, draft reply [N]), or list this branch's requests (list [BRANCH]). Use when branch work is ready for review or a review needs an answer.
+description: "Submit a branch (the one named, or this task's worktree) as a local pull request for review and integration, reply to its review (reply [N]), draft either for the user to check first (draft, draft reply [N]), or list this branch's requests (list [BRANCH]). Use when branch work is ready for review or a review needs an answer."
 ---
 
 # Submit or reply to a local request

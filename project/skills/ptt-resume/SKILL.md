@@ -1,6 +1,6 @@
 ---
 name: ptt-resume
-description: Continue as a holder in this session, typically after /clear: binds the holder name to this session and catches up from the records. Argument: the holder name (integrator-1, designer-g1, worker-T0007).
+description: "Continue as a holder in this session, typically after /clear: binds the holder name to this session and catches up from the records. Argument: the holder name (integrator-1, designer-g1, worker-T0007)."
 ---
 
 # Continue as a holder

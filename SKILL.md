@@ -1,6 +1,6 @@
 ---
 name: partitur
-description: Partitur, roles, records, and request flow for one user directing several AI agent sessions. Use to install or set up Partitur for a project, or when a session must know its role, what it may write, or how work and decisions flow; the ptt-* skills do the steps.
+description: "Partitur, roles, records, and request flow for one user directing several AI agent sessions. Use to install or set up Partitur for a project, or when a session must know its role, what it may write, or how work and decisions flow; the ptt-* skills do the steps."
 ---
 
 # Partitur

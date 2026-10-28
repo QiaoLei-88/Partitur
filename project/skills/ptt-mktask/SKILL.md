@@ -1,6 +1,6 @@
 ---
 name: ptt-mktask
-description: As a designer, draft a task from the agreed discussion, release a draft for taking, or amend a released charter. Arguments: none (draft), release N|name, amend N.
+description: "As a designer, draft a task from the agreed discussion, release a draft for taking, or amend a released charter. Arguments: none (draft), release N|name, amend N."
 ---
 
 # Make a task

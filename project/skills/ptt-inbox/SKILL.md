@@ -1,6 +1,6 @@
 ---
 name: ptt-inbox
-description: Show what is new in the records for this session's holder since it last looked (a subordinate's status or done report, an amendment, a note, a review or decision on its request, the close of its own task) and what waits on it. Use for: anything new, what needs me, before starting a step. Argument: none or a holder name.
+description: "Show what is new in the records for this session's holder since it last looked (a subordinate's status or done report, an amendment, a note, a review or decision on its request, the close of its own task) and what waits on it. Use for: anything new, what needs me, before starting a step. Argument: none or a holder name."
 ---
 
 # Inbox

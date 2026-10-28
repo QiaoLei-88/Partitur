@@ -1,6 +1,6 @@
 ---
 name: ptt-done
-description: As a task's holder, report its acceptance criteria met so that the supervisor can close it. Use when the task's work is merged and its criteria are met.
+description: "As a task's holder, report its acceptance criteria met so that the supervisor can close it. Use when the task's work is merged and its criteria are met."
 ---
 
 # Report a task done

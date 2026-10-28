@@ -1,6 +1,6 @@
 ---
 name: ptt-pr-review
-description: As the integrator, list, show, or review local pull requests, and carry out the user's decision (merge, request changes, reject, withdraw). Use to list, review, integrate, or merge requests. Arguments: list [open|merged|closed|all], show N, N, all.
+description: "As the integrator, list, show, or review local pull requests, and carry out the user's decision (merge, request changes, reject, withdraw). Use to list, review, integrate, or merge requests. Arguments: list [open|merged|closed|all], show N, N, all."
 ---
 
 # Review local requests

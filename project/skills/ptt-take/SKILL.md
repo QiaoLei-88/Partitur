@@ -1,6 +1,6 @@
 ---
 name: ptt-take
-description: Take a role or task for this session; conflicts are refused. Arguments: designer (task T0000), integrator, a task ID or name, or none to list ready tasks.
+description: "Take a role or task for this session; conflicts are refused. Arguments: designer (task T0000), integrator, a task ID or name, or none to list ready tasks."
 ---
 
 # Take a role or a task

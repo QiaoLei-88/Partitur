@@ -4,6 +4,7 @@ The private-terms check reads `.private-terms` (one term per line, case
 insensitive) if the file exists; it is kept out of version control, so a
 public clone skips that check.
 """
+import json
 import re
 import subprocess
 import unittest
@@ -27,7 +28,12 @@ class Repo(unittest.TestCase):
             fields = dict(line.split(": ", 1) for line in head)
             self.assertEqual(sorted(fields), ["description", "name"], f)
             self.assertEqual(fields["name"], f.parent.name if f.parent != ROOT else "partitur")
-            self.assertLessEqual(len(fields["description"]), 1024, f)
+            description = fields["description"]
+            if description.startswith('"'):
+                description = json.loads(description)
+            else:
+                self.assertNotIn(": ", description, f"{f}: quote YAML descriptions with colons")
+            self.assertLessEqual(len(description), 1024, f)
 
     def test_record_approval_wording_agrees(self):
         """Rule A12: a command or an AtE naming the records approves them;
