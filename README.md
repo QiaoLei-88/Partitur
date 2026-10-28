@@ -1,5 +1,7 @@
 # Partitur
 
+[简体中文](README.zh-CN.md)
+
 A partitur is the full score of a piece: every part, written out, from which
 each player reads. Players change; the score stays.
 
