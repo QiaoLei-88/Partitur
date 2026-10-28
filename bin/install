@@ -230,7 +230,18 @@ def read_settings(path):
         return {}
     try:
         data = json.loads(path.read_text() or "{}")
-        return data if isinstance(data, dict) else None
+        if not isinstance(data, dict) or not isinstance(data.get("hooks", {}), dict):
+            return None
+        entries = data.get("hooks", {}).get(HOOK_EVENT, [])
+        if not isinstance(entries, list):
+            return None
+        for entry in entries:
+            if not isinstance(entry, dict) or not isinstance(entry.get("hooks"), list):
+                return None
+            if any(not isinstance(h, dict) or not isinstance(h.get("command", ""), str)
+                   for h in entry["hooks"]):
+                return None
+        return data
     except ValueError:
         return None
 
@@ -246,7 +257,7 @@ def apply_hook(root, rel, e, before, opts, report):
     want = json.loads(e["data"])
     data = read_settings(path)
     if data is None:
-        report("not merged", path, "not valid JSON; add the prompt hook by hand: "
+        report("not merged", path, "invalid hook settings; add the prompt hook by hand: "
                + json.dumps(want))
         return
     existed = path.exists()
@@ -255,7 +266,8 @@ def apply_hook(root, rel, e, before, opts, report):
     if ours == [want]:
         report("kept", path, "Partitur's prompt hook")
         return
-    untouched = not ours or (before is not None and before["sha"] == sha(json.dumps(ours[0])))
+    untouched = not ours or (len(ours) == 1 and before is not None
+                            and before["sha"] == sha(json.dumps(ours[0])))
     if ours and not (opts.update and (untouched or opts.force)):
         report("outdated" if untouched else "modified", path, "Partitur's prompt hook; "
                + ("--update replaces it" if untouched else "--update --force replaces it"))
@@ -271,11 +283,20 @@ def apply_hook(root, rel, e, before, opts, report):
 def remove_hook(root, rel, e, opts, report):
     path = root / rel
     data = read_settings(path)
+    if data is None:
+        report("not merged", path, "invalid hook settings; left alone")
+        return False
     if not data:
         return not path.exists()
     entries = hook_entries(data)
-    if not any(is_ours(x) for x in entries):
+    ours = [x for x in entries if is_ours(x)]
+    if not ours:
         return True
+    if len(ours) != 1 or sha(json.dumps(ours[0])) != e["sha"]:
+        if not opts.force:
+            report("modified", path, "Partitur's prompt hook; kept (--force removes it)")
+            return False
+        backup(path, root, opts, report)
     entries[:] = [x for x in entries if not is_ours(x)]
     if not entries:
         del data["hooks"][HOOK_EVENT]

@@ -383,8 +383,8 @@ class InstallProject(unittest.TestCase):
         git(clone, "add", "-A")
         git(clone, "-c", "user.name=t", "-c", "user.email=t@x", "commit", "-qm", message)
 
-    def install_from(self, clone, *extra, check=True):
-        return run("python3", str(clone / "bin" / "install"), "--tool", "claude", "--scope",
+    def install_from(self, clone, *extra, check=True, tool="claude"):
+        return run("python3", str(clone / "bin" / "install"), "--tool", tool, "--scope",
                    "project", str(self.root), *extra, check=check, env=self.env)
 
     def test_update_from_designer_role_layout(self):
@@ -544,6 +544,54 @@ class InstallProject(unittest.TestCase):
         self.assertIn("ptt inbox --quiet", settings.read_text())
         self.install_from(clone, "--uninstall")
         self.assertFalse(settings.exists())
+
+    def test_hooks_keep_user_config_on_update_and_uninstall(self):
+        clone = self.partitur_clone()
+        for tool, rel in (("claude", ".claude/settings.json"),):
+            with self.subTest(tool=tool):
+                settings = self.root / rel
+                settings.parent.mkdir(exist_ok=True)
+                user = {"description": "my settings", "hooks": {"UserPromptSubmit": [
+                    {"hooks": [{"type": "command", "command": "echo mine"}]}]}}
+                settings.write_text(json.dumps(user))
+                self.install_from(clone, tool=tool)
+                installed = settings.read_text()
+                data = json.loads(installed)
+                data["hooks"]["UserPromptSubmit"][-1]["hooks"][0]["timeout"] = 17
+                changed = json.dumps(data)
+                settings.write_text(changed)
+                self.assertIn("modified", self.install_from(clone, "--update", tool=tool).stdout)
+                self.assertEqual(settings.read_text(), changed)
+                self.assertIn("modified", self.install_from(clone, "--uninstall", tool=tool).stdout)
+                self.assertEqual(settings.read_text(), changed)
+                self.install_from(clone, tool=tool)
+                backup = self.home / (tool + "-backup")
+                self.install_from(clone, "--update", "--force", "--backup-to", str(backup), tool=tool)
+                self.assertEqual((backup / rel).read_text(), changed)
+                self.assertEqual(settings.read_text(), installed)
+                self.install_from(clone, "--uninstall", tool=tool)
+                self.assertEqual(json.loads(settings.read_text()), user)
+                self.install_from(clone, tool=tool)
+                settings.write_text(changed)
+                backup = self.home / (tool + "-uninstall-backup")
+                self.install_from(clone, "--uninstall", "--force", "--backup-to",
+                                  str(backup), tool=tool)
+                self.assertEqual((backup / rel).read_text(), changed)
+                self.assertEqual(json.loads(settings.read_text()), user)
+
+    def test_invalid_hook_settings_are_preserved(self):
+        for tool, rel in (("claude", ".claude/settings.json"),):
+            settings = self.root / rel
+            settings.parent.mkdir(exist_ok=True)
+            for value in ('{broken', '[]', '{"hooks": []}',
+                          '{"hooks":{"UserPromptSubmit":{}}}',
+                          '{"hooks":{"UserPromptSubmit":[{"hooks":[null]}]}}'):
+                with self.subTest(tool=tool, value=value):
+                    settings.write_text(value)
+                    self.assertIn("not merged", self.install(tool=tool).stdout)
+                    self.assertEqual(settings.read_text(), value)
+                    self.assertIn("not merged", self.install("--uninstall", tool=tool).stdout)
+                    self.assertEqual(settings.read_text(), value)
 
     def test_uninstall_without_stamp(self):
         r = self.install("--uninstall", check=False)
