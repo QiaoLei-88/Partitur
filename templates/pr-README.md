@@ -70,5 +70,5 @@ Branches, worktrees, and `recovery/` tags of decided requests are removed
 after a cooldown (default 14 days) with the `ptt-pr-cleanup` skill;
 rejected and withdrawn heads are kept as `archive/pr-NNNNNN` tags.
 
-The procedures are the `ptt-pr-submit`, `ptt-pr-review`, and
-`ptt-pr-cleanup` skills.
+The procedures are the `ptt-pr-submit`, `ptt-pr-draft-reply`,
+`ptt-pr-reply`, `ptt-pr-review`, and `ptt-pr-cleanup` skills.

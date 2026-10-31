@@ -1,0 +1,33 @@
+---
+name: ptt-pr-draft-reply
+description: "Draft the answer to a review of this branch's local request for the user to check: the planned change per comment and the full reply text. Writes and releases nothing; /ptt-pr-reply releases it. Argument: none or the request number N."
+---
+
+# Draft a reply to a review
+
+The command, or an AtE naming these records, approves the records this skill
+writes (it writes none); other work needs AtE (rules file).
+
+The branch is the one the user names; otherwise the branch of the worktree
+this holder's task works in (`worktrees/<topic>`; if several, list them and
+ask). Run every git command from the workspace root with `git -C
+<worktree>`; never ask the user to change directory. Request numbers may be
+short (`4`, `pr-4`, `000004`). Without N, the request is this branch's one
+open request waiting for its author; if there is none or several, list them
+(`<records>/bin/pr list all --branch BRANCH`) and ask. With N, the request
+must be in `pr/open`: if `<records>/bin/pr list all` shows it merged or
+closed, report its state and decision and stop. A decided request takes no
+draft and no reply, and a pending draft of it lapses; a follow-up is a new
+request (`/ptt-pr-submit`).
+
+1. Read `<records>/bin/pr show N` and the code on the branch.
+2. Show, per comment ID, the planned change (a diff where short) or why
+   you disagree; then the full reply text (the template in
+   `ptt-pr-reply`) in a fenced block (```` ```markdown ````; with more
+   backticks than any fence inside it), so that it displays as it will be
+   written. Values that exist only after carrying out the plan (commit
+   SHAs, run ids, test counts) are `{fill: what}`, e.g. `{fill: commit
+   SHA}`, with the expected result outside the block.
+3. Write nothing: no file, no commit, no recorded message. End with: "To
+   release it, run `/ptt-pr-reply NNNNNN`; say first what to change, if
+   anything."

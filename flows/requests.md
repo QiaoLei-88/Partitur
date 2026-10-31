@@ -1,7 +1,8 @@
 # Requests
 
 How a change reaches a main branch. The procedures are the request skills
-(submit, review, cleanup); this file is the protocol they implement.
+(submit, draft-reply and reply, review, cleanup); this file is the protocol
+they implement.
 
 ## Layout
 

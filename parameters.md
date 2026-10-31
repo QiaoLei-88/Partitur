@@ -38,7 +38,7 @@ Changing one of these means changing the tools or skills that use it.
 | Merge message | `Merge <branch> (pr NNNNNN)` | C18 |
 | Cleanup cooldown | 14 days after the decision (`bin/pr gc --days N` overrides) | C11 |
 | Authorization words | `AtE`, `AtEiYA` | A2, A3 |
-| Skills | `ptt-take`, `ptt-resume`, `ptt-leave`, `ptt-whoami`, `ptt-inbox`, `ptt-mktask`, `ptt-done`, `ptt-close`; `ptt-pr-submit`, `ptt-pr-review`, `ptt-pr-cleanup` | G1, C1 |
+| Skills | `ptt-take`, `ptt-resume`, `ptt-leave`, `ptt-whoami`, `ptt-inbox`, `ptt-mktask`, `ptt-done`, `ptt-close`; `ptt-pr-submit`, `ptt-pr-draft-reply`, `ptt-pr-reply`, `ptt-pr-review`, `ptt-pr-cleanup` | G1, C1 |
 | Tools | `<records>/bin/ptt` (roles and tasks), `bin/pr` (requests), `bin/test-run` | |
 
 ## Project choices with a default

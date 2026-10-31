@@ -16,6 +16,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent
 PROJECT_BIN = HERE / "project" / "bin"
 INSTALL = HERE / "bin" / "install"
+N_SKILLS = len([d for d in (HERE / "project" / "skills").iterdir() if d.is_dir()])
 
 
 def run(*args, cwd=None, check=True, env=None):
@@ -332,7 +333,7 @@ class InstallProject(unittest.TestCase):
             for path in found:
                 if path.parent.name.startswith("ptt-"):
                     self.assertNotIn("<records>", path.read_text())
-                    self.assertIn("partitur-records/bin/ptt", path.read_text())
+                    self.assertIn("partitur-records/bin/", path.read_text())
         entry = skills / "partitur"
         for directory, _, files in os.walk(entry, followlinks=True):
             for name in files:
@@ -427,7 +428,7 @@ class InstallProject(unittest.TestCase):
         self.commit_clone(clone, "skill files before template rename")
         self.install_from(clone, "--records", "partitur-records", tool="all")
         link = self.root / ".agents/skills/partitur"
-        self.assertEqual(len(skill_files(link.parent)), 23)
+        self.assertEqual(len(skill_files(link.parent)), 1 + 2 * N_SKILLS)
         installed = {p: p.read_bytes() for p in link.parent.glob("ptt-*/SKILL.md")}
         claude_link = os.readlink(self.root / ".claude/skills/partitur")
         claude_hook = (self.root / ".claude/settings.json").read_bytes()
@@ -436,7 +437,7 @@ class InstallProject(unittest.TestCase):
         self.commit_clone(clone, "explicit skill templates")
         self.install_from(clone, "--records", "partitur-records", "--update", tool="all")
         self.assertEqual(link.resolve(), clone)
-        self.assertEqual(len(skill_files(link.parent)), 12)
+        self.assertEqual(len(skill_files(link.parent)), 1 + N_SKILLS)
         self.assertEqual({p: p.read_bytes() for p in installed}, installed)
         self.assertEqual(os.readlink(self.root / ".claude/skills/partitur"), claude_link)
         self.assertEqual((self.root / ".claude/settings.json").read_bytes(), claude_hook)
@@ -785,8 +786,8 @@ class InstallProject(unittest.TestCase):
         project = self.root / ".agents/skills"
         user = self.home / ".agents/skills"
         found = skill_files(project) + skill_files(user)
-        self.assertEqual(len(found), 12)
-        self.assertEqual(len({p.parent.name for p in found}), 12)
+        self.assertEqual(len(found), 1 + N_SKILLS)
+        self.assertEqual(len({p.parent.name for p in found}), 1 + N_SKILLS)
         self.assertFalse((project / "partitur").exists())
         self.install("--records", "partitur-records", "--uninstall", tool="codex")
         self.assertEqual(skill_files(project), [])

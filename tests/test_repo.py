@@ -49,6 +49,19 @@ class Repo(unittest.TestCase):
                 self.assertIn("The command, or an AtE naming these records, approves", text,
                               skill.parent.name)
 
+    def test_reply_is_drafted_and_released_by_its_own_commands(self):
+        """Replies to a review: /ptt-pr-draft-reply writes nothing, /ptt-pr-reply
+        releases; /ptt-pr-submit no longer replies."""
+        skills = ROOT / "project" / "skills"
+        def text(name):
+            return " ".join((skills / name / "SKILL.md.in").read_text().split())
+        self.assertNotIn("draft reply", text("ptt-pr-submit"))
+        self.assertNotIn("`reply [N]`", text("ptt-pr-submit"))
+        self.assertIn("Write nothing", text("ptt-pr-draft-reply"))
+        self.assertIn("/ptt-pr-reply", text("ptt-pr-draft-reply"))
+        self.assertIn("No draft for request NNNNNN in this conversation", text("ptt-pr-reply"))
+        self.assertIn("kind: reply", text("ptt-pr-reply"))
+
     def test_markdown_links_resolve(self):
         for f in tracked():
             if not f.name.endswith((".md", ".md.in")):

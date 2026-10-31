@@ -14,7 +14,7 @@ writes (it writes none); other work needs AtE (rules file).
    only what came after.
 2. Report each line with a suggested next step: read a changed `status.md`
    or note and say what it means for your work; read an amendment (`ptt
-   show <N>`); answer a review (`/ptt-pr-submit draft reply`); record a
+   show <N>`); answer a review (`/ptt-pr-draft-reply`); record a
    decided request's outcome in your status; settle what waits on you
    (`/ptt-close`, `/ptt-leave approve`). Act only with the user's command or
    AtE.
