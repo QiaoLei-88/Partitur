@@ -1,6 +1,6 @@
 ---
 name: ptt-pr-cleanup
-description: As the integrator, remove the worktrees, branches, and recovery tags of decided requests after a cooldown (default 14 days); reports the plan, runs it only on AtE. Use to clean up, prune, or gc decided requests. Argument: none or --days N.
+description: "As the integrator, remove the worktrees, branches, and recovery tags of decided requests after a cooldown (default 14 days); reports the plan, runs it only on AtE. Use to clean up, prune, or gc decided requests. Argument: none or --days N."
 ---
 
 # Clean up decided requests

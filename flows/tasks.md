@@ -69,8 +69,8 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
    continues as (`/ptt-resume <name>`), and it picks up from the records.
    Leaving is for handing the work to another session (D16, G13).
 10. **A holder is bound to one session.** Where the agent tool gives a
-    session ID (Claude Code does; Codex and a terminal do not), taking and
-    resuming record it with the holder name. A write as a holder bound to
+    session ID (Claude Code and Codex do), taking and resuming record it
+    with the holder name. A write as a holder bound to
     another session is refused, and so is any write from a session whose
     holder has resumed elsewhere; one session holds one role or task. An
     unbound holder (taken without a session ID, or before Partitur bound
@@ -124,20 +124,20 @@ In Codex the commands start with `$` instead of `/`.
   their word; the records show who did what, and the user's commands are
   the only authority (A2). This guards against mistakes, not against a
   session lying.
-- **Sessions are bound only where the tool gives an ID.** Claude Code does;
-  in Codex or a terminal, holders are unbound, and naming one holder in one
-  session at a time is the user's part. The binding, like names, guards
-  against mistakes, not against a session lying about its ID.
+- **Sessions are bound only where the tool gives an ID.** Claude Code and
+  Codex do; in a plain terminal without an ID, holders are unbound, and
+  naming one holder in one session at a time is the user's part. The binding
+  guards against mistakes, not against a session lying about its ID.
 - **Notices are pulled, except through the prompt hook.** `ptt inbox`
   lists what changed in the records for a holder since it last looked: a
   subordinate's `status.md`, done report, or leave request, an amendment, a
   note to the designer, a new review or decision on its request, and for the
   integrator a new request or reply; and, once, to the session last bound
   to a holder whose hold someone else ended (a close, an approved leave, a
-  freeing). In Claude Code, install's prompt hook
+  freeing). In Claude Code and Codex (once trusted), install's prompt hook
   runs it before each user message, so a bound holder sees it with the
-  user's next message; elsewhere the holder runs `/ptt-inbox`, and the user
-  carries the notice as before (D12, G17). A session that receives no
+  user's next message; without the hook the holder runs `/ptt-inbox`, and
+  the user carries the notice as before (D12, G17). A session that receives no
   message sees nothing until it does. Holder changes are not in it, so a
   session that names who holds a role or task, or who acts next, runs
   `ptt who` at that moment rather than trusting an earlier answer (G18).

@@ -12,6 +12,8 @@ Usage:
   Links this repository as the skill `partitur` in the user's skill
   directories: ~/.claude/skills (Claude Code) and ~/.agents/skills (Codex).
   Every session of this user can then find Partitur in any project.
+  Command templates are named SKILL.md.in; only their installed SKILL.md
+  files are discoverable as command skills.
 
 --scope project
   Sets PROJECT (default: the current directory, the workspace root that
@@ -32,8 +34,10 @@ Usage:
                   .claude/settings.json a prompt hook running `ptt inbox --quiet`
                   (it prints only when the records hold something new for the
                   session's holder); other settings there are kept
-    Codex:        AGENTS.md -> <records>/CLAUDE.md, .agents/skills/<skill>
-  where <skill> is each ptt-* skill, and `partitur` (this repository)
+    Codex:        AGENTS.md -> <records>/CLAUDE.md, .agents/skills/<skill>, and
+                  .codex/hooks.json running `ptt inbox --quiet --hook`
+                  (review and trust it in Codex before it runs)
+  where <skill> is each ptt-* skill, and the `partitur` entry skill
   unless the user scope already links it for that tool.
   The name defaults to the directory's name and <records> to `workspace`.
   The repository table (<records>/pr/repos) starts with every Git checkout
@@ -95,6 +99,7 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import subprocess
 import sys
@@ -230,7 +235,18 @@ def read_settings(path):
         return {}
     try:
         data = json.loads(path.read_text() or "{}")
-        return data if isinstance(data, dict) else None
+        if not isinstance(data, dict) or not isinstance(data.get("hooks", {}), dict):
+            return None
+        entries = data.get("hooks", {}).get(HOOK_EVENT, [])
+        if not isinstance(entries, list):
+            return None
+        for entry in entries:
+            if not isinstance(entry, dict) or not isinstance(entry.get("hooks"), list):
+                return None
+            if any(not isinstance(h, dict) or not isinstance(h.get("command", ""), str)
+                   for h in entry["hooks"]):
+                return None
+        return data
     except ValueError:
         return None
 
@@ -246,7 +262,7 @@ def apply_hook(root, rel, e, before, opts, report):
     want = json.loads(e["data"])
     data = read_settings(path)
     if data is None:
-        report("not merged", path, "not valid JSON; add the prompt hook by hand: "
+        report("not merged", path, "invalid hook settings; add the prompt hook by hand: "
                + json.dumps(want))
         return
     existed = path.exists()
@@ -255,7 +271,8 @@ def apply_hook(root, rel, e, before, opts, report):
     if ours == [want]:
         report("kept", path, "Partitur's prompt hook")
         return
-    untouched = not ours or (before is not None and before["sha"] == sha(json.dumps(ours[0])))
+    untouched = not ours or (len(ours) == 1 and before is not None
+                            and before["sha"] == sha(json.dumps(ours[0])))
     if ours and not (opts.update and (untouched or opts.force)):
         report("outdated" if untouched else "modified", path, "Partitur's prompt hook; "
                + ("--update replaces it" if untouched else "--update --force replaces it"))
@@ -271,11 +288,20 @@ def apply_hook(root, rel, e, before, opts, report):
 def remove_hook(root, rel, e, opts, report):
     path = root / rel
     data = read_settings(path)
+    if data is None:
+        report("not merged", path, "invalid hook settings; left alone")
+        return False
     if not data:
         return not path.exists()
     entries = hook_entries(data)
-    if not any(is_ours(x) for x in entries):
+    ours = [x for x in entries if is_ours(x)]
+    if not ours:
         return True
+    if len(ours) != 1 or sha(json.dumps(ours[0])) != e["sha"]:
+        if not opts.force:
+            report("modified", path, "Partitur's prompt hook; kept (--force removes it)")
+            return False
+        backup(path, root, opts, report)
     entries[:] = [x for x in entries if not is_ours(x)]
     if not entries:
         del data["hooks"][HOOK_EVENT]
@@ -539,7 +565,10 @@ def project_plan(a, tools, repos, name, src, quiet=False):
     add(f"{R}/tasks/charter-template.md", "maintained", src.read("templates/charter.md"))
     skills = src.names("project/skills")
     for skill in skills:
-        text = src.read(f"project/skills/{skill}/SKILL.md").decode()
+        template = f"project/skills/{skill}/SKILL.md.in"
+        if not src.has(template):  # installed versions before templates were renamed
+            template = f"project/skills/{skill}/SKILL.md"
+        text = src.read(template).decode()
         add(f"{R}/skills/{skill}/SKILL.md", "maintained", text.replace("<records>", R))
     for tool in tools:
         entry, tool_dir = TOOLS[tool]
@@ -556,6 +585,10 @@ def project_plan(a, tools, repos, name, src, quiet=False):
             hook = {"hooks": [{"type": "command",
                                "command": f'"$CLAUDE_PROJECT_DIR"/{R}/bin/ptt inbox --quiet'}]}
             add(".claude/settings.json", "hook", json.dumps(hook))
+        if tool == "codex" and b"def read_hook_session" in src.read("project/bin/ptt"):
+            command = shlex.quote(str(a.project.resolve() / R)) + "/bin/ptt inbox --quiet --hook"
+            hook = {"hooks": [{"type": "command", "command": command}]}
+            add(".codex/hooks.json", "hook", json.dumps(hook))
     return plan
 
 
@@ -835,6 +868,12 @@ def write_report(a, tools, report, output):
     if any(line.startswith("warning") for line in output.splitlines()):
         steps.append("Warnings: explain each line starting with `warning` in the output to "
                      "the user, with what to do about it.")
+    if "codex" in tools:
+        steps.append("Codex: start in the workspace root and review/trust "
+                     "`.codex/hooks.json` in Codex (`/hooks` in the CLI). The prompt hook "
+                     "delivers inbox updates only after it is trusted. Use `$ptt-inbox` "
+                     "manually if hooks are unavailable. After moving this workspace, "
+                     "update the hook's absolute path and review/trust it again.")
     for kind, rel in report.paths:
         if kind == "superseded":
             steps.append(f"Superseded: `{rel}` holds the project's content; move it as the "

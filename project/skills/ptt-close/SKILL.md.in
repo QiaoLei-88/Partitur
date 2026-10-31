@@ -1,6 +1,6 @@
 ---
 name: ptt-close
-description: As a supervisor (designer or sub-designer), close a task reported done, reopen it, or cancel a task nobody holds. Arguments: N, reopen N, cancel N.
+description: "As a supervisor (designer or sub-designer), close a task reported done, reopen it, or cancel a task nobody holds. Arguments: N, reopen N, cancel N."
 ---
 
 # Close, reopen, or cancel a task

@@ -1,6 +1,6 @@
 ---
 name: partitur
-description: Partitur, roles, records, and request flow for one user directing several AI agent sessions. Use to install or set up Partitur for a project, or when a session must know its role, what it may write, or how work and decisions flow; the ptt-* skills do the steps.
+description: "Partitur, roles, records, and request flow for one user directing several AI agent sessions. Use to install or set up Partitur for a project, or when a session must know its role, what it may write, or how work and decisions flow; the ptt-* skills do the steps."
 ---
 
 # Partitur
@@ -8,6 +8,9 @@ description: Partitur, roles, records, and request flow for one user directing s
 A partitur is the full score from which every player reads. Here the score
 is the project's records: rules, charters, requests, run records. Sessions
 come and go; the records carry the work.
+
+Command examples use Claude Code's `/ptt-*` notation; in Codex invoke the
+same skills as `$ptt-*` (for example `$ptt-take designer`).
 
 ## If you are a session in a Partitur project
 
@@ -48,6 +51,9 @@ user, including anything reported as differing. Install also writes
 steps below as they apply to this run. When the user ran install in a
 terminal and asks you to finish it, read that file and work through its
 steps; delete it, with the user's approval, when they are done.
+
+For Codex, explain the hook trust step in the install report. Until the
+project and `.codex/hooks.json` are trusted, use `$ptt-inbox` manually.
 
 Then, with the user:
 

@@ -1,6 +1,6 @@
 ---
 name: ptt-whoami
-description: Show who this session is in a Partitur project (holder name, role or task, supervisor, session binding), or with "all", who holds what. Only reads; what is new or waits is /ptt-inbox; continuing a holder after /clear is /ptt-resume. Arguments: none, NAME, all.
+description: "Show who this session is in a Partitur project (holder name, role or task, supervisor, session binding), or with \"all\", who holds what. Only reads; what is new or waits is /ptt-inbox; continuing a holder after /clear is /ptt-resume. Arguments: none, NAME, all."
 ---
 
 # Who am I

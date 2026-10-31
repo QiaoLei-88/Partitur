@@ -1,5 +1,7 @@
 # Partitur
 
+[简体中文](README.zh-CN.md)
+
 A partitur is the full score of a piece: every part, written out, from which
 each player reads. Players change; the score stays.
 
@@ -48,8 +50,8 @@ Six ideas decide everything else; when in doubt, ask which one applies.
 | turn a discussion into a task | the designer | `/ptt-mktask`, then `/ptt-mktask release N` |
 | have a session work on a task | any free session | `/ptt-take N` (or the task's name) |
 | know who a session is | any | `/ptt-whoami`; `/ptt-whoami all` for everyone |
-| know what is new for a session and what waits on it | any holder | `/ptt-inbox` (in Claude Code it also arrives by itself with your next message) |
-| continue a role after `/clear` | the cleared session | `/ptt-resume <holder name>` |
+| know what is new for a session and what waits on it | any holder | `/ptt-inbox` (with an active prompt hook, it also arrives with your next message) |
+| continue a role after `/clear` or in a fresh session | the continuing session | `/ptt-resume <holder name>` |
 | submit finished work for review | the task holder | `/ptt-pr-submit` |
 | answer a review | the task holder | `/ptt-pr-submit draft reply`, then `/ptt-pr-submit reply` (`draft` likewise before submitting) |
 | review and carry out your decision | the integrator (`/ptt-take integrator`) | `/ptt-pr-review` |
@@ -129,6 +131,24 @@ Always start sessions in the workspace root: Codex reads `AGENTS.md` and
 skills only from the Git root of its starting directory downwards, and the
 workspace root is usually not inside a Git repository.
 
+For Codex, install also adds `.codex/hooks.json`. Review and trust the
+project and its hook in Codex (`/hooks` in the CLI); until then, or on a
+client without prompt hooks, use `$ptt-inbox` manually. The hook reads the
+session ID from Codex's event and reports new records with the next user
+message. It does not wake an idle session. See the
+[official hook documentation](https://learn.chatgpt.com/docs/hooks).
+The hook uses the workspace's absolute path so it also works when the
+session changes directory; if the workspace moves, update that path and
+review/trust the hook again.
+
+Codex shell commands bind holders using `CODEX_THREAD_ID`, with
+`CODEX_SESSION_ID` as a fallback. Claude Code continues to use
+`CLAUDE_CODE_SESSION_ID`; `PTT_SESSION_ID` overrides either tool. A fresh
+chat or fork continues a holder only with `$ptt-resume <holder name>`;
+the previous session then loses write access through `ptt`. Continuing or
+compacting the same thread does not release the holder. Run `$ptt-whoami`
+to check the binding, and resume to reload the handover when needed.
+
 To bring a project up to a newer Partitur, pull this repository and rerun
 step 3's command with `--update`. The project remembers which Partitur
 commit installed it (`workspace/.partitur-version`), so the update replaces
@@ -138,6 +158,11 @@ after copying each into a backup directory).
 `--uninstall` removes what was installed the same way. For the user link,
 `--scope user --uninstall` covers the detected tools; add `--tool all` if
 you installed for both.
+
+Both tools link `partitur` to this repository for its entry skill and
+documents. Command templates in `project/skills/` are named `SKILL.md.in`;
+install fills in the records directory and writes each project's `SKILL.md`.
+The templates themselves are not discoverable command skills.
 
 Taking roles and tasks, the install command, and Codex support are recent
 and marked *Proposed* in the [rules index](rules.md) until they have been

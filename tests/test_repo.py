@@ -4,6 +4,7 @@ The private-terms check reads `.private-terms` (one term per line, case
 insensitive) if the file exists; it is kept out of version control, so a
 public clone skips that check.
 """
+import json
 import re
 import subprocess
 import unittest
@@ -20,14 +21,19 @@ def tracked():
 
 class Repo(unittest.TestCase):
     def test_skill_frontmatter(self):
-        for f in [ROOT / "SKILL.md", *sorted((ROOT / "project" / "skills").glob("*/SKILL.md"))]:
+        for f in [ROOT / "SKILL.md", *sorted((ROOT / "project" / "skills").glob("*/SKILL.md.in"))]:
             text = f.read_text()
             self.assertTrue(text.startswith("---\n"), f)
             head = text[4:text.index("\n---\n", 4)].split("\n")
             fields = dict(line.split(": ", 1) for line in head)
             self.assertEqual(sorted(fields), ["description", "name"], f)
             self.assertEqual(fields["name"], f.parent.name if f.parent != ROOT else "partitur")
-            self.assertLessEqual(len(fields["description"]), 1024, f)
+            description = fields["description"]
+            if description.startswith('"'):
+                description = json.loads(description)
+            else:
+                self.assertNotIn(": ", description, f"{f}: quote YAML descriptions with colons")
+            self.assertLessEqual(len(description), 1024, f)
 
     def test_record_approval_wording_agrees(self):
         """Rule A12: a command or an AtE naming the records approves them;
@@ -35,7 +41,7 @@ class Repo(unittest.TestCase):
         rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
         self.assertIn("or an AtE naming the records", rules)
         self.assertIn("Taking a role or task (`/ptt-take`) is approved only by the command", rules)
-        for skill in sorted((ROOT / "project" / "skills").glob("ptt-*/SKILL.md")):
+        for skill in sorted((ROOT / "project" / "skills").glob("ptt-*/SKILL.md.in")):
             text = " ".join(skill.read_text().split())
             if skill.parent.name == "ptt-take":
                 self.assertIn("only this command, typed in the session that takes", text)
@@ -45,7 +51,7 @@ class Repo(unittest.TestCase):
 
     def test_markdown_links_resolve(self):
         for f in tracked():
-            if f.suffix != ".md":
+            if not f.name.endswith((".md", ".md.in")):
                 continue
             for target in re.findall(r"\]\(([^)#]+)(?:#[^)]*)?\)", f.read_text()):
                 if not target.startswith(("http://", "https://")):

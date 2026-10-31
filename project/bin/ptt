@@ -7,9 +7,11 @@ task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
   ptt who                          who holds which role and task
   ptt whoami [NAME]                what NAME (default: the holder bound to this
                                    session) holds: role or task, supervisor, session
-  ptt inbox [NAME] [--quiet]       what is new for NAME since it last looked, and what
+  ptt inbox [NAME] [--quiet] [--hook]
+                                  what is new for NAME since it last looked, and what
                                    waits on it; --quiet prints only what is new, and
                                    nothing on any error (for a prompt hook)
+                                   --hook reads a UserPromptSubmit JSON event on stdin
   ptt tasks [--all]                tasks and their states
   ptt show TASK                    a task's charter, status, and events
   ptt take designer|integrator|TASK   take the root design task T0000 (designer),
@@ -67,15 +69,19 @@ design task is cancelled, while anything below it is unclear: a leave
 request or done report waiting, or a holder with no record for STALE_DAYS.
 Names given with --as are not authenticated: the records show who did what.
 
-Sessions: where the agent tool gives a session ID (Claude Code's
-CLAUDE_CODE_SESSION_ID; PTT_SESSION_ID overrides it), `take` and `resume`
-bind the holder name to it. A write acting as a bound holder (--as NAME, the
-NAME of `leave`) from another session is refused, and so is any write from a
-session whose holder has since been resumed elsewhere. Without a session ID
-(a terminal, Codex), nothing is bound or checked.
+Sessions: PTT_SESSION_ID overrides the tool's ID: CLAUDE_CODE_SESSION_ID,
+then CODEX_THREAD_ID, then CODEX_SESSION_ID for shell commands. `inbox --hook`
+uses the event's session_id instead, unless PTT_SESSION_ID is set. Codex's
+shell and hook IDs must identify the same session to find its bound holder.
+`take` and `resume` bind the holder name to the ID. A write acting as a bound
+holder (--as NAME, the NAME of `leave`) from another session is refused, and
+so is any write from a session whose holder has since been resumed
+elsewhere. Without a session ID (for example a plain terminal), nothing is
+bound or checked.
 """
 import argparse
 import fcntl
+import json
 import os
 import re
 import shutil
@@ -418,7 +424,22 @@ def held_by(name):
 
 def session_id():
     """This session's ID, if the agent tool gives one."""
-    return os.environ.get("PTT_SESSION_ID") or os.environ.get("CLAUDE_CODE_SESSION_ID") or None
+    return (os.environ.get("PTT_SESSION_ID") or os.environ.get("CLAUDE_CODE_SESSION_ID")
+            or os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID") or None)
+
+
+def read_hook_session():
+    """Use the hook event's identity even when its process has no tool environment."""
+    try:
+        event = json.load(sys.stdin)
+    except ValueError:
+        die("inbox --hook: expected a UserPromptSubmit JSON event")
+    need(isinstance(event, dict) and event.get("hook_event_name") == "UserPromptSubmit",
+         "inbox --hook: expected a UserPromptSubmit event")
+    sid = event.get("session_id")
+    need(isinstance(sid, str) and bool(sid.strip()) and "\n" not in sid and "\r" not in sid,
+         "inbox --hook: expected a nonempty session_id string")
+    return sid
 
 
 def holdings():
@@ -1168,7 +1189,7 @@ def run_main():
     add("whoami")
     sub.choices["whoami"].add_argument("name", nargs="?")
     add("tasks", all=dict(action="store_true"))
-    add("inbox", quiet=dict(action="store_true"))
+    add("inbox", quiet=dict(action="store_true"), hook=dict(action="store_true"))
     sub.choices["inbox"].add_argument("name", nargs="?")
     add("show", "task")
     add("take", "what")
@@ -1193,6 +1214,9 @@ def run_main():
     p.add_argument("--as", dest="as_", help="the writer's holder name, added to the message")
     p.add_argument("paths", nargs="+")
     a = ap.parse_args()
+    if a.cmd == "inbox" and a.hook:
+        sid = read_hook_session()
+        os.environ["PTT_SESSION_ID"] = os.environ.get("PTT_SESSION_ID") or sid
     if a.cmd in ("record", "pr-move") and a.as_:
         a.message += f" (by {a.as_})"
     need((REC / ".git").exists(), f"{REC} is not the records repository (no .git)")
