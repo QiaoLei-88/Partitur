@@ -34,7 +34,10 @@ same skills as `$ptt-*` (for example `$ptt-take designer`).
 ## Installing Partitur for a project
 
 When the user asks for it (that request is the AtE), from the project's
-workspace root, the directory holding its code checkouts:
+workspace root, the directory holding its code checkouts. If the user gave
+this repository's link and it is not cloned yet, say where you will clone
+it (a lasting place, `~/partitur` by default: the project links to it by
+absolute path) and wait for the user's go-ahead on the location; then:
 
 ```
 <this repository>/bin/install --scope project
@@ -107,6 +110,10 @@ Then, with the user:
    sessions for the roles (`/ptt-take designer`, `/ptt-take integrator`),
    which start from the records, and that requests wait until a session
    holds the integrator role.
+6. **User link (optional).** If the report offers linking Partitur for the
+   user, ask once; on the user's approval run the command it names, then
+   this install again with `--update`, which removes the project's own
+   link.
 
 ## Reading map
 

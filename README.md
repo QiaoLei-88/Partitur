@@ -69,26 +69,22 @@ Requirements: Git 2.28 or later, Python 3.8 or later, and a system with
 symbolic links (Linux or macOS; on Windows, WSL); Claude Code, Codex, or
 both.
 
-1. **Clone** this repository anywhere, for example `~/partitur`.
-2. **Once per machine**, make Partitur known to your agent tools:
-
-   ```
-   ~/partitur/bin/install --scope user
-   ```
-
-   It detects Claude Code and Codex and reports what it found;
-   `--tool claude`, `codex`, or `all` chooses explicitly.
-3. **Once per project**, in its workspace root (the directory that holds
-   the project's code checkouts), start a session, the *installation
-   session*, and ask: "install Partitur for this project". The session runs
+1. **Install for the project.** In its workspace root (the directory that
+   holds the project's code checkouts), start a session, the *installation
+   session*, and say: "Install Partitur for this project from
+   https://github.com/QiaoLei-88/Partitur". The session clones Partitur to
+   a lasting place (`~/partitur` unless you choose another), tells you what
+   it will run, and runs
 
    ```
    ~/partitur/bin/install --scope project
    ```
 
-   (or run it yourself inside the session, so that it sees the output: in
-   Claude Code, `! ~/partitur/bin/install --scope project`) and reports
-   what it created: the records repository `workspace/` with
+   You can also clone and run that command yourself (inside a Claude Code
+   session, `! ~/partitur/bin/install --scope project`, so that the session
+   sees the output). Install detects Claude Code and Codex
+   (`--tool claude`, `codex`, or `all` chooses) and reports what it created:
+   the records repository `workspace/` with
    the rules file, task and request directories, tools and skills, the
    root design task `T0000` (the designer's charter and handover), the
    integrator's file, the links your tools read, and a prompt hook that
@@ -100,7 +96,7 @@ both.
    partitur-install-report.md and help me finish the Partitur install":
    install leaves its output and the next steps in that file (not
    committed; delete it when done).
-4. **Fill in two files** with the installation session: the "Project Rules" at the end
+2. **Fill in two files** with the installation session: the "Project Rules" at the end
    of `workspace/CLAUDE.md` (your domain's rules; Partitur's own rules sit
    in a marked block above them), and the placeholders in
    `workspace/tasks/open/T0000-design/charter.md` (the root designer's
@@ -120,7 +116,7 @@ both.
    about the design agreed during the setup belongs in T0000's charter or
    `status.md` before you record. The installation session then ends; it
    takes no role.
-5. **Open fresh sessions** in the workspace root for the roles: in one,
+3. **Open fresh sessions** in the workspace root for the roles: in one,
    `/ptt-take designer`; in another, `/ptt-take integrator`. Each starts
    from the records, not from the setup conversation. If T0000 is not
    filled in yet (an existing project whose handover lives elsewhere), the
@@ -128,6 +124,28 @@ both.
    first piece of work with the designer and make it a task; in a third
    session, `/ptt-take` it. Requests wait until a session holds the
    integrator role; `ptt` notes it when one is submitted without.
+
+Optionally, once per machine, `~/partitur/bin/install --scope user` links
+Partitur for all your sessions, so that a session in any directory knows it
+(in the next project, "install Partitur for this project" then needs no link). The install report offers
+it; a later `--update` of a project removes the project's own link.
+
+### If you are a session asked to install Partitur from this link
+
+1. Say where you will clone it and what you will run, and wait for the
+   user's go-ahead: the request names the action, the location is the
+   user's to confirm. Clone to a lasting place, `~/partitur` by default:
+   the project links to that clone by its absolute path, so never a
+   temporary directory. If the place exists, ask: reuse it (`git -C
+   <clone> pull`), or choose another.
+2. From the workspace root, run `<clone>/bin/install --scope project`
+   (add `--tool all` if the project should serve a tool not installed
+   here), and report its output.
+3. Read `<clone>/SKILL.md`, section "Installing Partitur for a project",
+   and `partitur-install-report.md` in the workspace root, and work through
+   the steps with the user.
+4. To update later: `git -C <clone> pull`, then the same install command
+   with `--update`.
 
 Always start sessions in the workspace root: Codex reads `AGENTS.md` and
 skills only from the Git root of its starting directory downwards, and the
@@ -152,7 +170,7 @@ compacting the same thread does not release the holder. Run `$ptt-whoami`
 to check the binding, and resume to reload the handover when needed.
 
 To bring a project up to a newer Partitur, pull this repository and rerun
-step 3's command with `--update`. The project remembers which Partitur
+step 1's command with `--update`. The project remembers which Partitur
 commit installed it (`workspace/.partitur-version`), so the update replaces
 what is outdated and removes what Partitur no longer ships, but leaves your
 rules, your records, and any file you changed (`--force` replaces those,

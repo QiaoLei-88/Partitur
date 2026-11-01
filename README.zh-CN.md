@@ -62,25 +62,20 @@ Partitur 是一种由一位用户和多个 AI 代理会话共同开展软件项�
 环境要求：Git 2.28 或更高版本、Python 3.8 或更高版本，以及支持符号链接的系统
 （Linux 或 macOS；Windows 上使用 WSL）；安装 Claude Code、Codex，或两者。
 
-1. **克隆仓库**到任意位置，例如 `~/partitur`。
-2. **每台机器设置一次**，让代理工具能够找到 Partitur：
-
-   ```
-   ~/partitur/bin/install --scope user
-   ```
-
-   安装器会检测 Claude Code 和 Codex，并报告检测结果；
-   可以用 `--tool claude`、`codex` 或 `all` 明确选择。
-3. **每个项目设置一次**。在项目的工作区根目录（存放项目各代码检出目录的目录）
-   启动一个会话，称为*安装会话*，然后说：“为这个项目安装 Partitur”。
-   会话会运行：
+1. **为项目安装。** 在项目的工作区根目录（存放项目各代码检出目录的目录）
+   启动一个会话，称为*安装会话*，然后说：“从
+   https://github.com/QiaoLei-88/Partitur 为这个项目安装 Partitur”。
+   会话会把 Partitur 克隆到一个长期保留的位置（默认 `~/partitur`，也可以由你指定），
+   先告诉你将要运行的命令，然后运行：
 
    ```
    ~/partitur/bin/install --scope project
    ```
 
-   也可以在会话中自行运行，让会话看到输出；例如在 Claude Code 中执行
-   `! ~/partitur/bin/install --scope project`。会话会报告创建的内容：
+   你也可以自己克隆并运行这条命令（在 Claude Code 会话中执行
+   `! ~/partitur/bin/install --scope project`，让会话看到输出）。
+   安装器会检测 Claude Code 和 Codex（可以用 `--tool claude`、`codex` 或 `all`
+   明确选择），并报告创建的内容：
    记录库 `workspace/`，其中包含规则文件、任务与请求目录、工具和技能，
    根设计任务 `T0000`（设计者的章程和交接记录）、集成者文件、
    供代理工具读取的链接，以及向每个会话显示其新消息的提示词钩子
@@ -89,7 +84,7 @@ Partitur 是一种由一位用户和多个 AI 代理会话共同开展软件项�
    如果你是在普通终端中运行安装命令，则在工作区根目录启动安装会话，并说：
    “阅读 partitur-install-report.md，帮我完成 Partitur 安装”。
    安装器会把输出和后续步骤写入该文件（不提交，完成后删除）。
-4. **与安装会话一起填写两个文件**：`workspace/CLAUDE.md` 末尾的
+2. **与安装会话一起填写两个文件**：`workspace/CLAUDE.md` 末尾的
    “Project Rules”（项目规则，填写你的领域规则；Partitur 自身的规则位于上方
    带标记的区块中），以及 `workspace/tasks/open/T0000-design/charter.md`
    中的占位内容。后者是根设计者的章程，仅首次直接填写，此后由你提出修订；
@@ -106,7 +101,7 @@ Partitur 是一种由一位用户和多个 AI 代理会话共同开展软件项�
    此后，对 `workspace/` 的所有写入都通过 `ptt` 完成。
    安装期间达成共识的设计内容，应在记录前写入 T0000 的章程或 `status.md`。
    然后结束安装会话；它不领取任何角色。
-5. **在工作区根目录新开会话**，分别领取角色：一个会话执行
+3. **在工作区根目录新开会话**，分别领取角色：一个会话执行
    `/ptt-take designer`，另一个执行 `/ptt-take integrator`。
    每个会话都从记录开始，而不是依靠安装时的对话。
    如果 T0000 尚未填写（例如已有项目的交接材料保存在别处），
@@ -114,6 +109,23 @@ Partitur 是一种由一位用户和多个 AI 代理会话共同开展软件项�
    与设计者讨论第一项工作并将其形成任务，然后在第三个会话中用 `/ptt-take`
    领取该任务。请求需要等待有会话持有集成者角色才能处理；
    提交请求时若没有集成者，`ptt` 会提示。
+
+可选：每台机器运行一次 `~/partitur/bin/install --scope user`，
+为你的所有会话链接 Partitur，使任意目录中的会话都认识它
+（之后在下一个项目中说“为这个项目安装 Partitur”就不再需要链接）。
+安装报告会给出这一建议；之后对项目执行 `--update` 时，会移除项目自己的链接。
+
+### 如果你是被要求从这个链接安装 Partitur 的会话
+
+1. 先说明将克隆到哪里、将运行什么，等待用户确认：用户的请求指定了操作，
+   位置由用户确认。克隆到长期保留的位置，默认 `~/partitur`：
+   项目会通过绝对路径链接到这份克隆，因此不能放在临时目录中。
+   如果该位置已存在，请询问：复用它（`git -C <clone> pull`），还是另选位置。
+2. 在工作区根目录运行 `<clone>/bin/install --scope project`
+   （如果项目还要支持本机未安装的工具，加上 `--tool all`），并报告输出。
+3. 阅读 `<clone>/SKILL.md` 中的“Installing Partitur for a project”一节，
+   以及工作区根目录中的 `partitur-install-report.md`，与用户一起完成其中的步骤。
+4. 以后更新：先 `git -C <clone> pull`，再加 `--update` 运行同一条安装命令。
 
 始终在工作区根目录启动会话：Codex 只读取其启动目录所属 Git 根目录及其下级
 目录中的 `AGENTS.md` 和技能，而工作区根目录通常不在 Git 仓库内部。
@@ -135,7 +147,7 @@ Claude Code 继续使用 `CLAUDE_CODE_SESSION_ID`；
 继续同一会话或压缩其上下文不会释放持有者身份。
 运行 `$ptt-whoami` 检查绑定，需要时通过 resume 重新加载交接记录。
 
-要将项目升级到新版 Partitur，请拉取本仓库，并在第 3 步的命令中加上
+要将项目升级到新版 Partitur，请拉取本仓库，并在第 1 步的命令中加上
 `--update` 后重新运行。项目会在 `workspace/.partitur-version` 中记录
 安装时的 Partitur 提交，因此升级会替换过时内容、移除 Partitur 不再提供的内容，
 同时保留你的规则、记录和自行修改的文件。
