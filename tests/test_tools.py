@@ -782,11 +782,14 @@ class InstallProject(unittest.TestCase):
 
     def test_user_link_added_later_makes_project_link_redundant(self):
         self.install(tool="all")
+        report = (self.root / "partitur-install-report.md").read_text()
+        self.assertIn("--scope user --tool all", report)
         run("python3", str(INSTALL), "--scope", "user", "--tool", "all", env=self.env)
         out = self.install(tool="all").stdout
         self.assertRegex(out, r"redundant\s+\.agents/skills/partitur")
         self.assertRegex(out, r"redundant\s+\.claude/skills/partitur")
         self.assertTrue((self.root / ".agents/skills/partitur").is_symlink())
+        self.assertNotIn("--scope user", (self.root / "partitur-install-report.md").read_text())
         self.assertRegex(self.install("--update", tool="all").stdout,
                          r"removed\s+\.agents/skills/partitur")
         self.assertFalse((self.root / ".agents/skills/partitur").is_symlink())

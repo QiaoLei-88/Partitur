@@ -914,6 +914,15 @@ def write_report(a, tools, report, output):
     if c.get("outdated") or c.get("obsolete") or c.get("redundant"):
         steps.append("Files reported \"outdated\", \"obsolete\", or \"redundant\": "
                      "`--update` brings them up to this Partitur; ask the user.")
+    unlinked = [t for t in tools
+                if not (Path.home() / TOOLS[t][1] / "skills" / "partitur").exists()]
+    if unlinked:
+        steps.append("Optional, only with the user's approval: Partitur is linked for this "
+                     "project only. To let sessions in any directory find it (for example "
+                     "to install it in the next project by asking a session), run "
+                     f"`{HERE / 'bin' / 'install'} --scope user --tool "
+                     f"{unlinked[0] if len(unlinked) == 1 else 'all'}`, then rerun this "
+                     "install with `--update`, which removes the project's own link.")
     if any(c.get(k) for k in ("created", "updated", "replaced", "removed", "merged")):
         steps.append(f"When the steps above are done, record the records repository: "
                      f"`{R}/bin/ptt record -m \"install Partitur\" {R}`.")
