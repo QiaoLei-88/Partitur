@@ -81,7 +81,7 @@ Then, with the user:
      exercised in practice *(Proposed, T1)*: a successor checking its
      handover against the records; worker sessions; withdrawing a request;
      offering to be cleared at quiet points; taking roles and tasks with
-     supervised leaving (G1-G13). The user drops one only by saying so,
+     supervised leaving (G1-G18). The user drops one only by saying so,
      as a stated deviation.
 
    Present the conflicts and the one block question together. On the

@@ -27,7 +27,7 @@ run yet; this page is the contract for the first ones.
 - Merge, or commit to a main branch (C5, F2).
 - Change the design document or another session's records (B8).
 
-## Lifecycle *(Proposed, G1-G13)*
+## Lifecycle *(Proposed, G1-G18)*
 
 As a track: takes its task, reports done, leaves only with the
 supervisor's approval. A successor takes the task again and continues the
