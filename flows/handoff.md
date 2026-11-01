@@ -9,7 +9,7 @@ How work and knowledge pass between sessions and scopes.
 | Task (`tasks/<place>/T0007-slug/`) | designer (charter, amendments, close); holder (`status.md`, done); tool (events) | one piece of work a session takes ([roles and tasks](tasks.md)); D1, D2 *(Proposed, G8-G12)* | kept as history in `tasks/done/` or `cancelled/` (D4) |
 | `status.md` of a task | its holder | progress, outcomes with merge commits, findings for the designer; no review states, which go stale as soon as the request moves (D2, D6) | as its task |
 | Temporary note (`handoff/notes/<topic>.md`) | any session, to the designer | a finding that needs a decision (D3, D9) | deleted by its author once the designer has recorded its outcome |
-| Root design task (`tasks/open/T0000-design/`) | the user (charter, by amendment); the designer (`status.md`) | the root designer's charter and its handover, as any design task's `status.md` is its sub-designer's (D8, N6) | permanent: never closed |
+| Root design task (`tasks/open/T0000-design/`) | the user (charter: filled in directly once, then by amendment); the designer (`status.md`) | the root designer's charter and its handover, as any design task's `status.md` is its sub-designer's (D8, N6) | permanent: never closed |
 | Integrator's status (`handoff/integrator.md`) | the integrator | open concerns, pending housekeeping *(Proposed, D15)* | permanent, updated before a session ends |
 | Role records (`roles/integrator/`) | the tool, on take and leave | who held the role, generation by generation *(Proposed, G1)*; the designers' takes are the events of `T0000` | permanent |
 | Stage close | the designer | results, carried-forward items, the next stage's tasks (D11) | permanent, in the design document |
