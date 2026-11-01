@@ -447,6 +447,24 @@ class Ptt(unittest.TestCase):
         self.assertIn("removed the lock", self.ptt("unlock", "--force").stdout)
         self.ptt("take", "integrator")
 
+    def test_broken_lock_is_removed_only_by_force(self):
+        lock = self.rec / ".git" / "ptt.lock.d"
+        # an empty one is replaced by the next command's lock; the others block it
+        for name, text in (("", ""), ("stray", "x\n"),
+                           ("owner", "host=h\nmachine=elsewhere\nsince=0\n"),
+                           ("owner", "pid=1\n")):
+            lock.mkdir()
+            if name:
+                (lock / name).write_text(text)
+                env = dict(self.env(), PTT_LOCK_WAIT="0.3")
+                r = run("python3", str(self.rec / "bin" / "ptt"), "take", "integrator",
+                        env=env, check=False)
+                self.assertIn("names no owner", r.stderr)
+            self.assertIn("unlock --force", self.refused("unlock"))
+            self.assertIn("removed the lock of no owner", self.ptt("unlock", "--force").stdout)
+            self.assertFalse(lock.exists())
+        self.ptt("take", "integrator")
+
     def test_failed_record_leaves_nothing(self):
         d = self.designer()
         (self.rec / ".git" / "index.lock").write_text("")

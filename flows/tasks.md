@@ -149,8 +149,9 @@ In Codex the commands start with `$` instead of `/`.
   long as creating a directory there is atomic. A lock left by a killed
   command is removed when its process is known to be gone: automatically on
   the same machine, by `ptt unlock` on the machine that held it, or, if
-  that machine no longer exists, by the user's `ptt unlock --force`. Its
-  age never decides (F11).
+  that machine no longer exists, by the user's `ptt unlock --force`, which
+  also removes a broken lock that names no owner. Its age never decides
+  (F11).
 - **One gate for the records repository.** Every write to it goes through
   `ptt` (`ptt record` for request messages, `status.md`, and `handoff/integrator.md`),
   which commits exactly its paths under the lock all sessions share. Git

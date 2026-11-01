@@ -175,13 +175,15 @@ def process_start(pid):
 
 
 def lock_owner(path):
-    """The owner fields of the lock directory `path`, or None if it has none
-    (it is being created, or was removed)."""
+    """The owner fields of the lock directory `path`, or None if it names no
+    complete owner: it was removed meanwhile, or it is broken (its owner file
+    is written before the directory appears, so it is never seen half made)."""
     try:
-        return dict(line.split("=", 1) for line in (path / "owner").read_text().splitlines()
-                    if "=" in line)
+        owner = dict(line.split("=", 1) for line in (path / "owner").read_text().splitlines()
+                     if "=" in line)
     except OSError:
         return None
+    return owner if owner.get("machine") and owner.get("pid", "").isdigit() else None
 
 
 def owner_alive(owner):
@@ -262,9 +264,10 @@ def acquire(gitdir, wait=None):
                 die(f"the records are locked by {describe(owner)}, another machine. If that "
                     f"command is gone, run `ptt unlock` on {owner.get('host')}; only if that "
                     "machine no longer exists, `ptt unlock --force` here")
-            die("the records are locked by "
-                + (describe(owner) + ", still running" if owner else "a command starting now")
-                + "; try again")
+            die(f"the records are locked by {describe(owner)}, still running; try again"
+                if owner else "the records are locked, but the lock names no owner: it is "
+                "broken, unless it was just removed (try again; if it stays, `ptt unlock "
+                "--force`)")
         time.sleep(0.1)
     return path
 
@@ -290,7 +293,8 @@ def cmd_unlock(a):
         print("the records are not locked")
         return
     alive = owner_alive(owner) if owner else None
-    need(alive is not True, f"the lock is held by {describe(owner)}, which is running")
+    if alive is True:
+        die(f"the lock is held by {describe(owner)}, which is running")
     if alive is None and not a.force:
         die((f"the lock is held by {describe(owner)}, another machine: run `ptt unlock` "
              f"there, or `ptt unlock --force` if {owner.get('host')} no longer exists")
