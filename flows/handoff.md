@@ -66,11 +66,18 @@ Committed: yes. Open concerns: in handoff/integrator.md. Unrecorded
 agreements: none. Clear now if you like (/clear).
 ```
 
-The user's `/clear` is approval of the offer; ignoring it means continue.
-Clearing does not release the holder. In Claude Code, `/clear` starts a
-fresh session ID: continue with `/ptt-resume <name>`. In Codex, a fresh chat
-or fork continues with `$ptt-resume <name>`; continuing or compacting the
-same thread keeps its binding. Resuming with a different session ID moves
+With the offer the session leaves a handover (`ptt handover <name>`), a
+local marker, not a record. The user's `/clear`, or a new session, is
+approval of the offer; ignoring it means continue. Clearing does not
+release the holder. In Claude Code, `/clear` starts a fresh session ID; in
+Codex, so does a fresh chat or fork. The fresh session continues with
+`/ptt-resume` (`$ptt-resume` in Codex) and no name: the holder that left the
+handover. Without one, or with several, it lists the holders by their last
+write and the user names one. The handover lapses by events, never by age:
+when the holder writes again, its binding moves, or its hold ends; a
+pause of days keeps it. The session that was the holder is told once,
+through its inbox, that it continues elsewhere (G19). Continuing or
+compacting the same thread keeps its binding. Resuming with a different session ID moves
 the binding and prevents the earlier session from writing *(Proposed,
 G13, G16)*. A session never clears in the middle of a multi-round review or
 a design discussion only to save tokens: re-reading costs too.

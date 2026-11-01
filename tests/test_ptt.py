@@ -715,6 +715,49 @@ class Ptt(unittest.TestCase):
         self.assertEqual(self.ptt("inbox", "--quiet", session="I").stdout, "")
         self.assertIn("this session holds nothing", self.ptt("inbox", session="X").stdout)
 
+    def test_handover_lets_a_fresh_session_resume_without_a_name(self):
+        i = self.ptt("take", "integrator", session="A").stdout.strip()
+        self.assertIn("only that session", self.refused("handover", i, session="X"))
+        self.ptt("handover", i, session="A")
+        r = self.ptt("resume", session="B")
+        self.assertIn(f"{i} left a handover", r.stdout)
+        self.assertIn(f"this session is {i}", r.stdout)
+        self.assertFalse((self.rec / ".git" / "ptt-handover" / i).exists())
+        # the old session is told once, and its writes are refused
+        quiet = self.ptt("inbox", "--quiet", session="A").stdout
+        self.assertIn(f"{i} continues in another session", quiet)
+        self.assertEqual(self.ptt("inbox", "--quiet", session="A").stdout, "")
+        self.assertIn("continued in another session", self.refused("leave", i, session="A"))
+
+    def test_handover_lapses_when_its_holder_writes_again(self):
+        i = self.ptt("take", "integrator", session="A").stdout.strip()
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        self.ptt("handover", i, session="A")
+        status = self.rec / "handoff" / "integrator.md"
+        status.parent.mkdir(exist_ok=True)
+        status.write_text("still here\n")
+        self.ptt("record", "-m", "integrator: status", str(status), session="A")
+        self.assertIn(f"(by {i})", run("git", "-C", str(self.rec), "log", "-1",
+                                       "--format=%s").stdout)
+        menu = self.ptt("resume", session="B").stdout
+        self.assertIn("Which holder", menu)
+        self.assertNotIn("handover left", menu)
+        self.assertRegex(menu, rf"{i} +last write just now; may still be working")
+        self.assertIn(d, menu)
+        self.assertNotIn("this session is", menu)
+        self.assertFalse((self.rec / ".git" / "ptt-handover" / i).exists())
+
+    def test_resume_lists_two_handovers_instead_of_choosing(self):
+        i = self.ptt("take", "integrator", session="A").stdout.strip()
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        self.ptt("handover", i, session="A")
+        self.ptt("handover", d, session="D")
+        menu = self.ptt("resume", session="B").stdout
+        self.assertRegex(menu, rf"1\. ({i}|{d}) +handover left")
+        self.assertRegex(menu, rf"2\. ({i}|{d}) +handover left")
+        self.assertIn(f"this session is {d}", self.ptt("resume", d, session="B").stdout)
+        self.assertIn(f"{i} left a handover", self.ptt("resume", session="C").stdout)
+
     def test_inbox_quiet_never_fails(self):
         self.assertEqual(self.ptt("inbox", "--quiet").stdout, "")
         shutil.rmtree(self.rec / ".git")

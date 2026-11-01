@@ -46,7 +46,7 @@ Partitur 是一种由一位用户和多个 AI 代理会话共同开展软件项�
 | 让会话承担一个任务 | 任意空闲会话 | `/ptt-take N`（也可以使用任务名称） |
 | 查看会话的身份 | 任意会话 | `/ptt-whoami`；查看所有人用 `/ptt-whoami all` |
 | 查看与会话有关的新记录及待办事项 | 任意持有者 | `/ptt-inbox`（启用提示词钩子后，也会随你的下一条消息送达） |
-| 在 `/clear` 后或新会话中继续持有原角色 | 继续工作的会话 | `/ptt-resume <holder name>` |
+| 在 `/clear` 后或新会话中继续持有原角色 | 继续工作的会话 | `/ptt-resume`（接续在安静点留下交接标记的持有者；否则指定名字） |
 | 提交已完成的工作供审查 | 任务持有者 | `/ptt-pr-submit` |
 | 回复审查意见 | 任务持有者 | 先用 `/ptt-pr-draft-reply` 查看修改计划和回复全文，再用 `/ptt-pr-reply` 发布（提交前同样可以先用 `/ptt-pr-submit draft`） |
 | 审查并执行你的决定 | 集成者（通过 `/ptt-take integrator` 领取） | `/ptt-pr-review` |

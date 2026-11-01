@@ -5,6 +5,8 @@ Usage (NAME is the holder name a session received when it took its role or
 task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
 `T0007.1`, by its full name `T0007-slug`, or by its slug):
   ptt who                          who holds which role and task
+  ptt handover NAME                leave a handover marker: a fresh session continues
+                                   NAME with `ptt resume` and no name
   ptt unlock [--force]             remove the records lock if its owner is gone
                                    (--force: held on a machine that no longer exists)
   ptt whoami [NAME]                what NAME (default: the holder bound to this
@@ -19,7 +21,9 @@ task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
   ptt take designer|integrator|TASK   take the root design task T0000 (designer),
                                    the integrator role, or a ready task; prints the
                                    holder name
-  ptt resume NAME                  continue as NAME in this session (after /clear)
+  ptt resume [NAME]                continue as NAME in this session (after /clear); without
+                                   NAME, the holder with a handover marker, or a list of
+                                   holders by their last write
   ptt leave NAME [--status TEXT]   give up the integrator role or T0000 (designer), or
                                    ask to give up any other task
   ptt approve-leave TASK --as NAME   supervisor: accept a holder's request to leave
@@ -309,12 +313,17 @@ def git(*args, check=True, raise_=False):
     return r
 
 
+ACTOR = None                       # the holder this command writes as, when known
+
+
 def record(message, add=(), remove=(), created=(), undo=None):
     """Commit exactly `add` and `remove` (paths in the working tree, files or
     directories) as one commit, leaving everything else staged alone. The
     caller holds the lock. On any failure, `undo` runs, or the paths in
     `created` are removed, the touched paths are unstaged, and nothing is
-    recorded."""
+    recorded. The message names the writer, `(by NAME)`, unless it does."""
+    if ACTOR and ACTOR != "user" and not re.search(rf"by {re.escape(ACTOR)}\b(?![.-])", message):
+        message += f" (by {ACTOR})"
     rel = [str(p.relative_to(REC)) for p in (*add, *remove)]
     try:
         git("add", "-A", "--", *rel, check=False, raise_=True)
@@ -606,6 +615,49 @@ def holdings():
     return out
 
 
+def writes_by(name):
+    """git log options selecting commits written by holder NAME."""
+    return ["-E", "--grep", rf"by {re.escape(name)}([^A-Za-z0-9.-]|$)"]
+
+
+def last_write(name):
+    """The time of NAME's last commit in the records, or None."""
+    out = git("log", "-1", "--format=%ct", *writes_by(name), check=False).stdout.strip()
+    return int(out) if out else None
+
+
+def ago(t):
+    if t is None:
+        return "no write found"
+    d = max(0, time.time() - t)
+    for unit, size in (("days", 86400), ("h", 3600), ("min", 60)):
+        if d >= size:
+            return f"{int(d // size)} {unit} ago"
+    return "just now"
+
+
+def handover_dir():
+    return git_dir() / "ptt-handover"
+
+
+def handover(name, binding):
+    """NAME's handover marker if it is still valid, else None (and it is
+    removed). It lapses by events, never by age: when the holder writes again
+    after it, its binding moves, or its hold ends."""
+    f = handover_dir() / name
+    if not f.exists():
+        return None
+    m = dict(line.split("=", 1) for line in f.read_text().splitlines() if "=" in line)
+    valid = (binding is not None and m.get("session") == binding
+             and git("cat-file", "-e", m.get("commit", "") + "^{commit}", check=False).returncode == 0
+             and not git("log", "-1", "--format=%H", *writes_by(name),
+                         f"{m['commit']}..HEAD", check=False).stdout.strip())
+    if not valid:
+        f.unlink(missing_ok=True)
+        return None
+    return m
+
+
 def bound_here():
     """The holder bound to this session, or None."""
     sid = session_id()
@@ -704,7 +756,58 @@ def bind_note(name):
              "session, and its writes are not checked")
 
 
+def resume_choice():
+    """The holder a session continues as when the user names none: the one
+    with a valid handover marker, or None after listing the holders."""
+    held = holdings()
+    sid = session_id()
+    marked = [(n, handover(n, s[-1] if s else None)) for n, _, s in held]
+    marked = [(n, m) for n, m in marked if m]
+    if len(marked) == 1:
+        name, m = marked[0]
+        print(f"{name} left a handover {ago(float(m['time']))}; continuing it")
+        return name
+    rows = []
+    for n, _, s in held:
+        if sid and s and s[-1] == sid:
+            continue
+        m = dict(marked).get(n)
+        t = last_write(n)
+        busy = t is not None and time.time() - t < 600 and not m
+        rows.append((0 if m else 1, -(t or 0), n,
+                     f"handover left {ago(float(m['time']))}" if m else
+                     f"last write {ago(t)}" + ("; may still be working" if busy else "")))
+    if not rows:
+        print("no holder to continue; `ptt who` lists the holders")
+        return None
+    print("Which holder does this session continue as? (ptt resume NAME)")
+    for k, (_, _, n, text) in enumerate(sorted(rows), 1):
+        print(f"{k}. {n:16} {text}")
+    return None
+
+
+def cmd_handover(a):
+    """Leave a handover marker for NAME, so that a fresh session continues
+    it with `ptt resume` and no name. Only the session bound to NAME does."""
+    hits = [h for h in holdings() if h[0] == a.name]
+    need(hits, f"{a.name} holds nothing")
+    sessions = hits[0][2]
+    sid = session_id()
+    need(not sid or not sessions or sessions[-1] in (sid, None),
+         f"{a.name} is bound to another session; only that session leaves its handover")
+    handover_dir().mkdir(exist_ok=True)
+    (handover_dir() / a.name).write_text(
+        f"session={(sessions[-1] if sessions else '') or ''}\n"
+        f"commit={git('rev-parse', 'HEAD').stdout.strip()}\ntime={time.time()}\n")
+    print(f"handover left: a fresh session continues {a.name} with `ptt resume` "
+          "(/ptt-resume) and no name")
+
+
 def cmd_resume(a):
+    if not a.name:
+        a.name = resume_choice()
+        if not a.name:
+            return
     hits = [h for h in holdings() if h[0] == a.name]
     need(hits, f"{a.name} holds nothing; nothing to continue (`ptt who` lists the holders)")
     _, d, sessions = hits[0]
@@ -715,6 +818,7 @@ def cmd_resume(a):
     fields = dict(by=a.name, **bind())
     what = f"role {d.name}" if d.parent == ROLES else f"task {tid(TASK_DIR.match(d.name).group(1))}"
     add_event(d, "resume", fields, "", f"{what}: {a.name} continues in a new session")
+    (handover_dir() / a.name).unlink(missing_ok=True)
     print(f"this session is {a.name}")
     bind_note(a.name)
     if sid:
@@ -1251,9 +1355,32 @@ def inbox_ended(name, quiet):
     return True
 
 
+def inbox_moved(quiet):
+    """Tell a session, once, that its holder continues in another session."""
+    sid = session_id()
+    if not sid:
+        return False
+    for name, d, sessions in holdings():
+        if sid in sessions[:-1] and sessions[-1] != sid:
+            flag = git_dir() / "ptt-inbox" / f"moved-{sid}"
+            if flag.exists():
+                return False
+            commit = git("log", "-1", "--format=%h", "--", str(d.relative_to(REC)),
+                         check=False).stdout.strip()
+            line = (f"{name} continues in another session (records {commit}): this session "
+                    f"holds nothing now; record nothing more as {name}, and close it.")
+            print(f"ptt inbox for {name}: {line}" if quiet else line)
+            flag.parent.mkdir(exist_ok=True)
+            flag.write_text(commit + "\n")
+            return True
+    return False
+
+
 def cmd_inbox(a):
     name = a.name or bound_here()
     if not name:
+        if inbox_moved(a.quiet):
+            return
         if not inbox_ended(None, a.quiet) and not a.quiet:
             print("this session holds nothing" + ("" if session_id() else
                   " that ptt can see (no session ID); name the holder: ptt inbox NAME"))
@@ -1325,6 +1452,7 @@ def main():
 
 
 def run_main():
+    global ACTOR
     ap = argparse.ArgumentParser(prog="ptt", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -1344,10 +1472,12 @@ def run_main():
     add("tasks", all=dict(action="store_true"))
     add("inbox", quiet=dict(action="store_true"), hook=dict(action="store_true"))
     add("unlock", force=dict(action="store_true"))
+    add("handover", "name")
     sub.choices["inbox"].add_argument("name", nargs="?")
     add("show", "task")
     add("take", "what")
-    add("resume", "name")
+    add("resume")
+    sub.choices["resume"].add_argument("name", nargs="?")
     add("leave", "name", status=dict())
     add("approve-leave", "task", as_=True)
     add("free", "what", as_=True, reason=dict(required=True), force=dict(action="store_true"))
@@ -1382,9 +1512,10 @@ def run_main():
     run = globals()["cmd_" + a.cmd.replace("-", "_")]
     if a.cmd in MUTATING:
         with lock():
+            actor = a.name if a.cmd in ("leave", "resume") else getattr(a, "as_", None)
             if a.cmd not in ("take", "resume"):
-                actor = a.name if a.cmd == "leave" else a.as_
                 check_session(None if actor == "user" else actor)
+            ACTOR = actor or bound_here()
             run(a)
     else:
         run(a)

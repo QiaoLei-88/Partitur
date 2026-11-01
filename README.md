@@ -51,7 +51,7 @@ Six ideas decide everything else; when in doubt, ask which one applies.
 | have a session work on a task | any free session | `/ptt-take N` (or the task's name) |
 | know who a session is | any | `/ptt-whoami`; `/ptt-whoami all` for everyone |
 | know what is new for a session and what waits on it | any holder | `/ptt-inbox` (with an active prompt hook, it also arrives with your next message) |
-| continue a role after `/clear` or in a fresh session | the continuing session | `/ptt-resume <holder name>` |
+| continue a role after `/clear` or in a fresh session | the continuing session | `/ptt-resume` (the holder that left a handover at its quiet point; otherwise name it) |
 | submit finished work for review | the task holder | `/ptt-pr-submit` |
 | answer a review | the task holder | `/ptt-pr-draft-reply` to see the plan and reply text, then `/ptt-pr-reply` to release it (`/ptt-pr-submit draft` likewise before submitting) |
 | review and carry out your decision | the integrator (`/ptt-take integrator`) | `/ptt-pr-review` |

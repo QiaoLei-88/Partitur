@@ -89,7 +89,9 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    first; what it said earlier in the session may be stale (G18). After a
    recorded decision, or when nothing waits, offer once to be cleared if
    nothing is uncommitted, your concerns are in `integrator.md`, and nothing
-   was agreed only in conversation; state these three checks.
+   was agreed only in conversation; state these three checks, and leave a
+   handover (`<records>/bin/ptt handover <your name>`): a fresh session, or
+   this one after `/clear`, then continues with `/ptt-resume` and no name.
 
 ## Templates
 
