@@ -27,6 +27,9 @@ Changing one of these means changing the tools or skills that use it.
 | Root design task | `<records>/tasks/open/T0000-design/`, held by the designer, supervised by the user, never closed; `designer` names it in commands | D8, G10 |
 | Role records | `<records>/roles/integrator/MMMM-<kind>.md` | G1 |
 | Installed version | `<records>/.partitur-version`: the Partitur commit that installed or last updated the project | F12 |
+| Prompt hooks | `.claude/settings.json` (Claude Code) and `.codex/hooks.json` (Codex, trusted in Codex first) in the workspace root, each running `ptt inbox --quiet`; other settings there are kept | G17 |
+| Session IDs | `PTT_SESSION_ID`, else `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, `CODEX_SESSION_ID`; Codex's hook reads the event's `session_id` | G16 |
+| Inbox markers | `<records>/.git/ptt-inbox/<holder name>`: the records commit a holder last looked at; not committed | G17 |
 | Holder names | `designer-g<N>` (holders of `T0000`), `integrator-<N>`, `<kind>-<task ID>` (`track-T0007.1`), then `-2`, `-3` for later holders | G2 |
 | Stale holder | no record for 7 days, listed for the supervisor | G6 |
 | Request directories | `<records>/pr/{open,merged,closed}/NNNNNN-short-name/`, six-digit numbers | C1, C3a |

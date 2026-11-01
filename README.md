@@ -91,7 +91,9 @@ both.
    what it created: the records repository `workspace/` with
    the rules file, task and request directories, tools and skills, the
    root design task `T0000` (the designer's charter and handover), the
-   integrator's file, and the links your tools read. It lists the code
+   integrator's file, the links your tools read, and a prompt hook that
+   shows each session what is new for it (`.claude/settings.json` for
+   Claude Code; Codex's below). It lists the code
    repositories it found; one deeper down is added as a line in
    `workspace/pr/repos`. If you ran install in a plain terminal instead,
    start the installation session in the workspace root and say "Read
