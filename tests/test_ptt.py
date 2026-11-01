@@ -7,8 +7,10 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -385,6 +387,65 @@ class Ptt(unittest.TestCase):
         self.assertEqual(git("status", "--porcelain"), "")
         self.assertEqual(git("log", "-1", "--format=%s", "--", "notes.txt").strip(), "n40")
         self.assertEqual(loop.returncode, 0)
+
+    def held_lock(self):
+        """A ptt command holding the records lock: a pre-commit hook keeps it
+        in `git commit` until killed."""
+        hook = self.rec / ".git" / "hooks" / "pre-commit"
+        hook.write_text("#!/bin/sh\nsleep 60\n")
+        hook.chmod(0o755)
+        note = self.rec / "note.txt"
+        note.write_text("x\n")
+        proc = subprocess.Popen(["python3", str(self.rec / "bin" / "ptt"), "record", "-m",
+                                 "held", str(note)], env=self.env(), start_new_session=True,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        owner = self.rec / ".git" / "ptt.lock.d" / "owner"
+        for _ in range(100):
+            if owner.exists():
+                break
+            time.sleep(0.05)
+        self.assertTrue(owner.exists())
+        return proc, hook, owner
+
+    def kill(self, proc, hook):
+        os.killpg(proc.pid, signal.SIGKILL)
+        proc.wait()
+        hook.unlink()
+        (self.rec / ".git" / "index.lock").unlink(missing_ok=True)   # git's own, killed too
+        run("git", "-C", str(self.rec), "reset", "-q")
+
+    def test_lock_of_a_dead_process_is_removed(self):
+        proc, hook, owner = self.held_lock()
+        env = dict(self.env(), PTT_LOCK_WAIT="0.5")
+        busy = run("python3", str(self.rec / "bin" / "ptt"), "take", "integrator",
+                   env=env, check=False)
+        self.assertIn("still running", busy.stderr)
+        self.assertIn("which is running", self.refused("unlock"))
+        self.kill(proc, hook)
+        self.assertTrue(owner.exists())                 # left behind by the killed command
+        r = self.ptt("take", "integrator")
+        self.assertIn("removed a stale lock", r.stderr)
+        self.assertFalse(owner.exists())
+
+    def test_reused_process_number_does_not_keep_a_lock(self):
+        proc, hook, owner = self.held_lock()
+        self.kill(proc, hook)
+        fields = owner.read_text().replace(f"pid={proc.pid}", f"pid={os.getpid()}")
+        owner.write_text(re.sub(r"start=.*", "start=another process", fields))
+        self.assertIn("removed the lock", self.ptt("unlock").stdout)
+        self.assertIn("not locked", self.ptt("unlock").stdout)
+
+    def test_lock_of_another_machine_is_removed_only_by_force(self):
+        proc, hook, owner = self.held_lock()
+        self.kill(proc, hook)
+        owner.write_text(re.sub(r"machine=.*", "machine=elsewhere", owner.read_text()))
+        env = dict(self.env(), PTT_LOCK_WAIT="0.3")
+        r = run("python3", str(self.rec / "bin" / "ptt"), "take", "integrator",
+                env=env, check=False)
+        self.assertIn("another machine", r.stderr)
+        self.assertIn("unlock --force", self.refused("unlock"))
+        self.assertIn("removed the lock", self.ptt("unlock", "--force").stdout)
+        self.ptt("take", "integrator")
 
     def test_failed_record_leaves_nothing(self):
         d = self.designer()

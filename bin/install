@@ -94,9 +94,12 @@ points to this Partitur. Without --scope, nothing is changed and this text
 is printed.
 """
 import argparse
+import atexit
 import fcntl
 from datetime import datetime, timezone
 import hashlib
+import importlib.machinery
+import importlib.util
 import json
 import os
 import shlex
@@ -594,10 +597,17 @@ def project_plan(a, tools, repos, name, src, quiet=False):
 
 def records_lock(rec):
     """The lock every ptt command takes (F11), so that install never writes
-    while a session records."""
+    while a session records: the flock older ptt versions take, and the lock
+    directory of this Partitur's ptt, taken with its own code."""
     r = subprocess.run(["git", "-C", str(rec), "rev-parse", "--git-common-dir"],
                        capture_output=True, text=True)
-    f = open((rec / r.stdout.strip()).resolve() / "ptt.lock", "w")
+    gitdir = (rec / r.stdout.strip()).resolve()
+    sys.dont_write_bytecode = True        # no __pycache__ among the files install ships
+    loader = importlib.machinery.SourceFileLoader("ptt", str(HERE / "project" / "bin" / "ptt"))
+    ptt = importlib.util.module_from_spec(importlib.util.spec_from_loader("ptt", loader))
+    loader.exec_module(ptt)
+    atexit.register(ptt.release_dir, ptt.acquire(gitdir))
+    f = open(gitdir / "ptt.lock", "w")
     fcntl.flock(f, fcntl.LOCK_EX)
     return f
 

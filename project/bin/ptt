@@ -5,6 +5,8 @@ Usage (NAME is the holder name a session received when it took its role or
 task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
 `T0007.1`, by its full name `T0007-slug`, or by its slug):
   ptt who                          who holds which role and task
+  ptt unlock [--force]             remove the records lock if its owner is gone
+                                   (--force: held on a machine that no longer exists)
   ptt whoami [NAME]                what NAME (default: the holder bound to this
                                    session) holds: role or task, supervisor, session
   ptt inbox [NAME] [--quiet] [--hook]
@@ -85,6 +87,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import time
@@ -131,15 +134,165 @@ def git_dir():
     return (REC / r.stdout.strip()).resolve()
 
 
+# The lock is a directory, `ptt.lock.d` in the records repository's Git
+# directory: creating a directory is atomic wherever that directory lives, so
+# sessions on several machines sharing the records repository exclude each
+# other too. It names its owner (machine, process, process start), and a
+# lock is removed only when its owner is known to be dead, never for its age:
+# on this machine by checking the process, on another one only by `ptt unlock`
+# run there, or by the user's `ptt unlock --force`. Older ptt versions took
+# flock on `ptt.lock`; it is still taken, so that they are excluded during an
+# update.
+
+def machine_id():
+    for f in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
+        try:
+            return Path(f).read_text().strip()
+        except OSError:
+            pass
+    return socket.gethostname()
+
+
+def process_start(pid):
+    """An identity of process `pid`'s start, so that a reused process number
+    is not mistaken for the owner; None if it cannot be read."""
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text()
+        boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
+        return boot + ":" + stat.rsplit(")", 1)[1].split()[19]
+    except (OSError, IndexError):
+        pass
+    try:
+        r = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True,
+                           text=True)
+    except OSError:
+        return None
+    return " ".join(r.stdout.split()) or None
+
+
+def lock_owner(path):
+    """The owner fields of the lock directory `path`, or None if it has none
+    (it is being created, or was removed)."""
+    try:
+        return dict(line.split("=", 1) for line in (path / "owner").read_text().splitlines()
+                    if "=" in line)
+    except OSError:
+        return None
+
+
+def owner_alive(owner):
+    """True or False for an owner on this machine, None for another machine."""
+    if owner.get("machine") != machine_id():
+        return None
+    pid = int(owner.get("pid", "0"))
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        pass
+    start = process_start(pid)
+    return not (start and owner.get("start") and start != owner["start"])
+
+
+def describe(owner):
+    since = float(owner.get("since", "0"))
+    return (f"{owner.get('host', '?')} process {owner.get('pid', '?')}, holding it for "
+            f"{time.time() - since:.0f} s")
+
+
+def take_dir(path):
+    """Create the directory `path` with this process as its owner, atomically:
+    an owner file is written into a private directory renamed into place."""
+    tmp = path.with_name(f"{path.name}.{socket.gethostname()}.{os.getpid()}.tmp")
+    shutil.rmtree(tmp, ignore_errors=True)
+    tmp.mkdir()
+    pid = os.getpid()
+    (tmp / "owner").write_text(f"host={socket.gethostname()}\nmachine={machine_id()}\n"
+                               f"pid={pid}\nstart={process_start(pid) or ''}\n"
+                               f"since={time.time()}\n")
+    try:
+        os.rename(tmp, path)
+        return True
+    except OSError:
+        shutil.rmtree(tmp, ignore_errors=True)
+        return False
+
+
+def release_dir(path):
+    owner = lock_owner(path)
+    if owner and owner.get("machine") == machine_id() and owner.get("pid") == str(os.getpid()):
+        shutil.rmtree(path, ignore_errors=True)
+
+
+def break_stale(path, owner):
+    """Remove the lock `path` of `owner`, known dead, unless another process
+    did so meanwhile; breakers exclude each other with a lock of their own."""
+    breaker = path.with_name(path.name + ".break")
+    if not take_dir(breaker):
+        dead = lock_owner(breaker)
+        if dead and owner_alive(dead) is False:
+            shutil.rmtree(breaker, ignore_errors=True)
+        return
+    try:
+        if lock_owner(path) == owner:
+            shutil.rmtree(path, ignore_errors=True)
+            print(f"ptt: removed a stale lock of {owner.get('host')} process "
+                  f"{owner.get('pid')}, which is gone", file=sys.stderr)
+    finally:
+        release_dir(breaker)
+
+
+def acquire(gitdir, wait=None):
+    """Take the records lock in `gitdir`; die after `wait` seconds."""
+    path = Path(gitdir) / "ptt.lock.d"
+    wait = float(os.environ.get("PTT_LOCK_WAIT", "60")) if wait is None else wait
+    deadline = time.time() + wait
+    while not take_dir(path):
+        owner = lock_owner(path)
+        if owner and owner_alive(owner) is False:
+            break_stale(path, owner)
+            continue
+        if time.time() > deadline:
+            if owner and owner_alive(owner) is None:
+                die(f"the records are locked by {describe(owner)}, another machine. If that "
+                    f"command is gone, run `ptt unlock` on {owner.get('host')}; only if that "
+                    "machine no longer exists, `ptt unlock --force` here")
+            die("the records are locked by "
+                + (describe(owner) + ", still running" if owner else "a command starting now")
+                + "; try again")
+        time.sleep(0.1)
+    return path
+
+
 @contextmanager
 def lock():
-    """Serialize all changes of every session on this machine."""
-    with open(git_dir() / "ptt.lock", "w") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
-        try:
+    """Serialize all changes of every session sharing the records."""
+    path = acquire(git_dir())
+    try:
+        with open(git_dir() / "ptt.lock", "w") as f:
+            fcntl.flock(f, fcntl.LOCK_EX)
             yield
-        finally:
-            fcntl.flock(f, fcntl.LOCK_UN)
+    finally:
+        release_dir(path)
+
+
+def cmd_unlock(a):
+    """Remove the records lock if its owner is gone; --force removes one held
+    on another machine, for when that machine no longer exists."""
+    path = git_dir() / "ptt.lock.d"
+    owner = lock_owner(path)
+    if not path.exists():
+        print("the records are not locked")
+        return
+    alive = owner_alive(owner) if owner else None
+    need(alive is not True, f"the lock is held by {describe(owner)}, which is running")
+    if alive is None and not a.force:
+        die((f"the lock is held by {describe(owner)}, another machine: run `ptt unlock` "
+             f"there, or `ptt unlock --force` if {owner.get('host')} no longer exists")
+            if owner else "the lock names no owner; `ptt unlock --force` removes it")
+    shutil.rmtree(path)
+    print("removed the lock of " + (describe(owner) if owner else "no owner"))
 
 
 def git(*args, check=True, raise_=False):
@@ -1190,6 +1343,7 @@ def run_main():
     sub.choices["whoami"].add_argument("name", nargs="?")
     add("tasks", all=dict(action="store_true"))
     add("inbox", quiet=dict(action="store_true"), hook=dict(action="store_true"))
+    add("unlock", force=dict(action="store_true"))
     sub.choices["inbox"].add_argument("name", nargs="?")
     add("show", "task")
     add("take", "what")

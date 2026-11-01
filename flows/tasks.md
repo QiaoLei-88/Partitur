@@ -141,8 +141,14 @@ In Codex the commands start with `$` instead of `/`.
   message sees nothing until it does. Holder changes are not in it, so a
   session that names who holds a role or task, or who acts next, runs
   `ptt who` at that moment rather than trusting an earlier answer (G18).
-- **One machine.** The lock that keeps concurrent commands consistent works
-  for sessions on the same machine sharing the records repository.
+- **One shared records directory.** The lock that keeps concurrent commands
+  consistent is a directory in the records repository's Git directory, so
+  it works for sessions on every machine that shares that directory, as
+  long as creating a directory there is atomic. A lock left by a killed
+  command is removed when its process is known to be gone: automatically on
+  the same machine, by `ptt unlock` on the machine that held it, or, if
+  that machine no longer exists, by the user's `ptt unlock --force`. Its
+  age never decides (F11).
 - **One gate for the records repository.** Every write to it goes through
   `ptt` (`ptt record` for request messages, `status.md`, and `handoff/integrator.md`),
   which commits exactly its paths under the lock all sessions share. Git
