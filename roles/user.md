@@ -21,8 +21,10 @@ many sessions without holding their details.
 
 ## Does
 
-- Carries notices between sessions ("check this", "request 13 needs
-  update"); the substance is in records (D12).
+- Approves records by running the `/ptt-*` command, or by an AtE naming
+  them, and decides by option number (`1 AtE`) *(Proposed, A12, A13)*.
+- Carries notices between sessions only where no prompt hook delivers
+  them; the substance is in records (D12, G17).
 - Supplies inputs only the user has: data, cases, baselines, priorities.
 
 ## Need not do

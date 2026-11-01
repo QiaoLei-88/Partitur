@@ -14,7 +14,10 @@ use, *(Proposed)* one that is neither.
 - **Session.** One run of an AI agent. Disposable: it may end at any time,
   and nothing it alone remembers survives it (B7). It holds a role or a
   task only by taking it (`/ptt-take`), which records it and gives it a
-  holder name *(Proposed, G1, G2)*.
+  holder name *(Proposed, G1, G2)*. Where the agent tool gives a session ID,
+  the holder is bound to it; a fresh or cleared session continues a holder
+  only when the user names it (`/ptt-resume`), and the earlier session can
+  no longer write as it *(Proposed, G13, G16)*.
 - **Role.** A contract a session holds: what it decides, what it may write,
   what it hands on. Roles are stable; sessions holding them change. The
   [user](roles/user.md) and the [integrator](roles/integrator.md) serve the
@@ -127,7 +130,7 @@ apart.
 
 ```
                user (authority)
-         AtE ↓   ↑ reports, questions; notices between sessions
+         AtE ↓   ↑ reports, questions
              designer ──  tasks   ──► tracks, workers, sub-designers
                 ▲                          │
                 └─ status.md, notes ───────┘
@@ -135,6 +138,9 @@ apart.
                                      ◄── decision, recorded ──
 ```
 
-Findings travel as records; the user carries the notice that something is
-there (D12). Sessions do not message each other *(Proposed otherwise,
-D12b)*.
+Findings travel as records (D12). The notice that something is there
+reaches a holder through its inbox: `ptt inbox` lists what changed for it
+since it last looked, and a prompt hook adds that to the user's next
+message *(Proposed, G17)*. Where no hook runs, the holder runs `/ptt-inbox`
+or the user carries the notice. Sessions do not message each other
+*(Proposed otherwise, D12b)*.
