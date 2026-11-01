@@ -47,11 +47,13 @@ designer, for example `T0007` (N2; relative roles *(Proposed, N1)*; taking
 ## Lifecycle
 
 Takes its design task, starts from its charter and `status.md`, and checks
-the state in them against the records *(Proposed, D13)*. Cannot leave while
-a subordinate's leave request, done report, or silent holder anywhere below
-it waits (*(Proposed, G5)*). Ends by updating `status.md` (state, open
-items, next steps, all by lasting references) and stops writing once its
-successor takes over (D8). A handover may come at a stage boundary or
-mid-stage, whenever the session should end. It does not offer to be cleared
-mid-stage: its discussion context is what the stage runs on *(Proposed,
-D16)*.
+the state in them against the records *(Proposed, D13)*. Learns of its
+holders' `status.md`, done reports, leave requests, and notes through
+`/ptt-inbox` (G17); after `/clear`, the user continues it with `/ptt-resume
+<name>` (G13, G16). Cannot leave while a subordinate's leave request, done
+report, or silent holder anywhere below it waits (*(Proposed, G5)*). Ends by
+updating `status.md` (state, open items, next steps, all by lasting
+references) and stops writing once its successor takes over (D8). A handover
+may come at a stage boundary or mid-stage, whenever the session should end.
+It does not offer to be cleared mid-stage: its discussion context is what
+the stage runs on *(Proposed, D16)*.

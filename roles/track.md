@@ -30,8 +30,12 @@ probes, records findings. Does not decide design (B3).
 ## Lifecycle *(Proposed, G1-G18)*
 
 Takes its task (`/ptt-take N`) and starts from the charter, amendments, and
-any earlier holder's `status.md`. Reports acceptance met with `/ptt-done`;
-the supervisor closes the task. Leaves early only with the supervisor's
-approval (`/ptt-leave`), after bringing `status.md` up to date, so that the
-next holder continues from it. Offers to be cleared after each
-decided request (D16). See [roles and tasks](../flows/tasks.md).
+any earlier holder's `status.md`. Learns of amendments, reviews of its
+requests (answered with `/ptt-pr-draft-reply`, then `/ptt-pr-reply`), and
+decisions through `/ptt-inbox` (G17). Reports acceptance met with
+`/ptt-done`; the supervisor closes the task, and the inbox says so. After
+`/clear`, the user continues it with `/ptt-resume <name>` (G13, G16). Leaves
+early only with the supervisor's approval (`/ptt-leave`), after bringing
+`status.md` up to date, so that the next holder continues from it. Offers to
+be cleared after each decided request (D16). See [roles and
+tasks](../flows/tasks.md).
