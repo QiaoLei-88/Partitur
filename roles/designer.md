@@ -4,7 +4,7 @@ Holds the design of one design scope, as the holder of a `design` task.
 The root designer holds the root design task `T0000`, chartered by the user
 (`/ptt-take designer`); a sub-designer holds a `design` task of its parent
 designer, for example `T0007` (N2; relative roles *(Proposed, N1)*; taking
-*(Proposed, G1)*). Both work the same way, from their task's charter and
+(G1)). Both work the same way, from their task's charter and
 `status.md`.
 
 ## Owns (writes)
@@ -12,8 +12,8 @@ designer, for example `T0007` (N2; relative roles *(Proposed, N1)*; taking
 - The scope's design document: decisions labelled Agreed, Proposed, Open,
   with their evidence (D10).
 - The tasks of its scope: their charters while drafts, amendments after
-  release, and their closing; never a holder's `status.md` (D1, D2;
-  *(Proposed, G8-G12)*).
+  release, and their closing; never a holder's `status.md` (D1, D2,
+  G8, G11, G12).
 - Its design task's `status.md`, its handover (D8).
 
 ## Decides, with the user
@@ -30,7 +30,8 @@ designer, for example `T0007` (N2; relative roles *(Proposed, N1)*; taking
 - Records a note's outcome so that its author can delete it (D3).
 - Supervises its tasks' holders: approves or questions leave requests,
   closes or reopens done reports, and checks on a holder with no record for
-  days, freeing the task if the holder is gone *(Proposed, G4-G6)*.
+  days, freeing the task if the holder is gone (G4; freeing *(Proposed,
+  G5, G6)*).
 - Gives independent opinions; labels nothing Agreed that the user has not
   agreed in the wording recorded (A4, D17). Why: an agreed intent with changed
   wording is not an agreed decision; the user confirms the words.
@@ -39,7 +40,7 @@ designer, for example `T0007` (N2; relative roles *(Proposed, N1)*; taking
 
 ## May not
 
-- Implement: code belongs to worker sessions *(Proposed, B5b)*, probes to
+- Implement: code belongs to worker sessions (B5b), probes to
   tracks (E8) (B2).
 - Review or merge its own requests (C5).
 - Write another session's `status.md`, notes, or outputs (B8).

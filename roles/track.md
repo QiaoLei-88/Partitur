@@ -27,7 +27,7 @@ probes, records findings. Does not decide design (B3).
 - Work beyond its charter; new work needs an amendment or a new task from
   the designer (B3).
 
-## Lifecycle *(Proposed, G1-G18)*
+## Lifecycle (G1-G18; *Proposed: G5-G7, G10, G14, G15, G18*)
 
 Takes its task (`/ptt-take N`) and starts from the charter, amendments, and
 any earlier holder's `status.md`. Learns of amendments, reviews of its

@@ -56,9 +56,9 @@ repository, and a table maps repositories to checkouts and main branches
 10. **Merge.** `--no-ff`, only after the main branch is checked again to be
     an ancestor of the head, with the message `Merge <branch> (pr NNNNNN)`;
     the request directory is then moved and recorded in one step
-    (`ptt pr-move`) (C10, C18; *(Proposed, F11)*).
+    (`ptt pr-move`) (C10, C18, F11).
 11. **Cleanup** after a cooldown: worktrees, branches, recovery tags;
-    rejected heads kept as `archive/pr-NNNNNN` *(Adopted, C11)*.
+    rejected heads kept as `archive/pr-NNNNNN` (C11).
 12. **Withdrawal**: the user may withdraw a request; the integrator records
     it as a decision and moves the request to `closed/` *(Proposed, C19)*.
 13. **No AI attribution** in commits, merges, or messages, unless the
@@ -72,5 +72,5 @@ repository, and a table maps repositories to checkouts and main branches
 | review | user: decide |
 | decision recorded, not yet carried out | integrator: merge or move the directory |
 | decision: changes requested | requester: reply |
-| decision: merged, rejected, or withdrawn | integrator: cleanup after the cooldown *(Adopted, C11)* |
+| decision: merged, rejected, or withdrawn | integrator: cleanup after the cooldown (C11) |
 | cleanup | nobody: the request is finished |

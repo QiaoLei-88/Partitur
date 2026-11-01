@@ -1,4 +1,4 @@
-# Roles and tasks *(Proposed, G1-G18)*
+# Roles and tasks (G1-G18; *Proposed: G5-G7, G10, G14, G15, G18*)
 
 How a session gets its role, how work is cut into tasks, and how both pass
 from session to session. Every step is a command the user runs in a

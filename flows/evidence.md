@@ -32,4 +32,4 @@ A claim without a label is a claim the reader cannot weigh.
   pass (E5).
 - Unit tests live with the code and are permanent; fixed cases and expected
   results in their own repository; output becomes expected only by a
-  deliberate commit *(Adopted, E3a, E3b)*.
+  deliberate commit (E3a, E3b).

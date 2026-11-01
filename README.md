@@ -166,9 +166,9 @@ documents. Command templates in `project/skills/` are named `SKILL.md.in`;
 install fills in the records directory and writes each project's `SKILL.md`.
 The templates themselves are not discoverable command skills.
 
-Taking roles and tasks, the install command, and Codex support are recent
-and marked *Proposed* in the [rules index](rules.md) until they have been
-used in a real project.
+Taking roles and tasks, the install command, and the prompt hooks are in
+use in the origin project; the [rules index](rules.md) marks each rule
+still *Proposed*, such as freeing a silent holder or sub-design scopes.
 
 ## Contents
 

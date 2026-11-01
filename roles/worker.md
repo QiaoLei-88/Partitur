@@ -1,7 +1,7 @@
-# Worker *(Proposed, B5b)*
+# Worker
 
 Implements code as the holder of a `worker` task: with its tests, in a
-worktree, delivered through requests (B5a).
+worktree, delivered through requests (B5a, B5b).
 
 ## Owns (writes)
 
@@ -18,7 +18,7 @@ worktree, delivered through requests (B5a).
   then the release (`/ptt-pr-reply`); on a rewrite tags the old head and
   gives the mapping and range-diff (C6, C8).
 - Keeps unit tests permanent; weakening one is a change of its own
-  *(Adopted, E3a)*.
+  (E3a).
 - Brings design questions back to the designer instead of settling them in
   code (N3).
 
@@ -27,7 +27,7 @@ worktree, delivered through requests (B5a).
 - Merge, or commit to a main branch (C5, F2).
 - Change the design document or another session's records (B8).
 
-## Lifecycle *(Proposed, G1-G18)*
+## Lifecycle (G1-G18; *Proposed: G5-G7, G10, G14, G15, G18*)
 
 As a track: takes its task, reports done, leaves only with the
 supervisor's approval, learns of reviews, amendments, and the close through

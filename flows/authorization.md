@@ -7,8 +7,8 @@
 | (none) | Discussion. Agreement, praise, or a plan does not authorize anything *(Adopted, A1)*. |
 | `AtE` | Approval to Execute: the explicit authorization for the task it is attached to (A2). |
 | `AtEiYA` | AtE if you agree: form an independent view first; execute only if you agree, otherwise explain and keep discussing (A3). |
-| standing AtE | Authorization for a whole scope or repository, given to one session *(Adopted, A8)*. |
-| a `/ptt-*` command, or AtE naming records | The user's approval for a record (draft, release, done report, close, leave, request message): the command approves its own record and nothing more, unless it carries out a draft the user saw (`ptt-pr-submit` after its `draft`, `ptt-pr-reply` after `ptt-pr-draft-reply`); an AtE approves the records it names, several at once. Taking a role or task only by `/ptt-take` in the taking session *(Proposed, A12)*. |
+| standing AtE | Authorization for a whole scope or repository, given to one session (A8). |
+| a `/ptt-*` command, or AtE naming records | The user's approval for a record (draft, release, done report, close, leave, request message): the command approves its own record and nothing more, unless it carries out a draft the user saw (`ptt-pr-submit` after its `draft`, `ptt-pr-reply` after `ptt-pr-draft-reply`); an AtE approves the records it names, several at once. Taking a role or task only by `/ptt-take` in the taking session (A12). |
 
 ## Rules
 
@@ -24,7 +24,7 @@
 - Rewriting a main branch, merged commits, or the records repository needs
   its own authorization and a recovery reference first (A7).
 
-## Asking for a decision *(Proposed, A13)*
+## Asking for a decision (A13)
 
 When the user must decide, the session asks with a numbered list: its
 recommendation first and marked, one line per option, and always the last

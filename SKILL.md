@@ -42,7 +42,7 @@ workspace root, the directory holding its code checkouts:
 
 It detects the agent tools on this machine and installs for those; if the
 project should serve a tool that is not installed here, add `--tool all` (ask
-the user). The command is *Proposed* (F9, F10): report anything unexpected.
+the user). The command is in use (F9, F10); report anything unexpected.
 Everything else has a default (see [parameters](parameters.md)); `--repo` is
 needed only for checkouts not directly in the workspace root, which can also
 be added later as lines in `<records>/pr/repos`. Report the output to the
@@ -79,16 +79,17 @@ Then, with the user:
    - **Partitur's rules the project lacks** come with the block. Ask one
      question for all of them: adopt the block. Name the rules not yet
      exercised in practice *(Proposed, T1)*: a successor checking its
-     handover against the records; worker sessions; withdrawing a request;
-     offering to be cleared at quiet points; taking roles and tasks with
-     supervised leaving (G1-G18). The user drops one only by saying so,
-     as a stated deviation.
+     handover against the records; withdrawing a request; offering to be
+     cleared at quiet points; and of the task rules, refusing to leave while
+     something waits, freeing a silent holder, sub-design scopes, and
+     checking holders before naming them (G5-G7, G10, G14, G15, G18). The
+     user drops one only by saying so, as a stated deviation.
 
    Present the conflicts and the one block question together. On the
    user's approval, run install again with `--merge-rules` and write the
    project's part after the block as you sorted it. A new project gets the
    block at install; fill in its "Project Rules": domain rules, and any
-   choice that differs from the defaults *(Proposed, T2)*.
+   choice that differs from the defaults (T2).
 2. **Repositories.** If install warns that requests name a repository the
    table lacks, or a checkout lies deeper than the workspace root, propose
    the `--add-repo NAME:CHECKOUT:MAIN` line and run it when the user agrees.

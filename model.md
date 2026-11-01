@@ -14,10 +14,10 @@ use, *(Proposed)* one that is neither.
 - **Session.** One run of an AI agent. Disposable: it may end at any time,
   and nothing it alone remembers survives it (B7). It holds a role or a
   task only by taking it (`/ptt-take`), which records it and gives it a
-  holder name *(Proposed, G1, G2)*. Where the agent tool gives a session ID,
+  holder name (G1, G2). Where the agent tool gives a session ID,
   the holder is bound to it; a fresh or cleared session continues a holder
   only when the user names it (`/ptt-resume`), and the earlier session can
-  no longer write as it *(Proposed, G13, G16)*.
+  no longer write as it (G13, G16).
 - **Role.** A contract a session holds: what it decides, what it may write,
   what it hands on. Roles are stable; sessions holding them change. The
   [user](roles/user.md) and the [integrator](roles/integrator.md) serve the
@@ -33,7 +33,7 @@ use, *(Proposed)* one that is neither.
   records and files, and requests, beside the code repositories; each agent
   tool's entry point links to its rules file instead of copying it (F1).
   Sessions commit to it directly, each only the paths it owns (C14), all
-  through `ptt record` under one lock *(Proposed, F11)*; it has no
+  through `ptt record` under one lock (F11); it has no
   requests of its own.
 - **Code repository.** A repository the project delivers into, with one
   **main branch** that changes only by merges of decided requests (C5,
@@ -47,7 +47,8 @@ use, *(Proposed)* one that is neither.
   directory under `tasks/` with the designer's *charter* (what to do, what
   to read, where results go, what is out of scope, when it is done; D1),
   the holder's `status.md` (D2), and its events (release, take, leave,
-  done, close) *(Proposed, G8-G12)*. A `design` task opens a sub-scope.
+  done, close) (G8, G9, G11, G12). A `design` task opens a sub-scope
+  *(Proposed, G10)*.
   The root design task `T0000` is the root designer's: chartered by the
   user, never closed, its `status.md` the handover from one designer to the
   next (D8). A task's ID is `T`, its number, and its slug
@@ -141,6 +142,6 @@ apart.
 Findings travel as records (D12). The notice that something is there
 reaches a holder through its inbox: `ptt inbox` lists what changed for it
 since it last looked, and a prompt hook adds that to the user's next
-message *(Proposed, G17)*. Where no hook runs, the holder runs `/ptt-inbox`
+message (G17). Where no hook runs, the holder runs `/ptt-inbox`
 or the user carries the notice. Sessions do not message each other
 *(Proposed otherwise, D12b)*.
