@@ -780,6 +780,24 @@ class InstallProject(unittest.TestCase):
         self.assertFalse((self.root / ".claude" / "skills" / "partitur").exists())
         self.assertTrue((self.root / ".agents" / "skills" / "partitur").is_symlink())
 
+    def test_user_link_added_later_makes_project_link_redundant(self):
+        self.install(tool="all")
+        run("python3", str(INSTALL), "--scope", "user", "--tool", "all", env=self.env)
+        out = self.install(tool="all").stdout
+        self.assertRegex(out, r"redundant\s+\.agents/skills/partitur")
+        self.assertRegex(out, r"redundant\s+\.claude/skills/partitur")
+        self.assertTrue((self.root / ".agents/skills/partitur").is_symlink())
+        self.assertRegex(self.install("--update", tool="all").stdout,
+                         r"removed\s+\.agents/skills/partitur")
+        self.assertFalse((self.root / ".agents/skills/partitur").is_symlink())
+        self.assertFalse((self.root / ".claude/skills/partitur").is_symlink())
+        project = skill_files(self.root / ".agents/skills")
+        self.assertEqual(len(project) + 1, 1 + N_SKILLS)
+        # uninstall also removes a redundant link left by an install without --update
+        (self.root / ".agents/skills/partitur").symlink_to(HERE)
+        self.install("--uninstall", tool="all")
+        self.assertFalse((self.root / ".agents/skills/partitur").is_symlink())
+
     def test_codex_user_and_project_skills_do_not_overlap(self):
         run("python3", str(INSTALL), "--scope", "user", "--tool", "codex", env=self.env)
         self.install("--records", "partitur-records", tool="codex")

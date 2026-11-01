@@ -657,6 +657,19 @@ def read_stamp(path):
     return None
 
 
+def redundant_links(root, tools):
+    """The project's own `partitur` links to this Partitur that a user-scope
+    link makes redundant: with both, Codex would list the skill twice."""
+    out = []
+    for tool in tools:
+        tool_dir = TOOLS[tool][1]
+        link = root / tool_dir / "skills" / "partitur"
+        if ((Path.home() / tool_dir / "skills" / "partitur").exists() and link.is_symlink()
+                and Path(os.readlink(link)) == HERE):
+            out.append(link)
+    return out
+
+
 def scope_project(a, tools, report):
     root = a.project.resolve()
     if not root.is_dir():
@@ -681,6 +694,9 @@ def scope_project(a, tools, report):
             print("warning   unknown installing commit; comparing with this Partitur instead")
             old = delivered(project_plan(a, tools, [], name, Source(), quiet=True))
         kept = [rel for rel, e in old.items() if not remove_entry(root, rel, e, a, report)]
+        for link in redundant_links(root, tools):
+            link.unlink()
+            report("removed", link)
         stamp.unlink()
         report("removed", stamp)
         if kept:
@@ -725,16 +741,22 @@ def scope_project(a, tools, report):
                   "it, and rerun")
     plan = project_plan(a, tools, merge_repos(repos, add_repos), name, Source())
     apply(root, plan, old, a, report)
+    for link in redundant_links(root, tools):
+        if a.update:
+            link.unlink()
+            report("removed", link, "linked for the user already")
+        else:
+            report("redundant", link, "linked for the user already; --update removes it")
     set_repos(a, root, rec, table, repos, add_repos, report)
     now = partitur_commit()
     c = report.counts
-    pending = c.get("outdated") or c.get("obsolete") or c.get("superseded")
+    pending = any(c.get(k) for k in ("outdated", "obsolete", "superseded", "redundant"))
     if not stamp.exists() or a.update or not pending:
         stamp.write_text("partitur " + (now or "uncommitted") + "\n")
     if not now:
         print("\nwarning   this Partitur has uncommitted changes; a later update cannot find "
               "files it no longer ships. Install from a committed Partitur.")
-    if (c.get("outdated") or c.get("obsolete")) and not a.update:
+    if (c.get("outdated") or c.get("obsolete") or c.get("redundant")) and not a.update:
         print("\nThis Partitur is newer: rerun with --update to bring the project up to it.")
     if c.get("superseded"):
         print("\nSuperseded files hold the project's content, so Partitur never removes them: "
@@ -889,9 +911,9 @@ def write_report(a, tools, report, output):
         steps.append("Files reported \"modified\" or \"differs\" were left alone: tell the "
                      "user which matter, and whether `--update --force` (with a backup) or "
                      "keeping them is better.")
-    if c.get("outdated") or c.get("obsolete"):
-        steps.append("Files reported \"outdated\" or \"obsolete\": `--update` brings them "
-                     "up to this Partitur; ask the user.")
+    if c.get("outdated") or c.get("obsolete") or c.get("redundant"):
+        steps.append("Files reported \"outdated\", \"obsolete\", or \"redundant\": "
+                     "`--update` brings them up to this Partitur; ask the user.")
     if any(c.get(k) for k in ("created", "updated", "replaced", "removed", "merged")):
         steps.append(f"When the steps above are done, record the records repository: "
                      f"`{R}/bin/ptt record -m \"install Partitur\" {R}`.")
