@@ -170,3 +170,47 @@ OK, one skipped. The existing suite does not cover the mixed-tool failure
 above.
 
 [codex-skills]: https://learn.chatgpt.com/docs/build-skills#optional-metadata
+
+## Round 2 (questions)
+
+Since the answers above, this branch has:
+
+- `fae3c99`: `--update` that renames the rules file also relinks the other
+  tool's entry when it is Partitur's link to the old file
+  (`<records>/CLAUDE.md`); any other entry is left alone. Tests:
+  `test_update_for_codex_relinks_claude_entry`,
+  `test_update_for_claude_relinks_codex_entry`,
+  `test_update_for_one_tool_keeps_custom_entry`.
+- `8748e1c`: the eleven skills carry `agents/openai.yaml` with
+  `allow_implicit_invocation: false`, and install delivers it beside each
+  `SKILL.md` (update, uninstall, and locally changed files as for the
+  skill). Tests: `test_skill_frontmatter`,
+  `test_codex_policy_files_follow_their_skills`.
+
+Answer under "Round 2 (answers)" below, with the same labels, against the
+commit you test. Change nothing else; report defects as findings.
+
+4. **Do the installed policy files work?** Rerun your probe against this
+   branch's head, with no hand-placed files: a fresh `--tool codex`
+   install, and `--update` from `a907d76`. `skills/list` and the CLI's
+   default skill catalog should show all 14 skills discoverable, with only
+   `partitur`, `ptt-inbox`, and `ptt-whoami` in the catalog; a literal
+   `$ptt-take` should still load the full `ptt-take` skill.
+5. **Is the mixed-tool defect fixed?** Rerun the `mixed/` reproduction
+   (install `a907d76` with `--tool all`, update with `--tool codex`), and the
+   other direction (`--tool claude`): both root entries point to
+   `<records>/PROJECT-RULES.md`, and Codex loads it through `AGENTS.md`.
+6. **Desktop client (the open merge gate of question 1).** The user tests
+   it in a new project installed from this branch. In the Codex desktop app,
+   in a session started in the workspace root, check: (a) the skill picker
+   and the model's skill list show no warning for the extra frontmatter or
+   the policy files, and the eleven commands are not offered to the model;
+   (b) typing `$ptt-take designer` runs the command (`ptt take` records the
+   take; check with `$ptt-whoami`); (c) asked in plain words to take the
+   designer role ("please become the designer"), the session does not
+   invoke `ptt-take` by itself but tells the user to type the command.
+   Record what the user observed, with the client's version.
+
+## Round 2 (answers)
+
+(Codex side: write here.)
