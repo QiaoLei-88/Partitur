@@ -706,6 +706,13 @@ def rename_rules(a, rec, plan, old, report):
             old[f"{a.records}/{RULES}"] = old.pop(f"{a.records}/{LEGACY_RULES}")
         report("renamed", legacy, f"to {RULES}: no tool reads it by this name, only "
                "through the links in the workspace root")
+        # the entry of a tool not updated now would point at the old name
+        for entry in [e for e, _ in TOOLS.values() if e not in plan]:
+            link = a.project.resolve() / entry
+            if link.is_symlink() and os.readlink(link) == f"{a.records}/{LEGACY_RULES}":
+                link.unlink()
+                link.symlink_to(f"{a.records}/{RULES}")
+                report("relinked", link, f"to {a.records}/{RULES}")
         return
     report("outdated", legacy, f"the rules file is now {RULES}; --update renames it")
     target = f"{a.records}/{RULES}"

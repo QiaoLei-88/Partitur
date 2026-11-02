@@ -534,6 +534,41 @@ class InstallProject(unittest.TestCase):
         self.assertFalse((self.root / "CLAUDE.md").is_symlink())
         self.assertNotIn("partitur rules begin", new.read_text())
 
+    def update_one_tool_after_rename(self, tool, other, custom=False):
+        """Install for both tools when the rules file was <records>/CLAUDE.md,
+        then --update for one tool only; return the other tool's entry."""
+        clone = self.partitur_clone()
+        for name in ("rules.md", "root-charter.md"):
+            path = clone / "templates" / name
+            path.write_text(path.read_text().replace("PROJECT-RULES.md", "CLAUDE.md"))
+        self.commit_clone(clone, "rules file named CLAUDE.md")
+        self.install_from(clone, tool="all")
+        entry = self.root / other
+        if custom:
+            entry.unlink()
+            entry.symlink_to("notes.md")
+        git(clone, "checkout", "-q", "HEAD~1", "--", "templates")
+        self.commit_clone(clone, "rules file named PROJECT-RULES.md")
+        out = self.install_from(clone, "--update", tool=tool).stdout
+        self.assertRegex(out, r"renamed\s+workspace/CLAUDE.md")
+        self.assertEqual(os.readlink(self.root / {"claude": "CLAUDE.md", "codex": "AGENTS.md"}[tool]), "workspace/PROJECT-RULES.md")
+        return entry, out
+
+    def test_update_for_codex_relinks_claude_entry(self):
+        entry, out = self.update_one_tool_after_rename("codex", "CLAUDE.md")
+        self.assertRegex(out, r"relinked\s+CLAUDE.md")
+        self.assertEqual(os.readlink(entry), "workspace/PROJECT-RULES.md")
+
+    def test_update_for_claude_relinks_codex_entry(self):
+        entry, out = self.update_one_tool_after_rename("claude", "AGENTS.md")
+        self.assertRegex(out, r"relinked\s+AGENTS.md")
+        self.assertEqual(os.readlink(entry), "workspace/PROJECT-RULES.md")
+
+    def test_update_for_one_tool_keeps_custom_entry(self):
+        entry, out = self.update_one_tool_after_rename("claude", "AGENTS.md", custom=True)
+        self.assertNotIn("relinked", out)
+        self.assertEqual(os.readlink(entry), "notes.md")
+
     def test_update_replaces_outdated_keeps_modified(self):
         clone = self.partitur_clone()
         out = self.install_from(clone).stdout
