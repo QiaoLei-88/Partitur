@@ -18,6 +18,12 @@ PROJECT_BIN = HERE / "project" / "bin"
 INSTALL = HERE / "bin" / "install"
 N_SKILLS = len([d for d in (HERE / "project" / "skills").iterdir() if d.is_dir()])
 
+# A calling Git (rebase --exec, a hook) exports variables such as GIT_DIR that
+# would point the tests' git commands at its repository instead of theirs.
+for _var in subprocess.run(["git", "rev-parse", "--local-env-vars"], capture_output=True,
+                           text=True, check=True).stdout.split():
+    os.environ.pop(_var, None)
+
 
 def run(*args, cwd=None, check=True, env=None):
     if env is None:
