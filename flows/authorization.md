@@ -22,9 +22,10 @@
   child (A6, N5).
 - A request states the authorization it was made under (A10).
 - The commands that write or draft records are the user's to run: where
-  the agent tool allows (Claude Code's `disable-model-invocation`), they
-  are not offered to the session as skills, and their descriptions stay out
-  of its context; only the entry skill `partitur`, `/ptt-whoami`, and
+  the agent tool allows (Claude Code's `disable-model-invocation` in
+  `SKILL.md`, Codex's `allow_implicit_invocation: false` in
+  `agents/openai.yaml` beside it), they are not offered to the session as
+  skills, and their descriptions stay out of its context; only the entry skill `partitur`, `/ptt-whoami`, and
   `/ptt-inbox`, which only read, are offered to it. Acting on an AtE that
   names records, a session follows each command's skill file
   (`<records>/skills/<command>/SKILL.md`), which has the same effect as the

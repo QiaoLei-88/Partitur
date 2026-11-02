@@ -670,6 +670,30 @@ class InstallProject(unittest.TestCase):
         self.assertTrue(mine.exists())
         self.assertFalse((ws / ".partitur-version").exists())
 
+    def test_codex_policy_files_follow_their_skills(self):
+        """agents/openai.yaml beside a skill is delivered, updated, and
+        removed like the skill; one changed here is kept."""
+        clone = self.partitur_clone()
+        shutil.rmtree(clone / "project/skills/ptt-take/agents")
+        self.commit_clone(clone, "ptt-take without a policy file")
+        self.install_from(clone, tool="codex")
+        ws = self.root / "workspace"
+        take, done = (ws / f"skills/{s}/agents/openai.yaml" for s in ("ptt-take", "ptt-done"))
+        self.assertFalse(take.exists())
+        self.assertIn("allow_implicit_invocation: false", done.read_text())
+        self.assertFalse((ws / "skills/ptt-whoami/agents").exists())
+        git(clone, "checkout", "-q", "HEAD~1", "--", "project/skills")
+        self.commit_clone(clone, "ptt-take with a policy file")
+        out = self.install_from(clone, "--update", tool="codex").stdout
+        self.assertRegex(out, r"created\s+workspace/skills/ptt-take/agents/openai.yaml")
+        self.assertEqual((self.root / ".agents/skills/ptt-take/agents/openai.yaml").read_text(),
+                         take.read_text())
+        done.write_text(done.read_text() + "# mine\n")
+        out = self.install_from(clone, "--uninstall", tool="codex").stdout
+        self.assertRegex(out, r"modified\s+workspace/skills/ptt-done/agents/openai.yaml")
+        self.assertFalse((ws / "skills/ptt-take").exists())
+        self.assertIn("# mine", done.read_text())
+
     def test_prompt_hook_merged_kept_and_removed(self):
         settings = self.root / ".claude" / "settings.json"
         settings.parent.mkdir()

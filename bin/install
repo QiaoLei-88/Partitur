@@ -586,6 +586,9 @@ def project_plan(a, tools, repos, name, src, quiet=False):
             template = f"project/skills/{skill}/SKILL.md"
         text = src.read(template).decode()
         add(f"{R}/skills/{skill}/SKILL.md", "maintained", text.replace("<records>", R))
+        policy = f"project/skills/{skill}/agents/openai.yaml"  # Codex's invocation policy
+        if src.has(policy):
+            add(f"{R}/skills/{skill}/agents/openai.yaml", "maintained", src.read(policy))
     for tool in tools:
         entry, tool_dir = TOOLS[tool]
         plan[entry] = dict(kind="link", target=rules)

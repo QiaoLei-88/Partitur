@@ -32,6 +32,11 @@ class Repo(unittest.TestCase):
                                                               if explicit else []), "name"], f)
             if explicit:
                 self.assertEqual(fields["disable-model-invocation"], "true", f)
+            # and Codex's equivalent beside it, for the same commands
+            policy = f.parent / "agents" / "openai.yaml"
+            self.assertEqual(policy.read_text() if policy.exists() else None,
+                             "policy:\n  allow_implicit_invocation: false\n" if explicit else None,
+                             f)
             self.assertEqual(fields["name"], f.parent.name if f.parent != ROOT else "partitur")
             description = fields["description"]
             if description.startswith('"'):
