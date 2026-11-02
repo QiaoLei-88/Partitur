@@ -20,7 +20,7 @@ Changing one of these means changing the tools or skills that use it.
 
 | Name or format | Value | Rule |
 | --- | --- | --- |
-| Rules file | `<records>/CLAUDE.md`, Partitur's rules as a marked block, the project's outside it; linked from the workspace root as `CLAUDE.md` (Claude Code) and `AGENTS.md` (Codex) | F1, F10, F13 |
+| Rules file | `<records>/PROJECT-RULES.md`, Partitur's rules as a marked block, the project's outside it; linked from the workspace root as `CLAUDE.md` (Claude Code) and `AGENTS.md` (Codex), and read by no tool under its own name (a project installed when it was `<records>/CLAUDE.md` has it renamed by `--update`) | F1, F10, F13 |
 | Integrator's file | `<records>/handoff/integrator.md` | D15 |
 | Tasks | `<records>/tasks/{open,done,cancelled}/TNNNN[.N...]-slug/`: `charter.md`, `status.md`, events `MMMM-<kind>.md`; template `<records>/tasks/charter-template.md` | G8-G12 |
 | Task IDs | `T` + four-digit number + `.N` per level + `-slug` (`T0007.2-adapter-indexing`), the directory name, never changed; short forms `T0007.2`, `0007.2`, `7.2`, the slug | G10 |

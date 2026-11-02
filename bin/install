@@ -19,7 +19,10 @@ Usage:
   Sets PROJECT (default: the current directory, the workspace root that
   holds the code checkouts) up to work the Partitur way:
     <records>/                Git repository (main branch --branch, default master)
-    <records>/CLAUDE.md       the rules file, from templates/rules.md
+    <records>/PROJECT-RULES.md
+                              the rules file, from templates/rules.md; no
+                              tool reads it by this name, only through the
+                              links below, so it is loaded once
     <records>/pr/             request directories, repos table, README
     <records>/handoff/        integrator.md (the integrator's status), notes/
                               (temporary notes to the designer)
@@ -30,11 +33,11 @@ Usage:
     <records>/bin/            ptt, pr, and test-run, from project/bin/
     <records>/skills/         the ptt-* skills
   and, for each chosen tool, the links it reads in the workspace root:
-    Claude Code:  CLAUDE.md -> <records>/CLAUDE.md, .claude/skills/<skill>, and in
+    Claude Code:  CLAUDE.md -> <records>/PROJECT-RULES.md, .claude/skills/<skill>, and in
                   .claude/settings.json a prompt hook running `ptt inbox --quiet`
                   (it prints only when the records hold something new for the
                   session's holder); other settings there are kept
-    Codex:        AGENTS.md -> <records>/CLAUDE.md, .agents/skills/<skill>, and
+    Codex:        AGENTS.md -> <records>/PROJECT-RULES.md, .agents/skills/<skill>, and
                   .codex/hooks.json running `ptt inbox --quiet --hook`
                   (review and trust it in Codex before it runs)
   where <skill> is each ptt-* skill, and the `partitur` entry skill
@@ -52,7 +55,8 @@ Usage:
   own rules go outside it. An existing rules file without the block is left
   alone and reported "not merged"; --merge-rules adds the block after the
   file's title. Before that, ask the agent to compare both rule sets and list
-  every contradiction for the user to decide.
+  every contradiction for the user to decide. A project installed when the
+  rules file was <records>/CLAUDE.md has it renamed by --update.
 
 --tool auto (the default) installs for the agent tools found on this machine:
 Claude Code if the `claude` command or ~/.claude exists, Codex if the `codex`
@@ -111,6 +115,8 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent.parent
 URL = "https://github.com/QiaoLei-88/Partitur"
 TOOLS = {"claude": ("CLAUDE.md", ".claude"), "codex": ("AGENTS.md", ".agents")}
+RULES = "PROJECT-RULES.md"
+LEGACY_RULES = "CLAUDE.md"         # the rules file's name in the records before RULES
 
 
 class Report:
@@ -167,6 +173,12 @@ class Source:
                               f"{self.commit}:{rel}"], capture_output=True, text=True,
                              check=True).stdout
         return sorted(out.split())
+
+
+def rules_name(src):
+    """The rules file's name in the records repository, as Partitur source
+    `src` names it."""
+    return RULES if RULES.encode() in src.read("templates/rules.md") else LEGACY_RULES
 
 
 def known_commit(commit):
@@ -434,7 +446,7 @@ def apply(root, plan, old, opts, report):
                 report("superseded", path, note)
             continue
         if mode != "update":
-            if before["kind"] != "seeded" and (path.exists() or path.is_symlink()):
+            if before["kind"] not in ("seeded", "rules") and (path.exists() or path.is_symlink()):
                 report("obsolete", path, "--update removes it")
             continue
         remove_entry(root, rel, before, opts, report)
@@ -549,7 +561,8 @@ def project_plan(a, tools, repos, name, src, quiet=False):
     def add(rel, kind, data, mode=None):
         plan[rel] = dict(kind=kind, data=data if isinstance(data, bytes) else data.encode(),
                          mode=mode)
-    add(f"{R}/CLAUDE.md", "rules", fill("rules.md"))
+    rules = f"{R}/{rules_name(src)}"
+    add(rules, "rules", fill("rules.md"))
     add(f"{R}/pr/README.md", "maintained", fill("pr-README.md"))
     for d in ("pr/open", "pr/merged", "pr/closed", "tasks/open", "tasks/done", "tasks/cancelled",
               "roles/integrator", "handoff/notes"):
@@ -573,9 +586,12 @@ def project_plan(a, tools, repos, name, src, quiet=False):
             template = f"project/skills/{skill}/SKILL.md"
         text = src.read(template).decode()
         add(f"{R}/skills/{skill}/SKILL.md", "maintained", text.replace("<records>", R))
+        policy = f"project/skills/{skill}/agents/openai.yaml"  # Codex's invocation policy
+        if src.has(policy):
+            add(f"{R}/skills/{skill}/agents/openai.yaml", "maintained", src.read(policy))
     for tool in tools:
         entry, tool_dir = TOOLS[tool]
-        plan[entry] = dict(kind="link", target=f"{R}/CLAUDE.md")
+        plan[entry] = dict(kind="link", target=rules)
         for skill in skills:
             plan[f"{tool_dir}/skills/{skill}"] = dict(kind="link",
                                                       target=f"../../{R}/skills/{skill}")
@@ -680,6 +696,49 @@ def redundant_links(root, tools):
     return out
 
 
+def rename_rules(a, rec, plan, old, report):
+    """Rename the rules file of a project installed when it was CLAUDE.md
+    (--update), so that what install delivered there is compared under the
+    new name; or report it outdated and leave it and its links alone."""
+    legacy, rules = rec / LEGACY_RULES, rec / RULES
+    if not legacy.is_file() or legacy.is_symlink() or rules.exists():
+        return
+    if a.update:
+        legacy.rename(rules)
+        if old and f"{a.records}/{LEGACY_RULES}" in old:
+            old[f"{a.records}/{RULES}"] = old.pop(f"{a.records}/{LEGACY_RULES}")
+        report("renamed", legacy, f"to {RULES}: no tool reads it by this name, only "
+               "through the links in the workspace root")
+        # the entry of a tool not updated now would point at the old name
+        for entry in [e for e, _ in TOOLS.values() if e not in plan]:
+            link = a.project.resolve() / entry
+            if link.is_symlink() and os.readlink(link) == f"{a.records}/{LEGACY_RULES}":
+                link.unlink()
+                link.symlink_to(f"{a.records}/{RULES}")
+                report("relinked", link, f"to {a.records}/{RULES}")
+        return
+    report("outdated", legacy, f"the rules file is now {RULES}; --update renames it")
+    target = f"{a.records}/{RULES}"
+    for rel in [rel for rel, e in plan.items()
+                if rel == target or e.get("target") == target]:
+        del plan[rel]
+
+
+def mentions_of_legacy_rules(a, rec, report):
+    """Report the project's own text that still names the old rules file."""
+    old = f"{a.records}/{LEGACY_RULES}"
+    rules = rec / RULES
+    paths = [rules, rec / "tasks/open/T0000-design/charter.md",
+             rec / "tasks/open/T0000-design/status.md", rec / "handoff/integrator.md"]
+    for path in paths:
+        if not path.is_file():
+            continue
+        text = path.read_text()
+        block = block_of(text) if path == rules else None
+        if old in (text.replace(block, "") if block else text):
+            report("mentions", path, f"names {old}, now {a.records}/{RULES}: change it there")
+
+
 def scope_project(a, tools, report):
     root = a.project.resolve()
     if not root.is_dir():
@@ -747,10 +806,12 @@ def scope_project(a, tools, report):
         entry = root / TOOLS[tool][0]
         if entry.exists() and not entry.is_symlink():
             print(f"warning    {entry.name} exists and is not the rules file, so the tool would "
-                  f"not read the rules: move its content into {a.records}/CLAUDE.md, delete "
+                  f"not read the rules: move its content into {a.records}/{RULES}, delete "
                   "it, and rerun")
     plan = project_plan(a, tools, merge_repos(repos, add_repos), name, Source())
+    rename_rules(a, rec, plan, old, report)
     apply(root, plan, old, a, report)
+    mentions_of_legacy_rules(a, rec, report)
     for link in redundant_links(root, tools):
         if a.update:
             link.unlink()
@@ -779,7 +840,11 @@ def scope_project(a, tools, report):
     if c.get("not merged"):
         print("\nThe project's rules lack Partitur's block: " + AGENT_HINT
               + " Then rerun with --merge-rules.")
-    if any(c.get(k) for k in ("created", "updated", "replaced", "removed", "merged")):
+    if c.get("mentions"):
+        print(f"\nThe project's own text still names {a.records}/{LEGACY_RULES}: change "
+              f"each line reported \"mentions\" to {a.records}/{RULES}.")
+    if any(c.get(k) for k in ("created", "updated", "replaced", "removed", "merged",
+                              "renamed")):
         print(f"\nRecord the change: {a.records}/bin/ptt record -m \"install Partitur\" "
               f"{a.records}")
 
@@ -877,7 +942,7 @@ def write_report(a, tools, report, output):
              if (root / TOOLS[t][0]).exists() and not (root / TOOLS[t][0]).is_symlink()]
     if c.get("not merged") or c.get("merged") or loose:
         own = " and ".join(f"`{p.name}` in the workspace root" for p in loose) \
-            if loose else f"`{R}/CLAUDE.md`"
+            if loose else f"`{R}/{RULES}`"
         steps.append(
             f"Rules. Compare Partitur's rules block (`{HERE / 'templates' / 'rules.md'}`, "
             f"between the `partitur rules` markers) with the project's rules in {own}. "
@@ -890,12 +955,12 @@ def write_report(a, tools, report, output):
             f"in practice). See Partitur's SKILL.md, step Rules. "
             + ("On the user's approval, rerun this install with --merge-rules. "
                if c.get("not merged") else "")
-            + f"Then write the project's part of `{R}/CLAUDE.md` after the block, as "
+            + f"Then write the project's part of `{R}/{RULES}` after the block, as "
             "\"## Project Rules\": domain rules, the project's instances, and each kept "
             "conflict as a stated deviation (the block itself is never edited).")
     for p in loose:
         steps.append(f"`{p.name}` in the workspace root is a file, so the agent tool does not "
-                     f"read `{R}/CLAUDE.md`: once its rules are merged, delete it with the "
+                     f"read `{R}/{RULES}`: once its rules are merged, delete it with the "
                      "user's approval and rerun this install, which then links it.")
     if any(line.startswith("warning") for line in output.splitlines()):
         steps.append("Warnings: explain each line starting with `warning` in the output to "
@@ -917,6 +982,10 @@ def write_report(a, tools, report, output):
                      "its own design handover, the user may leave this to the designer, who "
                      "proposes it on taking T0000. Anything about the design agreed during "
                      "the setup goes into T0000's charter or `status.md`.")
+    if c.get("mentions"):
+        steps.append(f"Lines reported \"mentions\" are the project's own text naming the "
+                     f"old rules file `{R}/{LEGACY_RULES}`: with the user's approval, change "
+                     f"them to `{R}/{RULES}`.")
     if c.get("modified") or c.get("differs"):
         steps.append("Files reported \"modified\" or \"differs\" were left alone: tell the "
                      "user which matter, and whether `--update --force` (with a backup) or "
@@ -933,7 +1002,8 @@ def write_report(a, tools, report, output):
                      f"`{HERE / 'bin' / 'install'} --scope user --tool "
                      f"{unlinked[0] if len(unlinked) == 1 else 'all'}`, then rerun this "
                      "install with `--update`, which removes the project's own link.")
-    if any(c.get(k) for k in ("created", "updated", "replaced", "removed", "merged")):
+    if any(c.get(k) for k in ("created", "updated", "replaced", "removed", "merged",
+                              "renamed")):
         steps.append(f"When the steps above are done, record the records repository: "
                      f"`{R}/bin/ptt record -m \"install Partitur\" {R}`.")
     if c.get("created"):

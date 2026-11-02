@@ -1,6 +1,7 @@
 ---
 name: ptt-pr-draft-reply
 description: "Draft the answer to a review of this branch's local request for the user to check: the planned change per comment and the full reply text. Writes and releases nothing; /ptt-pr-reply releases it. Argument: none or the request number N."
+disable-model-invocation: true
 ---
 
 # Draft a reply to a review

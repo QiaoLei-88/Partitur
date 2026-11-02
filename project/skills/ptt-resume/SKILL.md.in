@@ -1,6 +1,7 @@
 ---
 name: ptt-resume
 description: "Continue as a holder in a fresh session or after /clear: binds the holder name to this session and catches up from the records. Argument: the holder name (integrator-1, designer-g1, worker-T0007), or none to continue the holder that left a handover."
+disable-model-invocation: true
 ---
 
 # Continue as a holder

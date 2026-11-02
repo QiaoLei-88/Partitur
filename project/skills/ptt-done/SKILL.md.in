@@ -1,6 +1,7 @@
 ---
 name: ptt-done
 description: "As a task's holder, report its acceptance criteria met so that the supervisor can close it. Use when the task's work is merged and its criteria are met."
+disable-model-invocation: true
 ---
 
 # Report a task done

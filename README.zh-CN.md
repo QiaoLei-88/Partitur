@@ -76,7 +76,7 @@ Partitur 是一种由一位用户和多个 AI 代理会话共同开展软件项�
    `! ~/partitur/bin/install --scope project`，让会话看到输出）。
    安装器会检测 Claude Code 和 Codex（可以用 `--tool claude`、`codex` 或 `all`
    明确选择），并报告创建的内容：
-   记录库 `workspace/`，其中包含规则文件、任务与请求目录、工具和技能，
+   记录库 `workspace/`，其中包含规则文件 `PROJECT-RULES.md`、任务与请求目录、工具和技能，
    根设计任务 `T0000`（设计者的章程和交接记录）、集成者文件、
    供代理工具读取的链接，以及向每个会话显示其新消息的提示词钩子
    （Claude Code 为 `.claude/settings.json`；Codex 的见下文）。安装器会列出发现的代码仓库；
@@ -84,7 +84,7 @@ Partitur 是一种由一位用户和多个 AI 代理会话共同开展软件项�
    如果你是在普通终端中运行安装命令，则在工作区根目录启动安装会话，并说：
    “阅读 partitur-install-report.md，帮我完成 Partitur 安装”。
    安装器会把输出和后续步骤写入该文件（不提交，完成后删除）。
-2. **与安装会话一起填写两个文件**：`workspace/CLAUDE.md` 末尾的
+2. **与安装会话一起填写两个文件**：`workspace/PROJECT-RULES.md` 末尾的
    “Project Rules”（项目规则，填写你的领域规则；Partitur 自身的规则位于上方
    带标记的区块中），以及 `workspace/tasks/open/T0000-design/charter.md`
    中的占位内容。后者是根设计者的章程，仅首次直接填写，此后由你提出修订；
