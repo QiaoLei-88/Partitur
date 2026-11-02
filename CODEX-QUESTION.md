@@ -213,4 +213,88 @@ commit you test. Change nothing else; report defects as findings.
 
 ## Round 2 (answers)
 
-(Codex side: write here.)
+Feedback on 2026-11-02, against
+`f49966b8d2bd736d41a338107790c61325293b1c`. This is a review and test report;
+no implementation changes were made during the review.
+
+### Run and limits
+
+**Tested.** `/usr/lib/chatgpt/resources/codex` still reports
+`codex-cli 0.166.0-alpha.5.1`. The clients and isolated profiles were as in
+round 1: CLI context construction and a separate desktop-bundled
+app-server instance, without account credentials or real project changes.
+
+Local evidence (temporary, not included in this commit):
+
+- Installation and app-server harness:
+  `/tmp/partitur-codex-round2-probe.py`.
+- CLI harness: `/tmp/partitur-codex-round2-cli.py`.
+- Run directory: `/tmp/partitur-codex-round2-u_311llz/`.
+- Installation logs, `skills-before.json`, four `*-thread.json` responses,
+  and `events.json` record the installation and app-server checks.
+- `cli-summary.json` records the four CLI assertions. Session JSONL files
+  are under `fresh-implicit/`, `fresh-explicit/`, `upgraded-implicit/`, and
+  `upgraded-explicit/` in that directory.
+
+The install options, app-server methods, and CLI command were those
+recorded in round 1. This time every policy file came from the installer;
+none was placed or modified by hand. The CLI matrix covered both a fresh
+install and an upgrade from `a907d76`, each with `Reply OK.` and the literal
+`$ptt-take`. Each process reached its 20-second timeout against the
+unavailable local endpoint. Assertions inspected the instructions and
+skill messages already written to session logs, not model responses.
+
+### 4. Installed policy files
+
+**Tested.** Both fresh `--tool codex` installation and `--update` from
+`a907d76` delivered exactly eleven `agents/openai.yaml` files, each with
+`policy.allow_implicit_invocation: false`. For each project, `skills/list`
+returned all 14 Partitur skills, enabled, with an empty errors list.
+
+In all four CLI cases the default Partitur catalog contained exactly
+`partitur`, `ptt-inbox`, and `ptt-whoami`. Both explicit cases also included
+a separate `<skill>` message containing the full `ptt-take` skill; neither
+implicit case did. Each case contained the project rules body in one
+instruction message. The installed policies therefore produce the same
+context behavior as the hand-placed policies tested in round 1.
+
+### 5. Mixed-tool migration
+
+**Tested.** Two separate projects were installed from `a907d76` with
+`--tool all --records partitur-records`. One was updated with
+`--tool codex`, the other with `--tool claude`, using the reviewed branch.
+In both projects, root AGENTS.md and CLAUDE.md were valid links to
+`partitur-records/PROJECT-RULES.md`. Starting an app-server thread in each
+workspace reported its AGENTS.md in `instructionSources`. The original
+mixed-tool failure is fixed in both directions.
+
+**Source / Tested.** The added relinking only applies to an existing
+symlink whose target is exactly the old Partitur rules path. It does not
+create the other tool's absent entry or replace a custom file or link.
+The regression suite checks both update directions and preservation of a
+custom link. Policy delivery uses the existing maintained-file machinery;
+the suite checks policy installation, addition on update, removal on
+uninstall, and preservation of a locally changed policy on uninstall.
+
+### 6. Desktop merge gate
+
+**Unknown.** No new desktop UI observation was supplied or performed.
+The skill picker, desktop warning display, a successful `ptt take`
+followed by `ptt-whoami`, and the response to a plain-language request to
+become the designer remain unverified. Question 6 remains an open merge
+gate for the user to test with the desktop client version recorded.
+
+**Inferred.** The policy controls default skill exposure; it does not
+prevent a model from reading a skill file or running a tool through other
+instructions. The natural-language check is a behavioral check of the
+session and Partitur rules, not a security guarantee of the policy file.
+
+### Review conclusion
+
+**Tested.** `python3 -m unittest discover -s tests` ran 104 tests:
+OK, one skipped (the private-terms check). `git diff --check` passed.
+
+**Source / Inferred.** No new must-fix defect was found in the changes
+since `f9d2b35`. The two implementation concerns from round 1 are resolved.
+The code review passes; this does not close the desktop merge gate or
+claim that a real role was taken during these probes.
