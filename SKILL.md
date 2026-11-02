@@ -14,10 +14,10 @@ same skills as `$ptt-*` (for example `$ptt-take designer`).
 
 ## If you are a session in a Partitur project
 
-1. Read the project's rules file. The workspace root links to it as
-   `CLAUDE.md` and/or `AGENTS.md`; it lives in the records repository
-   (`workspace/` unless the project chose another name, which the rules file
-   states). It is authoritative and may override this skill.
+1. Read the project's rules file, `PROJECT-RULES.md` in the records
+   repository (`workspace/` unless the project chose another name, which the
+   rules file states); the workspace root links to it as `CLAUDE.md` and/or
+   `AGENTS.md`. It is authoritative and may override this skill.
 2. Know what you hold: a session holds a role or task only by taking it
    (`/ptt-take`), or by continuing as a holder the user names
    (`/ptt-resume <name>`). Then read your role's page in [roles/](roles/)

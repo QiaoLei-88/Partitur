@@ -21,7 +21,7 @@ it out.
 
 ## Read first, in order
 
-1. `{{RECORDS}}/CLAUDE.md`, the rules file.
+1. `{{RECORDS}}/PROJECT-RULES.md`, the rules file.
 2. `status.md` next to this charter: where the previous designer stopped.
 3. The design document ({{WHERE: repository and path}}).
 4. `{{RECORDS}}/bin/pr list all`.

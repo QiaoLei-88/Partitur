@@ -21,7 +21,7 @@ the same skills as `$ptt-*`, for example `$ptt-take designer`.
 
 ## Instructions, Repositories, and Worktrees
 
-- This file, `{{RECORDS}}/CLAUDE.md` in the records repository, is authoritative; never copy it into or commit it in a code repository. The workspace root links to it as `CLAUDE.md` (Claude Code) and/or `AGENTS.md` (Codex): start sessions there so that it is loaded; a sibling directory is not discovered automatically.
+- This file, `{{RECORDS}}/PROJECT-RULES.md` in the records repository, holds all of the project's rules and is authoritative; never copy it into or commit it in a code repository. No agent tool reads it by its own name: the workspace root links to it as `CLAUDE.md` (Claude Code) and/or `AGENTS.md` (Codex), so start sessions there so that it is loaded once; a sibling directory is not discovered automatically.
 - Project paths are relative to the selected code checkout, records paths to the workspace; confirm actual locations. Before work, confirm the checkout, branch, existing changes, and applicable design documents; reference only documents and commands that exist.
 - An empty code repository may be bootstrapped in its primary checkout; after the first baseline, all code work is on a development branch in its own worktree (`worktrees/<topic>`). The primary checkout is for review and integration.
 - Main branches are listed in `{{RECORDS}}/pr/repos`. Only the integration session integrates into them; development sessions deliver branch commits and never commit to a main branch.

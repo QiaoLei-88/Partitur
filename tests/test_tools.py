@@ -284,7 +284,7 @@ class InstallProject(unittest.TestCase):
         out = self.install("--name", "Demo", "--records", "ws", "--repo", "code:code:master").stdout
         ws = self.root / "ws"
         self.assertEqual(git(ws, "branch", "--show-current"), "master")
-        rules = (ws / "CLAUDE.md").read_text()
+        rules = (ws / "PROJECT-RULES.md").read_text()
         self.assertIn("Demo Project Instructions", rules)
         self.assertNotIn("{{", rules)
         self.assertEqual((ws / "pr" / "repos").read_text().splitlines()[-1], "code code master")
@@ -349,13 +349,13 @@ class InstallProject(unittest.TestCase):
 
     def test_rerun_keeps_and_reports(self):
         self.install()
-        rules = self.root / "workspace" / "CLAUDE.md"
+        rules = self.root / "workspace" / "PROJECT-RULES.md"
         rules.write_text(rules.read_text() + "\nproject rule\n")
         tool = self.root / "workspace" / "bin" / "pr"
         tool.write_text(tool.read_text() + "\n# local change\n")
         out = self.install().stdout
         self.assertNotIn("created", out)
-        self.assertRegex(out, r"kept\s+workspace/CLAUDE\.md")
+        self.assertRegex(out, r"kept\s+workspace/PROJECT-RULES\.md")
         self.assertRegex(out, r"kept\s+workspace/pr/repos")
         self.assertRegex(out, r"(differs|modified)\s+workspace/bin/pr")
         self.assertIn("project rule", rules.read_text())
@@ -386,10 +386,10 @@ class InstallProject(unittest.TestCase):
         ws.mkdir()
         git(ws, "init", "-q", "-b", "master")
         (ws / "pr").mkdir()
-        rules = ws / "CLAUDE.md"
+        rules = ws / "PROJECT-RULES.md"
         rules.write_text("# My project\n\nOur own rules.\n\n## Domain\n\n- keep units SI\n")
         out = self.install().stdout
-        self.assertRegex(out, r"not merged\s+workspace/CLAUDE.md")
+        self.assertRegex(out, r"not merged\s+workspace/PROJECT-RULES.md")
         self.assertIn("real conflicts", out)
         self.assertNotIn("partitur rules begin", rules.read_text())
         report = (self.root / "partitur-install-report.md").read_text()
@@ -397,11 +397,11 @@ class InstallProject(unittest.TestCase):
         self.assertIn("not merged", report)                 # the output, kept
         self.assertIn("Read partitur-install-report.md", out)
         out = self.install("--merge-rules").stdout
-        self.assertRegex(out, r"merged\s+workspace/CLAUDE.md")
+        self.assertRegex(out, r"merged\s+workspace/PROJECT-RULES.md")
         text = rules.read_text()
         self.assertTrue(text.startswith("# My project\n\nOur own rules.\n\n<!-- partitur rules begin"))
         self.assertIn("- keep units SI", text)
-        self.assertRegex(self.install().stdout, r"kept\s+workspace/CLAUDE.md")
+        self.assertRegex(self.install().stdout, r"kept\s+workspace/PROJECT-RULES.md")
 
     def partitur_clone(self, name="partitur"):
         """A committed copy of Partitur, to install from and then change."""
@@ -499,6 +499,41 @@ class InstallProject(unittest.TestCase):
         self.assertNotIn("superseded", self.install_from(clone).stdout)
         self.install_from(clone, "--uninstall")
 
+    def test_update_renames_rules_file(self):
+        """A project installed when the rules file was <records>/CLAUDE.md:
+        a plain rerun leaves it alone, --update renames it and relinks."""
+        clone = self.partitur_clone()
+        templates = clone / "templates"
+        for name in ("rules.md", "root-charter.md"):
+            path = templates / name
+            path.write_text(path.read_text().replace("PROJECT-RULES.md", "CLAUDE.md"))
+        self.commit_clone(clone, "rules file named CLAUDE.md")
+        self.install_from(clone, tool="all")
+        ws = self.root / "workspace"
+        old, new = ws / "CLAUDE.md", ws / "PROJECT-RULES.md"
+        old.write_text(old.read_text() + "\nSee workspace/CLAUDE.md for the deviations.\n")
+        self.assertEqual(os.readlink(self.root / "AGENTS.md"), "workspace/CLAUDE.md")
+        git(clone, "checkout", "-q", "HEAD~1", "--", "templates")
+        self.commit_clone(clone, "rules file named PROJECT-RULES.md")
+        out = self.install_from(clone, tool="all").stdout
+        self.assertRegex(out, r"outdated\s+workspace/CLAUDE.md")
+        self.assertFalse(new.exists())
+        self.assertEqual(os.readlink(self.root / "CLAUDE.md"), "workspace/CLAUDE.md")
+        out = self.install_from(clone, "--update", tool="all").stdout
+        self.assertRegex(out, r"renamed\s+workspace/CLAUDE.md")
+        self.assertRegex(out, r"updated\s+workspace/PROJECT-RULES.md")
+        self.assertRegex(out, r"mentions\s+workspace/PROJECT-RULES.md")
+        self.assertRegex(out, r"mentions\s+workspace/tasks/open/T0000-design/charter.md")
+        self.assertFalse(old.exists())
+        self.assertIn("See workspace/CLAUDE.md", new.read_text())
+        self.assertIn("This file, `workspace/PROJECT-RULES.md`", new.read_text())
+        for entry in ("CLAUDE.md", "AGENTS.md"):
+            self.assertEqual(os.readlink(self.root / entry), "workspace/PROJECT-RULES.md")
+        self.assertNotIn("renamed", self.install_from(clone, tool="all").stdout)
+        self.install_from(clone, "--uninstall", tool="all")
+        self.assertFalse((self.root / "CLAUDE.md").is_symlink())
+        self.assertNotIn("partitur rules begin", new.read_text())
+
     def test_update_replaces_outdated_keeps_modified(self):
         clone = self.partitur_clone()
         out = self.install_from(clone).stdout
@@ -508,7 +543,7 @@ class InstallProject(unittest.TestCase):
         ws = self.root / "workspace"
         mine = ws / "bin" / "test-run"
         mine.write_text(mine.read_text() + "\n# my change\n")
-        rules = ws / "CLAUDE.md"
+        rules = ws / "PROJECT-RULES.md"
         rules.write_text(rules.read_text() + "\nproject rule\n")
         for name in ("pr", "test-run"):
             f = clone / "project" / "bin" / name
@@ -550,7 +585,7 @@ class InstallProject(unittest.TestCase):
     def test_rules_block_update_and_forced_backup(self):
         clone = self.partitur_clone()
         self.install_from(clone)
-        rules = self.root / "workspace" / "CLAUDE.md"
+        rules = self.root / "workspace" / "PROJECT-RULES.md"
         rules.write_text(rules.read_text().replace("(Rules specific to this project.)",
                                                    "- our domain rule"))
         t = clone / "templates" / "rules.md"
@@ -562,9 +597,9 @@ class InstallProject(unittest.TestCase):
         mine = self.root / "workspace" / "bin" / "pr"
         mine.write_text(mine.read_text() + "\n# mine\n")
         out = self.install_from(clone).stdout
-        self.assertRegex(out, r"outdated\s+workspace/CLAUDE.md")
+        self.assertRegex(out, r"outdated\s+workspace/PROJECT-RULES.md")
         out = self.install_from(clone, "--update").stdout
-        self.assertRegex(out, r"updated\s+workspace/CLAUDE.md")
+        self.assertRegex(out, r"updated\s+workspace/PROJECT-RULES.md")
         text = rules.read_text()
         self.assertIn("- a v2 rule", text)
         self.assertIn("- our domain rule", text)
@@ -575,7 +610,7 @@ class InstallProject(unittest.TestCase):
         self.assertNotIn("# mine", mine.read_text())
         self.assertIn(f"Backups of replaced or removed files: {backups}", out)
         out = self.install_from(clone, "--uninstall").stdout
-        self.assertRegex(out, r"removed\s+workspace/CLAUDE.md")
+        self.assertRegex(out, r"removed\s+workspace/PROJECT-RULES.md")
         self.assertNotIn("partitur rules begin", rules.read_text())
         self.assertIn("- our domain rule", rules.read_text())
 
@@ -595,7 +630,7 @@ class InstallProject(unittest.TestCase):
         self.assertFalse((ws / "bin" / "ptt").exists())
         self.assertFalse((self.root / "CLAUDE.md").is_symlink())
         self.assertFalse((self.root / ".claude").exists())
-        self.assertTrue((ws / "CLAUDE.md").exists())
+        self.assertTrue((ws / "PROJECT-RULES.md").exists())
         self.assertTrue((task / "charter.md").exists())
         self.assertTrue(mine.exists())
         self.assertFalse((ws / ".partitur-version").exists())
@@ -737,7 +772,7 @@ class InstallProject(unittest.TestCase):
         table = (self.root / "workspace" / "pr" / "repos").read_text().splitlines()
         self.assertEqual(table[1:], ["code code master", "lib lib main"])
         self.assertIn(f"{self.root.name} Project Instructions",
-                      (self.root / "workspace" / "CLAUDE.md").read_text())
+                      (self.root / "workspace" / "PROJECT-RULES.md").read_text())
         again = self.install(tool="claude", cwd=self.root).stdout
         self.assertNotIn("found", again)
 
@@ -747,8 +782,8 @@ class InstallProject(unittest.TestCase):
             src = (HERE / "project" / "skills" / skill / "SKILL.md.in").read_text()
             got = (self.root / "workspace" / "skills" / skill / "SKILL.md").read_text()
             self.assertEqual(got, src.replace("<records>", "workspace"))
-        self.assertIn("https://github.com/", (self.root / "workspace" / "CLAUDE.md").read_text())
-        self.assertNotIn(str(HERE), (self.root / "workspace" / "CLAUDE.md").read_text())
+        self.assertIn("https://github.com/", (self.root / "workspace" / "PROJECT-RULES.md").read_text())
+        self.assertNotIn(str(HERE), (self.root / "workspace" / "PROJECT-RULES.md").read_text())
 
     def test_existing_entry_file_warns(self):
         (self.root / "CLAUDE.md").write_text("old notes\n")

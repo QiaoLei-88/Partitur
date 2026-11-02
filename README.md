@@ -85,7 +85,7 @@ both.
    sees the output). Install detects Claude Code and Codex
    (`--tool claude`, `codex`, or `all` chooses) and reports what it created:
    the records repository `workspace/` with
-   the rules file, task and request directories, tools and skills, the
+   the rules file `PROJECT-RULES.md`, task and request directories, tools and skills, the
    root design task `T0000` (the designer's charter and handover), the
    integrator's file, the links your tools read, and a prompt hook that
    shows each session what is new for it (`.claude/settings.json` for
@@ -97,7 +97,7 @@ both.
    install leaves its output and the next steps in that file (not
    committed; delete it when done).
 2. **Fill in two files** with the installation session: the "Project Rules" at the end
-   of `workspace/CLAUDE.md` (your domain's rules; Partitur's own rules sit
+   of `workspace/PROJECT-RULES.md` (your domain's rules; Partitur's own rules sit
    in a marked block above them), and the placeholders in
    `workspace/tasks/open/T0000-design/charter.md` (the root designer's
    charter, filled in directly this once and amended by you afterwards;
