@@ -26,7 +26,12 @@ class Repo(unittest.TestCase):
             self.assertTrue(text.startswith("---\n"), f)
             head = text[4:text.index("\n---\n", 4)].split("\n")
             fields = dict(line.split(": ", 1) for line in head)
-            self.assertEqual(sorted(fields), ["description", "name"], f)
+            # the commands that write or draft records are the user's to run (A12)
+            explicit = f.parent.name not in ("ptt-inbox", "ptt-whoami") and f.parent != ROOT
+            self.assertEqual(sorted(fields), ["description", *(["disable-model-invocation"]
+                                                              if explicit else []), "name"], f)
+            if explicit:
+                self.assertEqual(fields["disable-model-invocation"], "true", f)
             self.assertEqual(fields["name"], f.parent.name if f.parent != ROOT else "partitur")
             description = fields["description"]
             if description.startswith('"'):

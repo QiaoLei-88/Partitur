@@ -1,6 +1,7 @@
 ---
 name: ptt-pr-reply
 description: "Release the answer to a review of this branch's local request: carry out the plan drafted with /ptt-pr-draft-reply in this conversation (commits, tests) and record the reply. Without such a draft, asks first. Argument: none or the request number N."
+disable-model-invocation: true
 ---
 
 # Reply to a review

@@ -1,6 +1,7 @@
 ---
 name: ptt-pr-submit
 description: "Submit a branch (the one named, or this task's worktree) as a local pull request for review and integration, draft the request for the user to check first (draft), or list this branch's requests (list [BRANCH]). Use when branch work is ready for review. A review is answered with /ptt-pr-draft-reply and /ptt-pr-reply."
+disable-model-invocation: true
 ---
 
 # Submit a local request
