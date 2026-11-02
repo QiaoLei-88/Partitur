@@ -22,12 +22,17 @@
   child (A6, N5).
 - A request states the authorization it was made under (A10).
 - The commands that write or draft records are the user's to run: where
-  the agent tool allows (Claude Code's `disable-model-invocation`), a
-  session cannot start them on its own, and their descriptions stay out of
-  its context; only the entry skill `partitur`, `/ptt-whoami`, and
+  the agent tool allows (Claude Code's `disable-model-invocation`), they
+  are not offered to the session as skills, and their descriptions stay out
+  of its context; only the entry skill `partitur`, `/ptt-whoami`, and
   `/ptt-inbox`, which only read, are offered to it. Acting on an AtE that
   names records, a session follows each command's skill file
-  (`<records>/skills/<command>/SKILL.md`) (A12).
+  (`<records>/skills/<command>/SKILL.md`), which has the same effect as the
+  command (A12). This keeps a session from starting a command in passing
+  and keeps its context free of them; it is not a permission boundary: a
+  session can still read the skill file or run `ptt` itself, and only the
+  rules and the user's oversight stop it, as names are not authenticated
+  ([roles and tasks](tasks.md), Limits).
 - Rewriting a main branch, merged commits, or the records repository needs
   its own authorization and a recovery reference first (A7).
 
