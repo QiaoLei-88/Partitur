@@ -133,7 +133,8 @@ In Codex the commands start with `$` instead of `/`.
 - **Notices are pulled, except through the prompt hook.** `ptt inbox`
   lists what changed in the records for a holder since it last looked: a
   subordinate's `status.md`, done report, or leave request, an amendment, a
-  note to the designer, a new review or decision on its request, and for the
+  note to it (and, until deleted, every note to it waits on it; a wrong
+  `to:` reaches nobody), a new review or decision on its request, and for the
   integrator a new request or reply; and, once, to the session last bound
   to a holder whose hold someone else ended (a close, an approved leave, a
   freeing). In Claude Code and Codex (once trusted), install's prompt hook
@@ -154,7 +155,9 @@ In Codex the commands start with `$` instead of `/`.
   (F11).
 - **One gate for the records repository.** Every write to it goes through
   `ptt` (`ptt record` for request messages, `status.md`, and `handoff/integrator.md`),
-  which commits exactly its paths under the lock all sessions share. Git
+  which commits exactly its paths under the lock all sessions share. A
+  file is deleted with `rm` and then recorded by its path (a deletion
+  staged with `git rm` is recorded as well). Git
   commands run by hand in the records repository while sessions work
   (stash, checkout, a manual commit) are outside this guarantee and can mix
   changes; do them only when no session is writing (F11).

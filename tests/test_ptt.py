@@ -182,13 +182,13 @@ class Ptt(unittest.TestCase):
         req2 = self.rec / "pr" / "open" / "000002-y"
         req2.mkdir()
         (req2 / "0001-request.md").write_text("x\n")
-        self.assertEqual(self.ptt("record", "-m", "submit", str(req2)).stderr, "")
+        self.assertNotIn("note:", self.ptt("record", "-m", "submit", str(req2)).stderr)
         self.ptt("leave", "designer-g1")
         charter = self.rec / "tasks" / "open" / "T0000-design" / "charter.md"
         self.fill(charter)
         self.fill(charter.parent / "status.md")
         self.ptt("record", "-m", "fill", str(charter.parent))
-        self.assertEqual(self.ptt("take", "designer", session="S").stderr, "")
+        self.assertNotIn("note:", self.ptt("take", "designer", session="S").stderr)
 
     def test_record_and_pr_move_accept_as(self):
         req = self.rec / "pr" / "open" / "000001-x"
@@ -212,6 +212,19 @@ class Ptt(unittest.TestCase):
         self.ptt("leave", holder)
         self.ptt("approve-leave", n, "--as", d)
         self.assertNotIn("amended", self.ptt("inbox", self.ptt("take", n).stdout.strip()).stdout)
+
+    def test_writes_report_path_and_commit(self):
+        """Every record names what it wrote and the records commit, on
+        standard error; standard output stays what scripts read."""
+        d = self.designer()
+        n = self.task("probe", d)
+        r = self.ptt("amend", n, "--as", d, "--text", "scope narrowed")
+        head = run("git", "-C", str(self.rec), "rev-parse", "--short", "HEAD").stdout.strip()
+        self.assertIn(f"wrote tasks/open/T0001-probe/0002-amend.md (records {head})", r.stderr)
+        holder = self.ptt("take", n)
+        self.assertRegex(holder.stderr, r"wrote tasks/open/T0001-probe/0003-take.md, "
+                         r"tasks/open/T0001-probe/status.md \(records \w+\)")
+        self.assertEqual(holder.stdout.strip(), "track-T0001")
 
     def test_root_task_has_no_dependencies(self):
         d = self.designer()
@@ -371,15 +384,37 @@ class Ptt(unittest.TestCase):
         self.assertIn("line breaks", self.refused("done", n, "--as", h, "--requests", "1\nby: x"))
         self.assertEqual(run("git", "-C", str(self.rec), "status", "--porcelain").stdout, "")
 
+    def test_record_deletions(self):
+        """A deletion is recorded after `rm` or after `git rm`; a path that is
+        gone already, or never was, is refused and says which."""
+        for name in ("a.md", "b.md"):
+            (self.rec / name).write_text("x\n")
+            self.ptt("record", "-m", f"add {name}", str(self.rec / name))
+        (self.rec / "a.md").unlink()
+        self.ptt("record", "-m", "delete a", str(self.rec / "a.md"))
+        run("git", "-C", str(self.rec), "rm", "-q", "b.md")
+        self.ptt("record", "-m", "delete b", str(self.rec / "b.md"))
+        git = lambda *a: run("git", "-C", str(self.rec), *a).stdout
+        self.assertEqual(git("ls-tree", "--name-only", "HEAD", "--", "a.md", "b.md"), "")
+        self.assertEqual(git("status", "--porcelain"), "")
+        gone = git("rev-parse", "--short", "HEAD").strip()
+        r = self.ptt("record", "-m", "delete b again", str(self.rec / "b.md"),
+                     check=False)
+        self.assertIn(f"b.md is not in the records: already deleted (records {gone})", r.stderr)
+        r = self.ptt("record", "-m", "typo", str(self.rec / "c.md"), check=False)
+        self.assertIn("c.md is not in the records\n", r.stderr)
+
     def test_record_alongside_task_changes(self):
         d = self.designer()
         notes = self.rec / "notes.txt"
         script = ("for i in $(seq 40); do echo $i >> notes.txt; "
                   f"python3 {self.rec / 'bin' / 'ptt'} record -m n$i notes.txt >/dev/null; done")
-        loop = subprocess.Popen(["sh", "-c", script], cwd=self.rec)
+        loop = subprocess.Popen(["sh", "-c", script], cwd=self.rec, stderr=subprocess.PIPE,
+                                text=True)
         for k in range(12):
             self.ptt("mktask", f"s{k}", "--as", d)
-        loop.wait()
+        errors = [x for x in loop.communicate()[1].splitlines() if not x.startswith("wrote ")]
+        self.assertEqual(errors, [])
         git = lambda *a: run("git", "-C", str(self.rec), *a).stdout
         tracked = git("ls-tree", "-r", "--name-only", "HEAD")
         for k in range(12):
@@ -672,6 +707,35 @@ class Ptt(unittest.TestCase):
         self.ptt("close", task, "--as", holder, session="D")
         self.assertIn("was closed", hook(event).stdout)
         self.assertEqual(hook(event).stdout, "")
+
+    def test_note_reaches_its_recipient_until_deleted(self):
+        """A note goes to the role or task its `to:` names, not to its author;
+        it waits on the recipient, also a later holder, until it is deleted."""
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        n = self.task("probe", d)
+        w = self.ptt("take", n, session="W").stdout.strip()
+        notes = self.rec / "handoff" / "notes"
+        notes.mkdir(parents=True)
+        (notes / "to-integrator.md").write_text("---\nto: integrator\n---\n\nmerge order\n")
+        self.ptt("record", "-m", "note to the integrator", str(notes / "to-integrator.md"),
+                 "--as", d, session="D")
+        (notes / "to-task.md").write_text("---\nto: T0001\n---\n\nmind the bounds\n")
+        self.ptt("record", "-m", "note to T0001", str(notes / "to-task.md"), "--as", d,
+                 session="D")
+        out = self.ptt("inbox", d).stdout
+        self.assertNotIn("to-integrator", out)
+        self.assertNotIn("to-task", out)
+        out = self.ptt("inbox", w).stdout
+        self.assertIn("read handoff/notes/to-task.md: a note to you", out)
+        self.assertNotIn("to-integrator", out)
+        i = self.ptt("take", "integrator", session="I").stdout.strip()
+        out = self.ptt("inbox", i).stdout
+        self.assertIn("waits on you: a note to you: handoff/notes/to-integrator.md", out)
+        self.assertNotIn("to-task", out)
+        (notes / "to-integrator.md").unlink()
+        self.ptt("record", "-m", "note read", str(notes / "to-integrator.md"), "--as", i,
+                 session="I")
+        self.assertNotIn("to-integrator", self.ptt("inbox", i).stdout)
 
     def test_inbox_shows_what_is_new_once(self):
         d = self.ptt("take", "designer", session="D").stdout.strip()
