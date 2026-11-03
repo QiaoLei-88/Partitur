@@ -11,6 +11,11 @@ session, branch, and worktree are gone.
 - Records cited from code repositories: records-repository commit, request
   number, or run id; never a live path in the records repository (D7).
 - Runs: run id.
+- A record (an amendment, a done report, a request message): its
+  records-repository commit first, its file only as `ptt` reported it
+  (`wrote tasks/open/T0007-x/0003-amend.md (records c6aa695)`) or as a
+  listing shows it. Event numbers count all of a task's events, so they
+  cannot be inferred; and never cite a record before it is written (D7).
 
 ## Not lasting
 

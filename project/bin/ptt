@@ -320,12 +320,14 @@ def git(*args, check=True, raise_=False):
 ACTOR = None                       # the holder this command writes as, when known
 
 
-def record(message, add=(), remove=(), created=(), undo=None):
+def record(message, add=(), remove=(), created=(), undo=None, shown=None):
     """Commit exactly `add` and `remove` (paths in the working tree, files or
     directories) as one commit, leaving everything else staged alone. The
     caller holds the lock. On any failure, `undo` runs, or the paths in
     `created` are removed, the touched paths are unstaged, and nothing is
-    recorded. The message names the writer, `(by NAME)`, unless it does."""
+    recorded. The message names the writer, `(by NAME)`, unless it does.
+    What was written, `shown` or else `add` and `remove`, is reported with
+    the commit, so that callers cite records as written, never inferred."""
     if ACTOR and ACTOR != "user" and not re.search(rf"by {re.escape(ACTOR)}\b(?![.-])", message):
         message += f" (by {ACTOR})"
     rel = [str(p.relative_to(REC)) for p in (*add, *remove)]
@@ -334,6 +336,9 @@ def record(message, add=(), remove=(), created=(), undo=None):
         if git("diff", "--cached", "--quiet", "--", *rel, check=False).returncode == 0:
             return False
         git("commit", "-q", "-m", message, "--", *rel, check=False, raise_=True)
+        commit = git("rev-parse", "--short", "HEAD").stdout.strip()
+        wrote = [str(p.relative_to(REC)) for p in (shown if shown is not None else (*add, *remove))]
+        print(f"wrote {', '.join(wrote)} (records {commit})", file=sys.stderr)
         return True
     except BaseException as err:
         git("reset", "-q", "--", *rel, check=False)
@@ -1034,7 +1039,7 @@ def finish(i, kind, place, fields, body, message):
     def undo():
         os.rename(target, i["dir"])
         (i["dir"] / event.name).unlink(missing_ok=True)
-    record(message, add=[target], remove=[i["dir"]], undo=undo)
+    record(message, add=[target], remove=[i["dir"]], undo=undo, shown=[target / event.name])
 
 
 def not_root(i):
@@ -1093,7 +1098,8 @@ def cmd_pr_move(a):
     target = REC / "pr" / a.to / src.name
     target.parent.mkdir(parents=True, exist_ok=True)
     os.rename(src, target)
-    record(a.message, add=[target], remove=[src], undo=lambda: os.rename(target, src))
+    record(a.message, add=[target], remove=[src], undo=lambda: os.rename(target, src),
+           shown=[target])
     print(f"request {number} moved to pr/{a.to}")
 
 

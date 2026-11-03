@@ -182,13 +182,13 @@ class Ptt(unittest.TestCase):
         req2 = self.rec / "pr" / "open" / "000002-y"
         req2.mkdir()
         (req2 / "0001-request.md").write_text("x\n")
-        self.assertEqual(self.ptt("record", "-m", "submit", str(req2)).stderr, "")
+        self.assertNotIn("note:", self.ptt("record", "-m", "submit", str(req2)).stderr)
         self.ptt("leave", "designer-g1")
         charter = self.rec / "tasks" / "open" / "T0000-design" / "charter.md"
         self.fill(charter)
         self.fill(charter.parent / "status.md")
         self.ptt("record", "-m", "fill", str(charter.parent))
-        self.assertEqual(self.ptt("take", "designer", session="S").stderr, "")
+        self.assertNotIn("note:", self.ptt("take", "designer", session="S").stderr)
 
     def test_record_and_pr_move_accept_as(self):
         req = self.rec / "pr" / "open" / "000001-x"
@@ -212,6 +212,19 @@ class Ptt(unittest.TestCase):
         self.ptt("leave", holder)
         self.ptt("approve-leave", n, "--as", d)
         self.assertNotIn("amended", self.ptt("inbox", self.ptt("take", n).stdout.strip()).stdout)
+
+    def test_writes_report_path_and_commit(self):
+        """Every record names what it wrote and the records commit, on
+        standard error; standard output stays what scripts read."""
+        d = self.designer()
+        n = self.task("probe", d)
+        r = self.ptt("amend", n, "--as", d, "--text", "scope narrowed")
+        head = run("git", "-C", str(self.rec), "rev-parse", "--short", "HEAD").stdout.strip()
+        self.assertIn(f"wrote tasks/open/T0001-probe/0002-amend.md (records {head})", r.stderr)
+        holder = self.ptt("take", n)
+        self.assertRegex(holder.stderr, r"wrote tasks/open/T0001-probe/0003-take.md, "
+                         r"tasks/open/T0001-probe/status.md \(records \w+\)")
+        self.assertEqual(holder.stdout.strip(), "track-T0001")
 
     def test_root_task_has_no_dependencies(self):
         d = self.designer()
@@ -376,10 +389,12 @@ class Ptt(unittest.TestCase):
         notes = self.rec / "notes.txt"
         script = ("for i in $(seq 40); do echo $i >> notes.txt; "
                   f"python3 {self.rec / 'bin' / 'ptt'} record -m n$i notes.txt >/dev/null; done")
-        loop = subprocess.Popen(["sh", "-c", script], cwd=self.rec)
+        loop = subprocess.Popen(["sh", "-c", script], cwd=self.rec, stderr=subprocess.PIPE,
+                                text=True)
         for k in range(12):
             self.ptt("mktask", f"s{k}", "--as", d)
-        loop.wait()
+        errors = [x for x in loop.communicate()[1].splitlines() if not x.startswith("wrote ")]
+        self.assertEqual(errors, [])
         git = lambda *a: run("git", "-C", str(self.rec), *a).stdout
         tracked = git("ls-tree", "-r", "--name-only", "HEAD")
         for k in range(12):
