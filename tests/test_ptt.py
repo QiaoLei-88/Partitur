@@ -708,6 +708,35 @@ class Ptt(unittest.TestCase):
         self.assertIn("was closed", hook(event).stdout)
         self.assertEqual(hook(event).stdout, "")
 
+    def test_note_reaches_its_recipient_until_deleted(self):
+        """A note goes to the role or task its `to:` names, not to its author;
+        it waits on the recipient, also a later holder, until it is deleted."""
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        n = self.task("probe", d)
+        w = self.ptt("take", n, session="W").stdout.strip()
+        notes = self.rec / "handoff" / "notes"
+        notes.mkdir(parents=True)
+        (notes / "to-integrator.md").write_text("---\nto: integrator\n---\n\nmerge order\n")
+        self.ptt("record", "-m", "note to the integrator", str(notes / "to-integrator.md"),
+                 "--as", d, session="D")
+        (notes / "to-task.md").write_text("---\nto: T0001\n---\n\nmind the bounds\n")
+        self.ptt("record", "-m", "note to T0001", str(notes / "to-task.md"), "--as", d,
+                 session="D")
+        out = self.ptt("inbox", d).stdout
+        self.assertNotIn("to-integrator", out)
+        self.assertNotIn("to-task", out)
+        out = self.ptt("inbox", w).stdout
+        self.assertIn("read handoff/notes/to-task.md: a note to you", out)
+        self.assertNotIn("to-integrator", out)
+        i = self.ptt("take", "integrator", session="I").stdout.strip()
+        out = self.ptt("inbox", i).stdout
+        self.assertIn("waits on you: a note to you: handoff/notes/to-integrator.md", out)
+        self.assertNotIn("to-task", out)
+        (notes / "to-integrator.md").unlink()
+        self.ptt("record", "-m", "note read", str(notes / "to-integrator.md"), "--as", i,
+                 session="I")
+        self.assertNotIn("to-integrator", self.ptt("inbox", i).stdout)
+
     def test_inbox_shows_what_is_new_once(self):
         d = self.ptt("take", "designer", session="D").stdout.strip()
         n = self.task("probe", d)

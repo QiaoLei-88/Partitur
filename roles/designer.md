@@ -27,7 +27,8 @@ designer, for example `T0007` (N2; relative roles *(Proposed, N1)*; taking
 
 - Turns findings arriving in tasks' `status.md` and notes into design, through
   requests against the design document that cite them (D14).
-- Records a note's outcome so that its author can delete it (D3).
+- Records the outcome of a note to it where it belongs, then deletes the
+  note; as root designer, also deletes stale notes (D3).
 - Supervises its tasks' holders: approves or questions leave requests,
   closes or reopens done reports, and checks on a holder with no record for
   days, freeing the task if the holder is gone (G4; freeing *(Proposed,
@@ -43,7 +44,8 @@ designer, for example `T0007` (N2; relative roles *(Proposed, N1)*; taking
 - Implement: code belongs to worker sessions (B5b), probes to
   tracks (E8) (B2).
 - Review or merge its own requests (C5).
-- Write another session's `status.md`, notes, or outputs (B8).
+- Write another session's `status.md`, notes, or outputs (B8); deleting a
+  note under D3 is not writing it.
 
 ## Lifecycle
 

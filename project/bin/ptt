@@ -1241,6 +1241,27 @@ def tree(rev):
     return out
 
 
+def note_for(f, name, held):
+    """Whether the note handoff/notes/F is to NAME, holding `held`, and not
+    by it: its `to:` names a role (`designer`, `integrator`) or a task;
+    without one it is to the designer (D3)."""
+    path = REC / "handoff" / "notes" / f
+    if not path.is_file():
+        return False
+    to = front_matter(path)[0].get("to", "designer").strip().lower()
+    if to == "designer":
+        to = ROOT
+    elif to != "integrator":
+        m = re.match(r"t?(\d+)((?:\.\d+)*)", to)
+        to = m.group(1).zfill(4) + m.group(2) if m else to
+    if to != ("integrator" if held == ("role", "integrator") else
+              held[1]["number"] if held[0] == "task" else None):
+        return False
+    added = git("log", "--diff-filter=A", "--format=%s", "--", str(path.relative_to(REC)),
+                check=False).stdout
+    return not re.search(rf"by {re.escape(name)}\b(?![.-])", added)
+
+
 def inbox_base(name, d):
     """The records commit NAME last looked at, or else its take."""
     mark = git_dir() / "ptt-inbox" / name
@@ -1284,8 +1305,8 @@ def news(name, held, base):
             if kind in ("amend", "reopen"):
                 out.append(f"your task {tid(mine['number'])}: {kind} event {f}; read it with "
                            f"`ptt show {tid(mine['number'])}` ({sha(area, d, f)})")
-        elif area == "notes" and mine and mine["number"] == ROOT:
-            out.append(f"read handoff/notes/{f}: a note to the designer ({sha(area, d, f)})")
+        elif area == "notes" and note_for(f, name, held):
+            out.append(f"read handoff/notes/{f}: a note to you ({sha(area, d, f)})")
         elif area == "pr" and EVENT.match(f):
             msg = REC / "pr" / place / d / f
             first = REC / "pr" / place / d / "0001-request.md"
@@ -1424,6 +1445,10 @@ def cmd_inbox(a):
         for f in i["amended"]:
             waits.append(f"amended since your take: {f}; read it with `ptt show {tid(i['number'])}`")
     waits += unclear(subtree(name))
+    for f in sorted({f for (area, _, f) in tree("HEAD") if area == "notes"}):
+        if note_for(f, name, held):
+            waits.append(f"a note to you: handoff/notes/{f}; once read and any outcome "
+                         "recorded where it belongs, delete it (rm, then ptt record)")
     if a.quiet:
         if new:
             print(f"ptt inbox for {name} (new in the records since it last looked):")
