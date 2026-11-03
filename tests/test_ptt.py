@@ -384,6 +384,26 @@ class Ptt(unittest.TestCase):
         self.assertIn("line breaks", self.refused("done", n, "--as", h, "--requests", "1\nby: x"))
         self.assertEqual(run("git", "-C", str(self.rec), "status", "--porcelain").stdout, "")
 
+    def test_record_deletions(self):
+        """A deletion is recorded after `rm` or after `git rm`; a path that is
+        gone already, or never was, is refused and says which."""
+        for name in ("a.md", "b.md"):
+            (self.rec / name).write_text("x\n")
+            self.ptt("record", "-m", f"add {name}", str(self.rec / name))
+        (self.rec / "a.md").unlink()
+        self.ptt("record", "-m", "delete a", str(self.rec / "a.md"))
+        run("git", "-C", str(self.rec), "rm", "-q", "b.md")
+        self.ptt("record", "-m", "delete b", str(self.rec / "b.md"))
+        git = lambda *a: run("git", "-C", str(self.rec), *a).stdout
+        self.assertEqual(git("ls-tree", "--name-only", "HEAD", "--", "a.md", "b.md"), "")
+        self.assertEqual(git("status", "--porcelain"), "")
+        gone = git("rev-parse", "--short", "HEAD").strip()
+        r = self.ptt("record", "-m", "delete b again", str(self.rec / "b.md"),
+                     check=False)
+        self.assertIn(f"b.md is not in the records: already deleted (records {gone})", r.stderr)
+        r = self.ptt("record", "-m", "typo", str(self.rec / "c.md"), check=False)
+        self.assertIn("c.md is not in the records\n", r.stderr)
+
     def test_record_alongside_task_changes(self):
         d = self.designer()
         notes = self.rec / "notes.txt"

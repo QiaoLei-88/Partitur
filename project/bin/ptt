@@ -331,8 +331,19 @@ def record(message, add=(), remove=(), created=(), undo=None, shown=None):
     if ACTOR and ACTOR != "user" and not re.search(rf"by {re.escape(ACTOR)}\b(?![.-])", message):
         message += f" (by {ACTOR})"
     rel = [str(p.relative_to(REC)) for p in (*add, *remove)]
+    staged = []                   # deleted with `git rm` already: the commit takes them as they are
+    for path in rel:
+        if (REC / path).exists() or git("ls-files", "--", path).stdout.strip():
+            continue
+        if not git("ls-tree", "HEAD", "--", path, check=False).stdout.strip():
+            gone = git("log", "-1", "--format=%h", "--diff-filter=D", "--", path,
+                       check=False).stdout.strip()
+            die(f"{path} is not in the records" + (f": already deleted (records {gone})"
+                                                   if gone else ""))
+        staged.append(path)
     try:
-        git("add", "-A", "--", *rel, check=False, raise_=True)
+        if len(staged) < len(rel):
+            git("add", "-A", "--", *[x for x in rel if x not in staged], check=False, raise_=True)
         if git("diff", "--cached", "--quiet", "--", *rel, check=False).returncode == 0:
             return False
         git("commit", "-q", "-m", message, "--", *rel, check=False, raise_=True)
