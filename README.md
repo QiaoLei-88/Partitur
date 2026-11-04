@@ -171,8 +171,9 @@ to check the binding, and resume to reload the handover when needed.
 
 To bring a project up to a newer Partitur, pull this repository and rerun
 step 1's command with `--update`. The project remembers which Partitur
-commit installed it (`workspace/.partitur-version`), so the update replaces
-what is outdated and removes what Partitur no longer ships, but leaves your
+commit and clone installed it (`workspace/.partitur-version`), so the update
+replaces what is outdated, removes what Partitur no longer ships, and moves
+the `partitur` skill link when you run it from another clone, but leaves your
 rules, your records, and any file you changed (`--force` replaces those,
 after copying each into a backup directory).
 `--uninstall` removes what was installed the same way. For the user link,
