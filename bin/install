@@ -63,8 +63,8 @@ Claude Code if the `claude` command or ~/.claude exists, Codex if the `codex`
 command or ~/.codex exists. It reports what it found, and stops if it finds
 neither; --tool claude, codex, or all chooses explicitly.
 
-A project records which Partitur commit installed it, in one line of
-<records>/.partitur-version. Git already knows what Partitur ships, so
+A project records which Partitur commit installed it, and from which clone,
+in <records>/.partitur-version. Git already knows what Partitur ships, so
 install rebuilds from that commit what it delivered then: "maintained" files
 (tools, skills, pr/README.md, the charter template), "seeded" files (the
 rules file, the root design task's charter and status, the integrator's
@@ -77,7 +77,9 @@ Compared with the project:
                      newer version), "modified" (changed here), "obsolete"
                      (delivered then, no longer shipped).
   --update           also replaces outdated files and removes obsolete ones,
-                     then stamps the current commit.
+                     moves the `partitur` skill links from the clone that
+                     installed the project to this one, then stamps the
+                     current commit and this clone.
   --uninstall        removes every maintained file and link still as
                      delivered; keeps seeded files, files changed here, and
                      every record (tasks, requests, roles).
@@ -395,11 +397,17 @@ def apply(root, plan, old, opts, report):
         if e["kind"] == "link":
             if path.is_symlink() and os.readlink(path) == e["target"]:
                 report("kept", path)
-            elif path.is_symlink() and before and os.readlink(path) == before["target"] \
-                    and mode == "update":
+            elif path.is_symlink() and before and os.readlink(path) == before["target"]:
+                if mode != "update":
+                    report("outdated", path, "--update relinks it")
+                    continue
                 path.unlink()
                 path.symlink_to(e["target"])
-                report("updated", path)
+                report("updated", path, f"was {before['target']}")
+            elif path.is_symlink() and not path.exists():
+                report("differs", path, "dangling, not Partitur's link; left alone (remove "
+                       "it and rerun)")
+                continue
             elif path.exists() or path.is_symlink():
                 report("differs", path, "not Partitur's link; left alone")
                 continue
@@ -546,9 +554,10 @@ def scope_user(a, tools, report):
             report("created", link)
 
 
-def project_plan(a, tools, repos, name, src, quiet=False):
+def project_plan(a, tools, repos, name, src, quiet=False, clone=None):
     """Everything install delivers to the project from Partitur source `src`,
-    as rel path -> entry. Tools and skills are whatever `src` ships."""
+    as rel path -> entry. Tools and skills are whatever `src` ships; the
+    `partitur` skill links point to `clone` (default: this clone)."""
     plan = {}
     R = a.records
 
@@ -599,7 +608,7 @@ def project_plan(a, tools, repos, name, src, quiet=False):
             if not quiet:
                 print(f"skipped    {tool_dir}/skills/partitur (linked for the user already)")
         else:
-            plan[f"{tool_dir}/skills/partitur"] = dict(kind="link", target=str(HERE))
+            plan[f"{tool_dir}/skills/partitur"] = dict(kind="link", target=clone or str(HERE))
         if tool == "claude" and b"def cmd_inbox" in src.read("project/bin/ptt"):
             hook = {"hooks": [{"type": "command",
                                "command": f'"$CLAUDE_PROJECT_DIR"/{R}/bin/ptt inbox --quiet'}]}
@@ -674,24 +683,44 @@ def set_repos(a, root, rec, table, repos, add_repos, report):
 
 
 def read_stamp(path):
+    """The installing commit and clone recorded in the stamp, each None when
+    unknown: uncommitted, or a stamp written before clones were recorded."""
     if not path.exists():
-        return None
+        return None, None
+    found = {}
     for line in path.read_text().splitlines():
-        if line.startswith("partitur "):
-            value = line.split(" ", 1)[1].strip()
-            return None if value == "uncommitted" else value
+        key, _, value = line.partition(" ")
+        if key in ("partitur", "source") and key not in found:
+            found[key] = value.strip() or None
+    commit = found.get("partitur")
+    return (None if commit == "uncommitted" else commit), found.get("source")
+
+
+def stamped_clone(root, tools, commit):
+    """For a stamp without a clone: the target of a project `partitur` link
+    that is a checkout at the stamped commit, the clone that installed it."""
+    for tool in tools:
+        link = root / TOOLS[tool][1] / "skills" / "partitur"
+        if not link.is_symlink():
+            continue
+        target = os.readlink(link)
+        r = subprocess.run(["git", "-C", str(link.parent / target), "rev-parse", "HEAD"],
+                           capture_output=True, text=True)
+        if not r.returncode and r.stdout.strip() == commit:
+            return target
     return None
 
 
-def redundant_links(root, tools):
-    """The project's own `partitur` links to this Partitur that a user-scope
-    link makes redundant: with both, Codex would list the skill twice."""
+def redundant_links(root, tools, clone=None):
+    """The project's own `partitur` links to this Partitur, or to the clone
+    that installed it, that a user-scope link makes redundant: with both,
+    Codex would list the skill twice."""
     out = []
     for tool in tools:
         tool_dir = TOOLS[tool][1]
         link = root / tool_dir / "skills" / "partitur"
         if ((Path.home() / tool_dir / "skills" / "partitur").exists() and link.is_symlink()
-                and Path(os.readlink(link)) == HERE):
+                and (Path(os.readlink(link)) == HERE or os.readlink(link) == clone)):
             out.append(link)
     return out
 
@@ -749,12 +778,15 @@ def scope_project(a, tools, report):
     stamp = rec / ".partitur-version"
     held = records_lock(rec) if (rec / ".git").exists() else None
     name = a.name or root.name
-    before = read_stamp(stamp)
+    before, clone = read_stamp(stamp)
     if before and not known_commit(before):
         print(f"warning    this Partitur clone does not have commit {before[:12]}, which "
               "installed the project; files no longer shipped cannot be found")
         before = None
-    old = delivered(project_plan(a, tools, [], name, Source(before), quiet=True)) if before else None
+    if before and not clone:
+        clone = stamped_clone(root, tools, before)
+    old = delivered(project_plan(a, tools, [], name, Source(before), quiet=True,
+                                 clone=clone)) if before else None
 
     if a.uninstall:
         if not stamp.exists():
@@ -763,7 +795,7 @@ def scope_project(a, tools, report):
             print("warning   unknown installing commit; comparing with this Partitur instead")
             old = delivered(project_plan(a, tools, [], name, Source(), quiet=True))
         kept = [rel for rel, e in old.items() if not remove_entry(root, rel, e, a, report)]
-        for link in redundant_links(root, tools):
+        for link in redundant_links(root, tools, clone):
             link.unlink()
             report("removed", link)
         stamp.unlink()
@@ -812,7 +844,7 @@ def scope_project(a, tools, report):
     rename_rules(a, rec, plan, old, report)
     apply(root, plan, old, a, report)
     mentions_of_legacy_rules(a, rec, report)
-    for link in redundant_links(root, tools):
+    for link in redundant_links(root, tools, clone):
         if a.update:
             link.unlink()
             report("removed", link, "linked for the user already")
@@ -823,7 +855,7 @@ def scope_project(a, tools, report):
     c = report.counts
     pending = any(c.get(k) for k in ("outdated", "obsolete", "superseded", "redundant"))
     if not stamp.exists() or a.update or not pending:
-        stamp.write_text("partitur " + (now or "uncommitted") + "\n")
+        stamp.write_text("partitur " + (now or "uncommitted") + f"\nsource {HERE}\n")
     if not now:
         print("\nwarning   this Partitur has uncommitted changes; a later update cannot find "
               "files it no longer ships. Install from a committed Partitur.")

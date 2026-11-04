@@ -149,7 +149,8 @@ Claude Code 继续使用 `CLAUDE_CODE_SESSION_ID`；
 
 要将项目升级到新版 Partitur，请拉取本仓库，并在第 1 步的命令中加上
 `--update` 后重新运行。项目会在 `workspace/.partitur-version` 中记录
-安装时的 Partitur 提交，因此升级会替换过时内容、移除 Partitur 不再提供的内容，
+安装时的 Partitur 提交和所用的 clone，因此升级会替换过时内容、移除 Partitur
+不再提供的内容；从另一个 clone 运行时，还会把 `partitur` skill 链接改为指向该 clone；
 同时保留你的规则、记录和自行修改的文件。
 使用 `--force` 可以替换自行修改的文件，但会先将每个文件复制到备份目录。
 `--uninstall` 按同样的原则移除已安装内容。

@@ -575,6 +575,91 @@ class InstallProject(unittest.TestCase):
         self.assertNotIn("relinked", out)
         self.assertEqual(os.readlink(entry), "notes.md")
 
+    def two_releases(self, old_stamp=False):
+        """Install from release A, then make release B: a clone at the same commit."""
+        a = self.partitur_clone("release-a")
+        b = self.home / "release-b"
+        git(self.home, "clone", "-q", str(a), str(b))
+        git(b, "checkout", "-q", "--detach")
+        self.install_from(a)
+        stamp = self.root / "workspace" / ".partitur-version"
+        self.assertEqual(stamp.read_text().splitlines()[1], f"source {a}")
+        if old_stamp:
+            stamp.write_text(f"partitur {git(a, 'rev-parse', 'HEAD')}\n")
+        return a, b, self.root / ".claude/skills/partitur"
+
+    def check_relinks_from_another_release(self, old_stamp):
+        a, b, link = self.two_releases(old_stamp)
+        out = self.install_from(b).stdout
+        self.assertRegex(out, r"outdated\s+\.claude/skills/partitur\s+\(--update")
+        self.assertEqual(os.readlink(link), str(a))
+        out = self.install_from(b, "--update").stdout
+        self.assertRegex(out, rf"updated\s+\.claude/skills/partitur\s+\(was {a}\)")
+        self.assertEqual(os.readlink(link), str(b))
+        self.assertIn(f"source {b}", (self.root / "workspace/.partitur-version").read_text())
+        self.assertRegex(self.install_from(b).stdout, r"kept\s+\.claude/skills/partitur")
+
+    def test_update_from_another_release_relinks(self):
+        self.check_relinks_from_another_release(old_stamp=False)
+
+    def test_update_from_another_release_relinks_with_old_stamp(self):
+        self.check_relinks_from_another_release(old_stamp=True)
+
+    def check_leaves_other_links_alone(self, old_stamp):
+        a, b, link = self.two_releases(old_stamp)
+        other = self.home / "other"
+        other.mkdir()
+        elsewhere = self.partitur_clone("elsewhere")
+        (elsewhere / "README.md").write_text("changed\n")
+        self.commit_clone(elsewhere, "another commit")
+        for target in (other, elsewhere):
+            link.unlink()
+            link.symlink_to(target)
+            out = self.install_from(b, "--update").stdout
+            self.assertRegex(out, r"differs\s+\.claude/skills/partitur\s+\(not Partitur")
+            self.assertEqual(os.readlink(link), str(target))
+
+    def test_update_leaves_other_links_alone(self):
+        self.check_leaves_other_links_alone(old_stamp=False)
+
+    def test_update_leaves_other_links_alone_with_old_stamp(self):
+        self.check_leaves_other_links_alone(old_stamp=True)
+
+    def test_update_relinks_dangling_link_to_stamped_release(self):
+        a, b, link = self.two_releases()
+        shutil.rmtree(a)
+        out = self.install_from(b, "--update").stdout
+        self.assertRegex(out, rf"updated\s+\.claude/skills/partitur\s+\(was {a}\)")
+        self.assertEqual(os.readlink(link), str(b))
+
+    def test_dangling_link_with_old_stamp_left_alone(self):
+        a, b, link = self.two_releases(old_stamp=True)
+        shutil.rmtree(a)
+        out = self.install_from(b, "--update").stdout
+        self.assertRegex(out, r"differs\s+\.claude/skills/partitur\s+\(dangling")
+        self.assertEqual(os.readlink(link), str(a))
+
+    def check_uninstall_from_another_release(self, old_stamp):
+        a, b, link = self.two_releases(old_stamp)
+        out = self.install_from(b, "--uninstall").stdout
+        self.assertRegex(out, r"removed\s+\.claude/skills/partitur")
+        self.assertFalse(link.is_symlink())
+
+    def test_uninstall_from_another_release_removes_link(self):
+        self.check_uninstall_from_another_release(old_stamp=False)
+
+    def test_uninstall_from_another_release_removes_link_with_old_stamp(self):
+        self.check_uninstall_from_another_release(old_stamp=True)
+
+    def test_user_link_makes_link_to_another_release_redundant(self):
+        a, b, link = self.two_releases()
+        (self.home / ".claude" / "skills").mkdir(parents=True)
+        (self.home / ".claude" / "skills" / "partitur").symlink_to(b)
+        self.assertRegex(self.install_from(b).stdout, r"redundant\s+\.claude/skills/partitur")
+        self.assertRegex(self.install_from(b, "--update").stdout,
+                         r"removed\s+\.claude/skills/partitur")
+        self.assertFalse(link.is_symlink())
+
     def test_update_replaces_outdated_keeps_modified(self):
         clone = self.partitur_clone()
         out = self.install_from(clone).stdout
