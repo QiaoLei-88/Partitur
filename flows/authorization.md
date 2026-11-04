@@ -37,7 +37,7 @@
 - Rewriting a main branch, merged commits, or the records repository needs
   its own authorization and a recovery reference first (A7).
 
-## Asking for a decision (A13)
+## Asking for a decision (A13, A14, A15)
 
 When the user must decide, the session asks with a numbered list: its
 recommendation first and marked, one line per option, and always the last
@@ -48,9 +48,11 @@ discussion.
 
 The list follows its question line directly, never another numbered list:
 Markdown renders two adjacent lists as one and renumbers the second, so the
-user sees other numbers than the session wrote. A number that is not an
-option means the user may have seen another rendering: the session says so
-and asks again as the user saw it.
+user sees other numbers than the session wrote *(Adopted, A14)*.
+
+A number that is not an option means the user may have seen another
+rendering: the session says so and asks again as the user saw it
+*(Adopted, A15)*.
 
 ```
 Decide request 000015:
