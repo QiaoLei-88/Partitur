@@ -5,12 +5,21 @@ insensitive) if the file exists; it is kept out of version control, so a
 public clone skips that check.
 """
 import json
+import os
 import re
 import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# A calling Git (rebase --exec, a hook) exports variables such as GIT_DIR that
+# would point the tests' git commands at its repository instead of theirs.
+for _var in subprocess.run(["git", "rev-parse", "--local-env-vars"], capture_output=True,
+                           text=True, check=True).stdout.split():
+    os.environ.pop(_var, None)
 
 
 def tracked():
@@ -20,6 +29,23 @@ def tracked():
 
 
 class Repo(unittest.TestCase):
+    def test_tests_ignore_a_calling_gits_repository(self):
+        # git rebase --exec and hooks export GIT_DIR; the tests' own git
+        # commands must still reach only their temporary repositories
+        with tempfile.TemporaryDirectory() as d:
+            subprocess.run(["git", "init", "-q", d], check=True)
+            caller = Path(d) / ".git"
+            def snapshot():
+                return {p.relative_to(caller): p.read_bytes()
+                        for p in caller.rglob("*") if p.is_file()}
+            before = snapshot()
+            env = dict(os.environ, GIT_DIR=str(caller), GIT_WORK_TREE=d)
+            r = subprocess.run([sys.executable, "-m", "unittest", "test_ptt.Ptt.test_task_lifecycle",
+                                "test_tools.Workspace.test_list_states"], cwd=ROOT / "tests", env=env,
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertEqual(snapshot(), before)
+
     def test_skill_frontmatter(self):
         for f in [ROOT / "SKILL.md", *sorted((ROOT / "project" / "skills").glob("*/SKILL.md.in"))]:
             text = f.read_text()

@@ -16,6 +16,12 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
 
+# A calling Git (rebase --exec, a hook) exports variables such as GIT_DIR that
+# would point the tests' git commands at its repository instead of theirs.
+for _var in subprocess.run(["git", "rev-parse", "--local-env-vars"], capture_output=True,
+                           text=True, check=True).stdout.split():
+    os.environ.pop(_var, None)
+
 
 def run(*args, cwd=None, check=True, env=None, input=None):
     r = subprocess.run(args, cwd=cwd, capture_output=True, text=True, env=env, input=input)
