@@ -6,6 +6,7 @@ Run: python3 -m unittest discover -s tests   (from the repository root)
 import json
 import os
 import re
+import runpy
 import shutil
 import signal
 import subprocess
@@ -113,7 +114,12 @@ class Ptt(unittest.TestCase):
         self.ptt("done", "T0001", "--as", holder, "--requests", "000003")
         self.assertIn("reports done", self.ptt("inbox", d).stdout)
         self.assertIn("does not supervise", self.refused("close", "T0001", "--as", "integrator-1"))
-        self.ptt("close", "T0001", "--as", d)
+        closed = self.ptt("close", "T0001", "--as", d)
+        self.assertIn("A tasks/done/T0001-wall-distance/0004-close.md", closed.stderr)
+        self.assertIn("R100 tasks/open/T0001-wall-distance/charter.md -> "
+                      "tasks/done/T0001-wall-distance/charter.md", closed.stderr)
+        self.assertIn("R100 tasks/open/T0001-wall-distance/status.md -> "
+                      "tasks/done/T0001-wall-distance/status.md", closed.stderr)
         self.assertTrue((self.rec / "tasks" / "done" / "T0001-wall-distance").is_dir())
         listing = self.ptt("tasks", "--all").stdout
         self.assertIn("closed", listing)
@@ -201,7 +207,10 @@ class Ptt(unittest.TestCase):
         req.mkdir(parents=True)
         (req / "0001-request.md").write_text("x\n")
         self.ptt("record", "-m", "pr 000001: submit", "--as", "track-T0001", str(req))
-        self.ptt("pr-move", "1", "merged", "-m", "pr 000001: merged", "--as", "integrator-1")
+        run("git", "-C", str(self.rec), "config", "diff.renames", "false")
+        moved = self.ptt("pr-move", "1", "merged", "-m", "pr 000001: merged", "--as", "integrator-1")
+        self.assertRegex(moved.stderr, r"recorded [0-9a-f]+: R100 "
+                         r"pr/open/000001-x/0001-request.md -> pr/merged/000001-x/0001-request.md\n")
         log = run("git", "-C", str(self.rec), "log", "--format=%s").stdout
         self.assertIn("pr 000001: submit (by track-T0001)", log)
         self.assertIn("pr 000001: merged (by integrator-1)", log)
@@ -226,11 +235,70 @@ class Ptt(unittest.TestCase):
         n = self.task("probe", d)
         r = self.ptt("amend", n, "--as", d, "--text", "scope narrowed")
         head = run("git", "-C", str(self.rec), "rev-parse", "--short", "HEAD").stdout.strip()
-        self.assertIn(f"wrote tasks/open/T0001-probe/0002-amend.md (records {head})", r.stderr)
+        self.assertEqual(r.stderr, f"recorded {head}: A tasks/open/T0001-probe/0002-amend.md\n")
         holder = self.ptt("take", n)
-        self.assertRegex(holder.stderr, r"wrote tasks/open/T0001-probe/0003-take.md, "
-                         r"tasks/open/T0001-probe/status.md \(records \w+\)")
+        self.assertRegex(holder.stderr, r"recorded [0-9a-f]+: A tasks/open/T0001-probe/0003-take.md, "
+                         r"A tasks/open/T0001-probe/status.md\n")
         self.assertEqual(holder.stdout.strip(), "track-T0001")
+
+    def test_record_root_lists_committed_files(self):
+        (self.rec / "a.md").write_text("my note\n")
+        (self.rec / "b.md").write_text("another session's note\n")
+        template = self.rec / "tasks" / "charter-template.md"
+        template.write_text(template.read_text() + "\nAn update.\n")
+        r = self.ptt("record", "-m", "record root", str(self.rec))
+        head = run("git", "-C", str(self.rec), "rev-parse", "--short", "HEAD").stdout.strip()
+        self.assertEqual(r.stderr, f"recorded {head}: A a.md, A b.md, M tasks/charter-template.md\n")
+        self.assertEqual(r.stdout, "")
+        unchanged = self.ptt("record", "-m", "unchanged", str(self.rec))
+        self.assertEqual((unchanged.stdout, unchanged.stderr), ("nothing to record\n", ""))
+
+    def test_record_directory_lists_only_changed_files(self):
+        notes = self.rec / "notes"
+        notes.mkdir()
+        (notes / "a.md").write_text("before\n")
+        (notes / "unchanged.md").write_text("same\n")
+        self.ptt("record", "-m", "initial notes", str(notes))
+        (notes / "a.md").write_text("after\n")
+        (notes / "z.md").write_text("new\n")
+        r = self.ptt("record", "-m", "updated notes", str(notes))
+        head = run("git", "-C", str(self.rec), "rev-parse", "--short", "HEAD").stdout.strip()
+        self.assertEqual(r.stderr, f"recorded {head}: M notes/a.md, A notes/z.md\n")
+
+    def test_record_output_limit(self):
+        for count, suffix in ((10, ""), (11, ", ... (11 files total)")):
+            with self.subTest(count=count):
+                notes = self.rec / f"batch{count}"
+                notes.mkdir()
+                for i in range(count):
+                    (notes / f"{i:02d}.md").write_text(f"note {i}\n")
+                r = self.ptt("record", "-m", "many notes", str(notes))
+                head = run("git", "-C", str(self.rec), "rev-parse", "--short", "HEAD").stdout.strip()
+                expected = ", ".join(f"A {notes.name}/{i:02d}.md" for i in range(10)) + suffix
+                self.assertEqual(r.stderr, f"recorded {head}: {expected}\n")
+
+    def test_first_record_lists_files(self):
+        run("git", "-C", str(self.rec), "update-ref", "-d", "refs/heads/master")
+        r = self.ptt("record", "-m", "first record", str(self.rec))
+        head = run("git", "-C", str(self.rec), "rev-parse", "--short", "HEAD").stdout.strip()
+        self.assertEqual(r.stderr, f"recorded {head}: A bin/ptt, A tasks/charter-template.md, "
+                         "A tasks/open/T0000-design/charter.md\n")
+
+    def test_record_report_failure_keeps_committed_files(self):
+        ptt = runpy.run_path(str(self.rec / "bin" / "ptt"))
+        git = ptt["git"]
+        def fail_listing(*args, **kwargs):
+            if args[0] == "diff-tree":
+                raise SystemExit("listing failed")
+            return git(*args, **kwargs)
+        ptt["record"].__globals__["git"] = fail_listing
+        note = self.rec / "note.md"
+        note.write_text("keep this\n")
+        with ptt["lock"](), self.assertRaisesRegex(SystemExit, "listing failed"):
+            ptt["record"]("keep committed note", add=[note], created=[note])
+        self.assertEqual(note.read_text(), "keep this\n")
+        self.assertEqual(run("git", "-C", str(self.rec), "show", "HEAD:note.md").stdout, "keep this\n")
+        self.assertEqual(run("git", "-C", str(self.rec), "status", "--porcelain").stdout, "")
 
     def test_root_task_has_no_dependencies(self):
         d = self.designer()
@@ -397,9 +465,11 @@ class Ptt(unittest.TestCase):
             (self.rec / name).write_text("x\n")
             self.ptt("record", "-m", f"add {name}", str(self.rec / name))
         (self.rec / "a.md").unlink()
-        self.ptt("record", "-m", "delete a", str(self.rec / "a.md"))
+        deleted = self.ptt("record", "-m", "delete a", str(self.rec / "a.md"))
+        self.assertRegex(deleted.stderr, r"recorded [0-9a-f]+: D a.md\n")
         run("git", "-C", str(self.rec), "rm", "-q", "b.md")
-        self.ptt("record", "-m", "delete b", str(self.rec / "b.md"))
+        deleted = self.ptt("record", "-m", "delete b", str(self.rec / "b.md"))
+        self.assertRegex(deleted.stderr, r"recorded [0-9a-f]+: D b.md\n")
         git = lambda *a: run("git", "-C", str(self.rec), *a).stdout
         self.assertEqual(git("ls-tree", "--name-only", "HEAD", "--", "a.md", "b.md"), "")
         self.assertEqual(git("status", "--porcelain"), "")
@@ -419,7 +489,7 @@ class Ptt(unittest.TestCase):
                                 text=True)
         for k in range(12):
             self.ptt("mktask", f"s{k}", "--as", d)
-        errors = [x for x in loop.communicate()[1].splitlines() if not x.startswith("wrote ")]
+        errors = [x for x in loop.communicate()[1].splitlines() if not x.startswith("recorded ")]
         self.assertEqual(errors, [])
         git = lambda *a: run("git", "-C", str(self.rec), *a).stdout
         tracked = git("ls-tree", "-r", "--name-only", "HEAD")
@@ -562,8 +632,9 @@ class Ptt(unittest.TestCase):
         (self.rec / "a.txt").write_text("a\n")
         (self.rec / "b.txt").write_text("b\n")
         run("git", "-C", str(self.rec), "add", "b.txt")
-        self.assertEqual(self.ptt("record", "-m", "a only", str(self.rec / "a.txt")).stdout.strip(),
-                         "recorded")
+        r = self.ptt("record", "-m", "a only", str(self.rec / "a.txt"))
+        self.assertEqual(r.stdout, "")
+        self.assertRegex(r.stderr, r"recorded [0-9a-f]+: A a.txt\n")
         self.assertIn("A  b.txt", run("git", "-C", str(self.rec), "status", "--porcelain").stdout)
         self.assertIn("outside", self.refused("record", "-m", "x", "/etc/hostname"))
 

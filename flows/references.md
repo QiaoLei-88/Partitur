@@ -13,9 +13,14 @@ session, branch, and worktree are gone.
 - Runs: run id.
 - A record (an amendment, a done report, a request message): its
   records-repository commit first, its file only as `ptt` reported it
-  (`wrote tasks/open/T0007-x/0003-amend.md (records c6aa695)`) or as a
+  (`recorded c6aa695: A tasks/open/T0007-x/0003-amend.md`) or as a
   listing shows it. Event numbers count all of a task's events, so they
   cannot be inferred; and never cite a record before it is written (D7).
+  The report lists at most 10 changed files, with status letters and both
+  paths of a rename; if shortened, it gives the total. Inspect the commit
+  for the full list.
+  For `ptt record`, the report is on standard error and standard output is
+  empty after a commit. A no-op prints `nothing to record` on standard output.
 
 ## Not lasting
 
