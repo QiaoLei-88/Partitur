@@ -20,7 +20,8 @@ acts with `--as user`.
    closed or cancelled). A criterion not met: do not close; report what is
    missing and ask `1. Reopen` (the missing criteria) / `2. Wait` (the
    holder completes it) / `3. No decision, discuss further`, your
-   recommendation first.
+   recommendation first, as a decision list right after its question line
+   (rules file).
 3. Carry its findings into the design (a request against the design
    document); offer the holder's session to be cleared.
 

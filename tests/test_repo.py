@@ -85,6 +85,23 @@ class Repo(unittest.TestCase):
                 self.assertIn("The command, or an AtE naming these records, approves", text,
                               skill.parent.name)
 
+    def test_decision_list_wording_agrees(self):
+        """Rule A13: the options follow their question line, never another
+        numbered list; a number that is not an option is asked again."""
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        rules = text("templates", "rules.md")
+        self.assertIn("right after its question line, never after another numbered list", rules)
+        self.assertIn("A number that is not an option means the user may have seen another rendering", rules)
+        flow = text("flows", "authorization.md")
+        self.assertIn("The list follows its question line directly, never another numbered list", flow)
+        self.assertIn("A number that is not an option means the user may have seen another rendering", flow)
+        self.assertIn("right after its question line", text("SKILL.md"))
+        self.assertIn("decision list right after its question line", text("project", "skills", "ptt-close", "SKILL.md.in"))
+        review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
+        self.assertIn("decision list right after its question line, never after another numbered list", review)
+        self.assertIn("a number that is not an option: ask again", review)
+
     def test_reply_is_drafted_and_released_by_its_own_commands(self):
         """Replies to a review: /ptt-pr-draft-reply writes nothing, /ptt-pr-reply
         releases; /ptt-pr-submit no longer replies."""

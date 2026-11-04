@@ -62,7 +62,8 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    number and is already recorded, rename yours to the next free one. Record
    only this file: `<records>/bin/ptt record -m "pr NNNNNN: review MMMM"
    <file>`. Report the analysis, comments, and recommendation, end with the
-   decision list, and stop:
+   decision list right after its question line, never after another
+   numbered list (rules file), and stop:
 
    ```
    Decide request NNNNNN:
@@ -72,7 +73,8 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    4. No decision, discuss further
    ```
 7. On the user's decision (an option number with AtE, possibly with changed
-   comments), write `MMMM-decision.md` and record it before anything else:
+   comments; a number that is not an option: ask again, rules file), write
+   `MMMM-decision.md` and record it before anything else:
    `<records>/bin/ptt record -m "pr NNNNNN: decision <merge|changes
    requested|reject|withdraw>" <file>`. Then:
    - **Merge**: check the ancestry again (step 3; `<main>` may have moved);
