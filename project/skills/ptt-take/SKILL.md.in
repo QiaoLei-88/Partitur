@@ -34,6 +34,8 @@ takes, approves recording it (an AtE does not); the work itself needs AtE
      inbox <name>` for what waits on you. A `design` task makes you the
      designer of its scope: you make and close its subtasks; `T0000`'s
      holder makes the top-level tasks.
+     After acting on an amendment, use `<records>/bin/ptt adopt TASK N[,N]
+     --as NAME` on the user's AtE; if you disagree, write a note to the designer.
 5. If the tool notes that `T0000` is not filled in (a project just set up,
    or a placeholder left since), find what exists: earlier handover files
    in `<records>/handoff/` (not `integrator.md`, `notes/`), "superseded"

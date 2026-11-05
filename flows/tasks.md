@@ -91,7 +91,7 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
       status.md           the holder's: done, open, where it stands
       0001-release.md     events, each written once:
       0002-take.md          release, take, leave-request, leave, done,
-      0003-leave-request.md reopen, amend, resume, close, cancel
+      0003-leave-request.md reopen, amend, adopt, resume, close, cancel
       ...
 <records>/roles/integrator/ 0001-take.md (integrator-1), 0002-leave.md, ...
 ```
@@ -104,6 +104,19 @@ unfinished tasks (G10).
 A task's state is derived from its events, as a request's is from its
 messages; there is no state file to go stale (C2).
 
+## Adopting amendments
+
+After acting on an amendment, the task's holder records an `adopt`
+event on the user's AtE. Each amendment is adopted only once.
+A disagreement goes to the designer as a note.
+
+The new `NNNN-adopt.md` contains `by`, `event: adopt`, `amends` (the
+comma-separated, four-digit amendment event numbers), `date`, and optional
+body text. It clears exactly the named amendments from the inbox's waiting
+list. Other amendments keep waiting across resumes. A new take starts with
+none waiting because the new holder reads the charter and every amendment
+with `ptt show`.
+
 ## Commands
 
 | Command | Who | Runs |
@@ -113,6 +126,7 @@ messages; there is no state file to go stale (C2).
 | `/ptt-inbox [name]` | any holder | `ptt inbox`: what is new since the holder last looked, and what waits on it |
 | `/ptt-resume [NAME]` | a cleared or fresh session | `ptt resume`: continue as NAME, or without NAME the holder that left a handover (`ptt handover`), bound to this session |
 | `/ptt-mktask`, `release N`, `amend N` | designer | `ptt mktask`, `ptt ready`, `ptt amend` |
+| `ptt adopt TASK N[,N] --as NAME [--text TEXT]` | holder | record adoption of the named amendment events |
 | `/ptt-done` | holder | `ptt done` |
 | `/ptt-close N`, `reopen N`, `cancel N` | supervisor | `ptt close`, `ptt reopen`, `ptt cancel` |
 | `/ptt-leave`, `approve N`, `free N\|ROLE` | holder; supervisor; supervisor or user | `ptt leave`, `ptt approve-leave`, `ptt free` |
