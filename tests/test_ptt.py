@@ -885,6 +885,60 @@ class Ptt(unittest.TestCase):
                  session="I")
         self.assertNotIn("to-integrator", self.ptt("inbox", i).stdout)
 
+    def test_note_needs_a_recipient_in_front_matter(self):
+        """Recording a note added or changed refuses one whose front matter
+        names no role or existing task, and records nothing; a deletion
+        passes. A note written before the check, without `to:`, still goes
+        to the designer, marked."""
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        n = self.task("probe", d)
+        w = self.ptt("take", n, session="W").stdout.strip()
+        notes = self.rec / "handoff" / "notes"
+        notes.mkdir(parents=True)
+        head = lambda: run("git", "-C", str(self.rec), "rev-parse", "HEAD").stdout
+        header = "A note begins with front matter naming its recipient (designer, " \
+                 "integrator, or a task ID such as T0007):\n---\nto: designer\n---\n"
+        for text, why in (("bounds\n", "no front matter"),
+                          ("to: T0001\n\nbounds\n", "a `to:` line outside front matter"),
+                          ("---\nfrom: me\n---\n\nbounds\n", "front matter without `to:`"),
+                          ("---\nto: T0099\n---\n\nbounds\n",
+                           "`to: T0099` names neither designer, integrator, nor a task"),
+                          ("---\nto: wall-distance\n---\n\nbounds\n",
+                           "`to: wall-distance` names neither designer, integrator, nor a task")):
+            (notes / "x.md").write_text(text)
+            before = head()
+            for target in (notes / "x.md", notes, self.rec):
+                err = self.refused("record", "-m", "note", str(target), session="W")
+                self.assertEqual(err, f"ptt: handoff/notes/x.md: {why}; nothing recorded. "
+                                 + header, text)
+                self.assertEqual(head(), before)
+                self.assertEqual(run("git", "-C", str(self.rec), "status", "--porcelain",
+                                     "--untracked-files=all").stdout, "?? handoff/notes/x.md\n")
+        for to, who in (("designer", d), ("integrator", None), ("T0001", w), ("1", w),
+                        ("t0000", d)):
+            (notes / "x.md").write_text(f"---\nto: {to}\n---\n\nbounds\n")
+            self.ptt("record", "-m", f"note to {to}", str(notes / "x.md"))
+            for holder in (d, w):
+                waits = "a note to you: handoff/notes/x.md;" in self.ptt("inbox", holder).stdout
+                self.assertEqual(waits, holder == who, (to, holder))
+        run("git", "-C", str(self.rec), "mv", str(notes / "x.md"), str(notes / "y.md"))
+        self.assertIn("R100 handoff/notes/x.md -> handoff/notes/y.md",
+                      self.ptt("record", "-m", "renamed", str(notes)).stderr)
+        (notes / "x.md").write_text("changed without front matter\n")
+        self.assertIn("no front matter", self.refused("record", "-m", "edit", str(notes / "x.md")))
+        old = notes / "old.md"                          # written before the check
+        old.write_text("to: T0001\n\nbounds\n")
+        run("git", "-C", str(self.rec), "add", str(old))
+        run("git", "-C", str(self.rec), "commit", "-qm", "old note")
+        out = self.ptt("inbox", d).stdout
+        mark = "; it names no recipient (no `to:` in front matter), so it is the designer's"
+        self.assertIn(f"read handoff/notes/old.md: a note to you{mark} (", out)
+        self.assertIn(f"waits on you: a note to you: handoff/notes/old.md{mark}; once read", out)
+        self.assertNotIn("old.md", self.ptt("inbox", w).stdout)
+        old.unlink()
+        r = self.ptt("record", "-m", "old note read", str(old), session="D")
+        self.assertIn("D handoff/notes/old.md", r.stderr)
+
     def test_inbox_shows_what_is_new_once(self):
         d = self.ptt("take", "designer", session="D").stdout.strip()
         n = self.task("probe", d)
@@ -897,7 +951,7 @@ class Ptt(unittest.TestCase):
         self.ptt("record", "-m", "T0001 status", str(status), session="W")
         note = self.rec / "handoff" / "notes" / "t0001-x.md"
         note.parent.mkdir(parents=True)
-        note.write_text("x\n")
+        note.write_text("---\nto: designer\n---\n\nx\n")
         self.ptt("record", "-m", "note", str(note), session="W")
         req = self.rec / "pr" / "open" / "000001-x"
         req.mkdir(parents=True)
