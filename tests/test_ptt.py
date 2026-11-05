@@ -228,6 +228,77 @@ class Ptt(unittest.TestCase):
         self.ptt("approve-leave", n, "--as", d)
         self.assertNotIn("amended", self.ptt("inbox", self.ptt("take", n).stdout.strip()).stdout)
 
+    def test_adopt_clears_only_named_amendments_across_resume(self):
+        d = self.designer()
+        n = self.task("probe", d)
+        holder = self.ptt("take", n, session="A").stdout.strip()
+        for text in ("scope narrowed", "input clarified", "bounds specified"):
+            self.ptt("amend", n, "--as", d, "--text", text)
+        waiting = r"waits on you: amended since your take: (\d{4}-amend.md)"
+        self.assertEqual(re.findall(waiting, self.ptt("inbox", holder).stdout),
+                         ["0003-amend.md", "0004-amend.md", "0005-amend.md"])
+        adopted = self.ptt("adopt", n, "3, 0005", "--as", holder,
+                           "--text", "Updated the implementation and checks.", session="A")
+        event = self.rec / "tasks" / "open" / "T0001-probe" / "0006-adopt.md"
+        text = event.read_text()
+        for field in (f"by: {holder}\n", "event: adopt\n", "amends: 0003, 0005\n",
+                      "Updated the implementation and checks.\n"):
+            self.assertIn(field, text)
+        self.assertRegex(text, r"date: \d{4}-\d{2}-\d{2}\n")
+        self.assertIn("A tasks/open/T0001-probe/0006-adopt.md", adopted.stderr)
+        self.assertEqual(re.findall(waiting, self.ptt("inbox", holder).stdout), ["0004-amend.md"])
+        self.ptt("resume", holder, session="B")
+        self.assertEqual(re.findall(waiting, self.ptt("inbox", holder).stdout), ["0004-amend.md"])
+        self.assertIn("continued in another session", self.refused(
+            "adopt", n, "4", "--as", holder, session="A"))
+        self.ptt("adopt", n, "4", "--as", holder, session="B")
+        self.assertEqual(re.findall(waiting, self.ptt("inbox", holder).stdout), [])
+        self.ptt("amend", n, "--as", d, "--text", "one more requirement")
+        self.assertEqual(re.findall(waiting, self.ptt("inbox", holder).stdout), ["0009-amend.md"])
+        self.assertEqual(run("git", "-C", str(self.rec), "status", "--porcelain").stdout, "")
+
+    def test_adopt_refuses_invalid_events_without_partial_writes(self):
+        d = self.designer()
+        n = self.task("probe", d)
+        holder = self.ptt("take", n).stdout.strip()
+        self.ptt("amend", n, "--as", d, "--text", "scope narrowed")
+        before = run("git", "-C", str(self.rec), "rev-parse", "HEAD").stdout
+        for numbers, actor, error in (("3", d, "does not hold"), ("3", "user", "does not hold"),
+                                      ("9999", holder, "no event"), ("0", holder, "no event"),
+                                      ("1", holder, "not an amendment"),
+                                      ("2", holder, "not an amendment"),
+                                      ("3,9999", holder, "no event"),
+                                      ("3,2", holder, "not an amendment"),
+                                      ("", holder, "event numbers"),
+                                      ("3,", holder, "event numbers"),
+                                      ("x", holder, "event numbers")):
+            with self.subTest(numbers=numbers, actor=actor):
+                self.assertIn(error, self.refused("adopt", n, numbers, "--as", actor))
+                self.assertEqual(run("git", "-C", str(self.rec), "rev-parse", "HEAD").stdout, before)
+                self.assertEqual(run("git", "-C", str(self.rec), "status", "--porcelain").stdout, "")
+        self.ptt("adopt", n, "3,0003", "--as", holder)
+        event = self.rec / "tasks" / "open" / "T0001-probe" / "0004-adopt.md"
+        self.assertIn("\namends: 0003\n", event.read_text())
+        self.ptt("amend", n, "--as", d, "--text", "input clarified")
+        before = run("git", "-C", str(self.rec), "rev-parse", "HEAD").stdout
+        for numbers in ("3", "5,3"):
+            self.assertIn("already adopted", self.refused("adopt", n, numbers, "--as", holder))
+            self.assertEqual(run("git", "-C", str(self.rec), "rev-parse", "HEAD").stdout, before)
+            self.assertEqual(run("git", "-C", str(self.rec), "status", "--porcelain").stdout, "")
+        self.assertIn("waits on you: amended since your take: 0005-amend.md",
+                      self.ptt("inbox", holder).stdout)
+
+    def test_designer_adopts_user_amendment_to_root_task(self):
+        d = self.designer()
+        self.ptt("amend", "T0000", "--as", "user", "--text", "design document moved")
+        self.assertIn("waits on you: amended since your take: 0002-amend.md",
+                      self.ptt("inbox", d).stdout)
+        self.assertIn("does not hold", self.refused("adopt", "T0000", "2", "--as", "user"))
+        self.ptt("adopt", "T0000", "2", "--as", d)
+        event = self.rec / "tasks" / "open" / "T0000-design" / "0003-adopt.md"
+        self.assertIn(f"by: {d}\n", event.read_text())
+        self.assertNotIn("waits on you: amended", self.ptt("inbox", d).stdout)
+
     def test_writes_report_path_and_commit(self):
         """Every record names what it wrote and the records commit, on
         standard error; standard output stays what scripts read."""

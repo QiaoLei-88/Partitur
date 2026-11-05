@@ -35,6 +35,8 @@ task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
   ptt ready TASK --as NAME         designer: release a completed draft for taking
   ptt amend TASK --as NAME --text TEXT [--depends TASK,TASK]
                                    designer: amend a released charter
+  ptt adopt TASK N[,N] --as NAME [--text TEXT]
+                                   holder: adopt the named amendment event numbers
   ptt done TASK --as NAME [--requests N,N] [--text TEXT]
                                    holder: report the task's acceptance met
   ptt close TASK --as NAME         supervisor: accept the report; the hold ends
@@ -492,6 +494,10 @@ def parse_ids(text):
     return out
 
 
+def adopted_numbers(event):
+    return {n.strip().zfill(4) for n in event.get("amends", "").split(",")}
+
+
 def raw_info(place, d):
     charter = front_matter(d / "charter.md")[0] if (d / "charter.md").exists() else {}
     number = TASK_DIR.match(d.name).group(1)
@@ -510,6 +516,9 @@ def raw_info(place, d):
                 info["depends"] = parse_ids(e["depends"])
             if info["holder"]:
                 info["amended"].append(e["path"].name)
+        elif k == "adopt":
+            adopted = adopted_numbers(e)
+            info["amended"] = [f for f in info["amended"] if f[:4] not in adopted]
         elif k == "take":
             info.update(state="held", holder=e["by"], leave_request=None, done=None, amended=[],
                         sessions=[e.get("session_id")])
@@ -1022,6 +1031,26 @@ def cmd_amend(a):
     print("amended; tell the holder, if any")
 
 
+def cmd_adopt(a):
+    i = get(a.task)
+    need(i["state"] == "held" and i["holder"] == a.as_, f"{a.as_} does not hold task {tid(i['number'])}")
+    numbers = [n.strip() for n in a.numbers.split(",")]
+    need(all(re.fullmatch(r"[0-9]{1,4}", n) for n in numbers),
+         "use comma-separated event numbers (1-4 digits each)")
+    numbers = list(dict.fromkeys(f"{int(n):04d}" for n in numbers))
+    evs = {f"{e['n']:04d}": e for e in events(i["dir"])}
+    adopted = {n for e in evs.values() if e["kind"] == "adopt"
+               for n in adopted_numbers(e)}
+    for n in numbers:
+        need(n in evs, f"task {tid(i['number'])} has no event {n}")
+        need(evs[n]["kind"] == "amend", f"event {n} of task {tid(i['number'])} is not an amendment")
+        need(n not in adopted, f"amendment {n} of task {tid(i['number'])} is already adopted")
+    amends = ", ".join(numbers)
+    add_event(i["dir"], "adopt", dict(by=a.as_, amends=amends), a.text or "",
+              f"task {tid(i['number'])}: amendments {amends} adopted by {a.as_}")
+    print(f"adopted: {amends}")
+
+
 def cmd_done(a):
     i = get(a.task)
     not_root(i)
@@ -1470,8 +1499,8 @@ def cmd_inbox(a):
     mark.write_text(head + "\n")
 
 
-MUTATING = {"take", "resume", "leave", "approve-leave", "free", "mktask", "ready", "amend", "done",
-            "close", "reopen", "cancel", "record", "pr-move"}
+MUTATING = {"take", "resume", "leave", "approve-leave", "free", "mktask", "ready", "amend", "adopt",
+            "done", "close", "reopen", "cancel", "record", "pr-move"}
 
 
 def check_format():
@@ -1535,6 +1564,7 @@ def run_main():
     add("mktask", "slug", as_=True, kind=dict(default="track"), depends=dict())
     add("ready", "task", as_=True)
     add("amend", "task", as_=True, text=dict(required=True), depends=dict())
+    add("adopt", "task", "numbers", as_=True, text=dict())
     add("done", "task", as_=True, requests=dict(), text=dict())
     add("close", "task", as_=True)
     add("reopen", "task", as_=True, reason=dict(required=True))
