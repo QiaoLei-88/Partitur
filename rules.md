@@ -31,6 +31,8 @@ project's development notes.
 | A10 | A request states the authorization it was made under | Exercised |
 | A12 | A record (draft, release, done report, close, leave, request message) needs the user's approval: the `/ptt-*` command, which approves its own record and nothing more, unless it carries out a draft the user saw (`ptt-pr-submit` after its `draft`, `ptt-pr-reply` after `ptt-pr-draft-reply`), or an AtE naming the records, several at once; taking a role or task only by `/ptt-take` in the taking session; agreement without either is not approval | Exercised |
 | A13 | A session asks for a decision with a numbered list, its recommendation first, always ending with `No decision, discuss further`; a decision is an option number with AtE, anything else is discussion | Exercised |
+| A14 | The decision list follows its question line directly, never another numbered list (Markdown renders adjacent lists as one and renumbers the second) | Adopted |
+| A15 | A number that is not an option means the user may have seen another rendering: the session says so and asks again as the user saw it | Adopted |
 
 ## Roles
 
