@@ -21,7 +21,7 @@ task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
   ptt take designer|integrator|TASK   take the root design task T0000 (designer),
                                    the integrator role, or a ready task; prints the
                                    holder name
-  ptt resume [NAME]                continue as NAME in this session (after /clear); without
+  ptt resume [NAME]                continue as NAME in this new conversation; without
                                    NAME, the holder with a handover marker, or a list of
                                    holders by their last write
   ptt leave NAME [--status TEXT]   give up the integrator role or T0000 (designer), or
@@ -727,7 +727,7 @@ def check_session(name):
                 f"again, run `ptt resume {holder}` here ({skill(f'ptt-resume {holder}')})")
         if holder == name and sessions[-1] and sessions[-1] != sid:
             die(f"{name} is bound to another session; if this session continues {name} "
-                f"(after /clear), run `ptt resume {name}` first ({skill(f'ptt-resume {name}')})")
+                f"in a new conversation, run `ptt resume {name}` first ({skill(f'ptt-resume {name}')})")
 
 
 def subtree(name):

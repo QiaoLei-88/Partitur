@@ -754,7 +754,7 @@ class Ptt(unittest.TestCase):
         self.assertEqual(self.ptt("whoami", session="A").stdout.split(":")[0], d)
         self.assertIn("session: this one", self.ptt("whoami", d, session="A").stdout)
         self.assertIn("holds nothing", self.ptt("whoami", session="B").stdout)
-        # after /clear the session has a new ID: writes as d are refused until resumed
+        # a new conversation has a new ID: writes as d are refused until resumed
         self.assertIn("bound to another session", self.refused(
             "mktask", "x", "--as", d, session="B"))
         self.assertIn("another one", self.ptt("whoami", d, session="B").stdout)
@@ -825,7 +825,10 @@ class Ptt(unittest.TestCase):
                 holder = native("take", "integrator").stdout.strip()
                 if key:
                     refusal = native("leave", holder, env=env_b, check=False).stderr
-                    self.assertIn(f"({form.format(f'ptt-resume {holder}')})", refusal)
+                    self.assertIn(f"continues {holder} in a new conversation, run "
+                                  f"`ptt resume {holder}` first "
+                                  f"({form.format(f'ptt-resume {holder}')})", refusal)
+                    self.assertNotIn("/clear", refusal)
                 handover = native("handover", holder).stdout
                 self.assertIn(f"({form.format('ptt-resume')}) and no name", handover)
                 native("leave", holder)
