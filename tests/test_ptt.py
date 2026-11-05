@@ -807,6 +807,29 @@ class Ptt(unittest.TestCase):
                 native("record", "-m", "handover", str(status), env=env_b)
                 native("leave", holder, env=env_b)
 
+    def test_hints_name_commands_in_the_calling_tools_notation(self):
+        """`/ptt-...` in Claude Code, `$ptt-...` in Codex, both when the
+        tool is unknown (PTT_SESSION_ID alone, or no session variable)."""
+        claude, codex = "/{}", "${}"
+        both = "/{0} in Claude Code, ${0} in Codex"
+        for key, form in (("CLAUDE_CODE_SESSION_ID", claude), ("CODEX_THREAD_ID", codex),
+                          ("CODEX_SESSION_ID", codex), ("PTT_SESSION_ID", both), (None, both)):
+            with self.subTest(key=key):
+                env_a = dict(self.env(), **({key: "A"} if key else {}))
+                env_b = dict(self.env(), **({key: "B"} if key else {}))
+
+                def native(*args, env=env_a, check=True):
+                    return run("python3", str(self.rec / "bin" / "ptt"), *args,
+                               env=env, check=check)
+
+                holder = native("take", "integrator").stdout.strip()
+                if key:
+                    refusal = native("leave", holder, env=env_b, check=False).stderr
+                    self.assertIn(f"({form.format(f'ptt-resume {holder}')})", refusal)
+                handover = native("handover", holder).stdout
+                self.assertIn(f"({form.format('ptt-resume')}) and no name", handover)
+                native("leave", holder)
+
     def test_session_environment_precedence(self):
         keys = ("PTT_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID",
                 "CODEX_SESSION_ID")

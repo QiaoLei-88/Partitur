@@ -85,6 +85,10 @@ class Repo(unittest.TestCase):
                 self.assertIn("The command, or an AtE naming these records, approves", text,
                               skill.parent.name)
 
+    def test_rules_name_commands_in_the_sessions_tool(self):
+        rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
+        self.assertIn("Name a command for the user in your own tool's notation.", rules)
+
     def test_decision_list_wording_agrees(self):
         """Rule A13: the options follow their question line, never another
         numbered list; a number that is not an option is asked again."""

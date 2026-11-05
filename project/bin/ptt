@@ -85,7 +85,9 @@ shell and hook IDs must identify the same session to find its bound holder.
 holder (--as NAME, the NAME of `leave`) from another session is refused, and
 so is any write from a session whose holder has since been resumed
 elsewhere. Without a session ID (for example a plain terminal), nothing is
-bound or checked.
+bound or checked. Hints name a skill command in the calling tool's notation,
+known from those variables: `/ptt-...` in Claude Code, `$ptt-...` in Codex,
+and both where neither is set (PTT_SESSION_ID alone names no tool).
 """
 import argparse
 import fcntl
@@ -624,6 +626,16 @@ def session_id():
             or os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID") or None)
 
 
+def skill(command):
+    """COMMAND (`ptt-resume NAME`) as the user types it in the calling tool:
+    `/ptt-...` in Claude Code, `$ptt-...` in Codex, both when neither is known."""
+    if os.environ.get("CLAUDE_CODE_SESSION_ID"):
+        return f"/{command}"
+    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID"):
+        return f"${command}"
+    return f"/{command} in Claude Code, ${command} in Codex"
+
+
 def read_hook_session():
     """Use the hook event's identity even when its process has no tool environment."""
     try:
@@ -712,10 +724,10 @@ def check_session(name):
         if sid in sessions[:-1] and sessions[-1] != sid:
             die(f"this session was {holder}, which has since continued in another session "
                 f"(ptt resume); this session must no longer write. If it should be {holder} "
-                f"again, run `ptt resume {holder}` here (/ptt-resume {holder})")
+                f"again, run `ptt resume {holder}` here ({skill(f'ptt-resume {holder}')})")
         if holder == name and sessions[-1] and sessions[-1] != sid:
             die(f"{name} is bound to another session; if this session continues {name} "
-                f"(after /clear), run `ptt resume {name}` first (/ptt-resume {name})")
+                f"(after /clear), run `ptt resume {name}` first ({skill(f'ptt-resume {name}')})")
 
 
 def subtree(name):
@@ -834,7 +846,7 @@ def cmd_handover(a):
         f"session={(sessions[-1] if sessions else '') or ''}\n"
         f"commit={git('rev-parse', 'HEAD').stdout.strip()}\ntime={time.time()}\n")
     print(f"handover left: a fresh session continues {a.name} with `ptt resume` "
-          "(/ptt-resume) and no name")
+          f"({skill('ptt-resume')}) and no name")
 
 
 def cmd_resume(a):
@@ -1179,7 +1191,7 @@ def cmd_record(a):
         print("nothing to record")
     if new_requests and not role_state("integrator")[0]:
         note(f"no session holds the integrator role: request {', '.join(sorted(new_requests))} "
-             "waits until one takes it (/ptt-take integrator, in a fresh session)")
+             f"waits until one takes it ({skill('ptt-take integrator')}, in a fresh session)")
 
 
 NOTE_HEADER = "---\nto: designer\n---"

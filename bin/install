@@ -1041,8 +1041,9 @@ def write_report(a, tools, report, output):
     if c.get("created"):
         steps.append("This is the installation session: it takes no role. Tell the user to open "
                      "fresh sessions in the workspace root for the roles (`/ptt-take designer`, "
-                     "`/ptt-take integrator`), which start from the records, and that requests "
-                     "wait until a session holds the integrator role.")
+                     "`/ptt-take integrator` in Claude Code; `$ptt-take designer`, "
+                     "`$ptt-take integrator` in Codex), which start from the records, and that "
+                     "requests wait until a session holds the integrator role.")
     when = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
     text = (f"# Partitur install report\n\n"
             f"- When: {when}\n- Partitur: {partitur_commit() or 'uncommitted'}\n"
