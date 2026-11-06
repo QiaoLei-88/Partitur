@@ -1200,8 +1200,8 @@ def note_recipient(path):
 
 def check_notes(paths):
     """Refuse to record a note under `paths`, added or changed, whose front
-    matter names no recipient that exists: such a note would reach nobody
-    but the designer, unmarked (D3). Deleting a note is never refused."""
+    matter names no role or open task: such a note would reach nobody, or
+    the designer unmarked (D3). Deleting a note is never refused."""
     rel = [str(p.relative_to(REC)) for p in paths]
     entries = iter(git("status", "-z", "--porcelain", "--untracked-files=all", "--",
                        *rel).stdout.split("\0"))
@@ -1210,7 +1210,8 @@ def check_notes(paths):
         files.append(e[3:])
         if e[:1] in ("R", "C"):
             next(entries, None)               # a rename's source path
-    known = {t[1] for t in all_tasks()} | {"integrator"}
+    places = {t[1]: t[0] for t in all_tasks()}
+    known = {n for n, place in places.items() if place == "open"} | {"integrator"}
     for f in sorted(set(files)):
         parts = Path(f).parts
         if len(parts) != 3 or parts[:2] != ("handoff", "notes") or parts[2] == ".gitkeep" \
@@ -1220,13 +1221,15 @@ def check_notes(paths):
         if to in known:
             continue
         lines = (REC / f).read_text().splitlines()
-        why = (f"`to: {front_matter(REC / f)[0]['to']}` names neither designer, integrator, "
-               "nor a task" if to else
+        why = (f"`to: {front_matter(REC / f)[0]['to']}` names a task that is "
+               f"{places[to]}, with no holder" if to in places else
+               f"`to: {front_matter(REC / f)[0]['to']}` names neither designer, integrator, "
+               "nor an open task" if to else
                "front matter without `to:`" if lines[:1] == ["---"] else
                "a `to:` line outside front matter" if any(re.match(r"\s*to\s*:", x) for x in lines)
                else "no front matter")
         die(f"{f}: {why}; nothing recorded. A note begins with front matter naming its "
-            f"recipient (designer, integrator, or a task ID such as T0007):\n{NOTE_HEADER}")
+            f"recipient (designer, integrator, or an open task's ID such as T0007):\n{NOTE_HEADER}")
 
 
 def note(text):

@@ -887,24 +887,35 @@ class Ptt(unittest.TestCase):
 
     def test_note_needs_a_recipient_in_front_matter(self):
         """Recording a note added or changed refuses one whose front matter
-        names no role or existing task, and records nothing; a deletion
+        names no role or open task, and records nothing; a deletion
         passes. A note written before the check, without `to:`, still goes
         to the designer, marked."""
         d = self.ptt("take", "designer", session="D").stdout.strip()
         n = self.task("probe", d)
         w = self.ptt("take", n, session="W").stdout.strip()
+        done, cancelled = self.task("done", d), self.task("dropped", d)
+        g = self.ptt("take", done, session="G").stdout.strip()
+        self.ptt("done", done, "--as", g, session="G")
+        self.ptt("close", done, "--as", d, session="D")
+        self.ptt("cancel", cancelled, "--as", d, "--reason", "not needed", session="D")
+        self.ptt("mktask", "draft", "--as", d)          # T0004, a draft: open, no holder
         notes = self.rec / "handoff" / "notes"
         notes.mkdir(parents=True)
         head = lambda: run("git", "-C", str(self.rec), "rev-parse", "HEAD").stdout
         header = "A note begins with front matter naming its recipient (designer, " \
-                 "integrator, or a task ID such as T0007):\n---\nto: designer\n---\n"
+                 "integrator, or an open task's ID such as T0007):\n---\nto: designer\n---\n"
         for text, why in (("bounds\n", "no front matter"),
                           ("to: T0001\n\nbounds\n", "a `to:` line outside front matter"),
                           ("---\nfrom: me\n---\n\nbounds\n", "front matter without `to:`"),
                           ("---\nto: T0099\n---\n\nbounds\n",
-                           "`to: T0099` names neither designer, integrator, nor a task"),
+                           "`to: T0099` names neither designer, integrator, nor an open task"),
                           ("---\nto: wall-distance\n---\n\nbounds\n",
-                           "`to: wall-distance` names neither designer, integrator, nor a task")):
+                           "`to: wall-distance` names neither designer, integrator, nor an "
+                           "open task"),
+                          ("---\nto: T0002\n---\n\nbounds\n",
+                           "`to: T0002` names a task that is done, with no holder"),
+                          ("---\nto: 3\n---\n\nbounds\n",
+                           "`to: 3` names a task that is cancelled, with no holder")):
             (notes / "x.md").write_text(text)
             before = head()
             for target in (notes / "x.md", notes, self.rec):
@@ -915,7 +926,7 @@ class Ptt(unittest.TestCase):
                 self.assertEqual(run("git", "-C", str(self.rec), "status", "--porcelain",
                                      "--untracked-files=all").stdout, "?? handoff/notes/x.md\n")
         for to, who in (("designer", d), ("integrator", None), ("T0001", w), ("1", w),
-                        ("t0000", d)):
+                        ("t0000", d), ("T0004", None)):
             (notes / "x.md").write_text(f"---\nto: {to}\n---\n\nbounds\n")
             self.ptt("record", "-m", f"note to {to}", str(notes / "x.md"))
             for holder in (d, w):

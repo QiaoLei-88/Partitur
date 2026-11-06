@@ -148,7 +148,7 @@ In Codex the commands start with `$` instead of `/`.
   lists what changed in the records for a holder since it last looked: a
   subordinate's `status.md`, done report, or leave request, an amendment, a
   note to it (and, until deleted, every note to it waits on it; `ptt record`
-  refuses a note whose front matter names no role or existing task, and an
+  refuses a note whose front matter names no role or open task, and an
   older note without a `to:` goes to the designer, marked), a new review or
   decision on its request, and for the integrator a new request or reply;
   and, once, to the session last bound to a holder whose hold someone else
