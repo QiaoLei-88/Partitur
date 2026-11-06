@@ -147,17 +147,19 @@ In Codex the commands start with `$` instead of `/`.
 - **Notices are pulled, except through the prompt hook.** `ptt inbox`
   lists what changed in the records for a holder since it last looked: a
   subordinate's `status.md`, done report, or leave request, an amendment, a
-  note to it (and, until deleted, every note to it waits on it; a wrong
-  `to:` reaches nobody), a new review or decision on its request, and for the
-  integrator a new request or reply; and, once, to the session last bound
-  to a holder whose hold someone else ended (a close, an approved leave, a
-  freeing). In Claude Code and Codex (once trusted), install's prompt hook
-  runs it before each user message, so a bound holder sees it with the
-  user's next message; without the hook the holder runs `/ptt-inbox`, and
-  the user carries the notice as before (D12, G17). A session that receives no
-  message sees nothing until it does. Holder changes are not in it, so a
-  session that names who holds a role or task, or who acts next, runs
-  `ptt who` at that moment rather than trusting an earlier answer (G18).
+  note to it (and, until deleted, every note to it waits on it; `ptt record`
+  refuses a note whose front matter names no role or open task, and an
+  older note without a `to:` goes to the designer, marked), a new review or
+  decision on its request, and for the integrator a new request or reply;
+  and, once, to the session last bound to a holder whose hold someone else
+  ended (a close, an approved leave, a freeing). In Claude Code and Codex
+  (once trusted), install's prompt hook runs it before each user message,
+  so a bound holder sees it with the user's next message; without the hook
+  the holder runs `/ptt-inbox`, and the user carries the notice as before
+  (D12, G17). A session that receives no message sees nothing until it
+  does. Holder changes are not in it, so a session that names who holds a
+  role or task, or who acts next, runs `ptt who` at that moment rather than
+  trusting an earlier answer (G18).
 - **One shared records directory.** The lock that keeps concurrent commands
   consistent is a directory in the records repository's Git directory, so
   it works for sessions on every machine that shares that directory, as

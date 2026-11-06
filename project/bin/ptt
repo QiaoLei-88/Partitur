@@ -1174,11 +1174,62 @@ def cmd_record(a):
         need(not moved, f"{p.relative_to(REC)}: {number} is now {moved[0].relative_to(REC)} "
              "(moved by a decision); write there instead, and remove this stray copy" if moved
              else "")
+    check_notes(paths)
     if not record(a.message, add=paths):
         print("nothing to record")
     if new_requests and not role_state("integrator")[0]:
         note(f"no session holds the integrator role: request {', '.join(sorted(new_requests))} "
              "waits until one takes it (/ptt-take integrator, in a fresh session)")
+
+
+NOTE_HEADER = "---\nto: designer\n---"
+
+
+def note_recipient(path):
+    """Whom the note at `path` is to: ROOT for `designer`, `integrator`, or
+    a task number, as its front matter's `to:` names it; None without a
+    `to:`; the text as written if it is none of these."""
+    to = front_matter(path)[0].get("to", "").strip().lower()
+    if not to:
+        return None
+    if to == "designer":
+        return ROOT
+    m = re.match(r"t?(\d+(?:\.\d+)*)", to)
+    return normalize(m.group(1)) if m else to
+
+
+def check_notes(paths):
+    """Refuse to record a note under `paths`, added or changed, whose front
+    matter names no role or open task: such a note would reach nobody, or
+    the designer unmarked (D3). Deleting a note is never refused."""
+    rel = [str(p.relative_to(REC)) for p in paths]
+    entries = iter(git("status", "-z", "--porcelain", "--untracked-files=all", "--",
+                       *rel).stdout.split("\0"))
+    files = []
+    for e in entries:
+        files.append(e[3:])
+        if e[:1] in ("R", "C"):
+            next(entries, None)               # a rename's source path
+    places = {t[1]: t[0] for t in all_tasks()}
+    known = {n for n, place in places.items() if place == "open"} | {"integrator"}
+    for f in sorted(set(files)):
+        parts = Path(f).parts
+        if len(parts) != 3 or parts[:2] != ("handoff", "notes") or parts[2] == ".gitkeep" \
+                or not (REC / f).is_file():
+            continue
+        to = note_recipient(REC / f)
+        if to in known:
+            continue
+        lines = (REC / f).read_text().splitlines()
+        why = (f"`to: {front_matter(REC / f)[0]['to']}` names a task that is "
+               f"{places[to]}, with no holder" if to in places else
+               f"`to: {front_matter(REC / f)[0]['to']}` names neither designer, integrator, "
+               "nor an open task" if to else
+               "front matter without `to:`" if lines[:1] == ["---"] else
+               "a `to:` line outside front matter" if any(re.match(r"\s*to\s*:", x) for x in lines)
+               else "no front matter")
+        die(f"{f}: {why}; nothing recorded. A note begins with front matter naming its "
+            f"recipient (designer, integrator, or an open task's ID such as T0007):\n{NOTE_HEADER}")
 
 
 def note(text):
@@ -1282,18 +1333,20 @@ def note_for(f, name, held):
     path = REC / "handoff" / "notes" / f
     if not path.is_file():
         return False
-    to = front_matter(path)[0].get("to", "designer").strip().lower()
-    if to == "designer":
-        to = ROOT
-    elif to != "integrator":
-        m = re.match(r"t?(\d+)((?:\.\d+)*)", to)
-        to = m.group(1).zfill(4) + m.group(2) if m else to
+    to = note_recipient(path) or ROOT
     if to != ("integrator" if held == ("role", "integrator") else
               held[1]["number"] if held[0] == "task" else None):
         return False
     added = git("log", "--diff-filter=A", "--format=%s", "--", str(path.relative_to(REC)),
                 check=False).stdout
     return not re.search(rf"by {re.escape(name)}\b(?![.-])", added)
+
+
+def unaddressed(f):
+    """The inbox line's mark for a note without a `to:`, written before
+    `ptt record` checked it."""
+    return ("" if note_recipient(REC / "handoff" / "notes" / f) else
+            "; it names no recipient (no `to:` in front matter), so it is the designer's")
 
 
 def inbox_base(name, d):
@@ -1340,7 +1393,8 @@ def news(name, held, base):
                 out.append(f"your task {tid(mine['number'])}: {kind} event {f}; read it with "
                            f"`ptt show {tid(mine['number'])}` ({sha(area, d, f)})")
         elif area == "notes" and note_for(f, name, held):
-            out.append(f"read handoff/notes/{f}: a note to you ({sha(area, d, f)})")
+            out.append(f"read handoff/notes/{f}: a note to you{unaddressed(f)} "
+                       f"({sha(area, d, f)})")
         elif area == "pr" and EVENT.match(f):
             msg = REC / "pr" / place / d / f
             first = REC / "pr" / place / d / "0001-request.md"
@@ -1481,8 +1535,8 @@ def cmd_inbox(a):
     waits += unclear(subtree(name))
     for f in sorted({f for (area, _, f) in tree("HEAD") if area == "notes"}):
         if note_for(f, name, held):
-            waits.append(f"a note to you: handoff/notes/{f}; once read and any outcome "
-                         "recorded where it belongs, delete it (rm, then ptt record)")
+            waits.append(f"a note to you: handoff/notes/{f}{unaddressed(f)}; once read and "
+                         "any outcome recorded where it belongs, delete it (rm, then ptt record)")
     if a.quiet:
         if new:
             print(f"ptt inbox for {name} (new in the records since it last looked):")
