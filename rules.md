@@ -132,6 +132,7 @@ project's development notes.
 | F13 | Partitur's rules live in a marked block of the project's rules file; an existing rules file gets the block only on the user's approval (`--merge-rules`), after the agent sorts the project's rules: duplicates removed and domain rules kept without asking, one question per real conflict (a kept one becomes a stated deviation outside the block), and one question for adopting the block; update and uninstall touch only the block | Exercised |
 | F14 | A forced update or uninstall copies every file it replaces or removes into a backup directory first | Exercised |
 | F15 | The installation session takes no role: it sets up, records, and ends; the roles start in fresh sessions from the records, and design agreements made during the setup go into T0000 first | Proposed |
+| F16 | A session names a skill command for the user in its own tool's notation (`/ptt-*` in Claude Code, `$ptt-*` in Codex); `ptt`'s hints follow the calling tool and give both forms where it is unknown | Adopted |
 | T1 | The rules template and request README include B5b, D13, D16, and C19 (withdrawal) as defaults, although none was exercised when they were chosen (B5b has been since); a project keeps or drops them | Proposed |
 | T2 | Domain-specific rules go in the rules file's "Project Rules"; the template carries only generic rules (interface contracts, independent verification, tolerance-based comparison) | Exercised |
 
