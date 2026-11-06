@@ -7,7 +7,8 @@ Subsequent explicit decisions by the user take precedence.
 The rules between these markers follow Partitur ({{PARTITUR}}).
 
 Skill commands below use Claude Code's `/ptt-*` notation; in Codex invoke
-the same skills as `$ptt-*`, for example `$ptt-take designer`.
+the same skills as `$ptt-*`, for example `$ptt-take designer`. Name a
+command for the user in your own tool's notation.
 
 ## Authorization and Scope
 

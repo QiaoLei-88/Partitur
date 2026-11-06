@@ -754,7 +754,7 @@ class Ptt(unittest.TestCase):
         self.assertEqual(self.ptt("whoami", session="A").stdout.split(":")[0], d)
         self.assertIn("session: this one", self.ptt("whoami", d, session="A").stdout)
         self.assertIn("holds nothing", self.ptt("whoami", session="B").stdout)
-        # after /clear the session has a new ID: writes as d are refused until resumed
+        # a new conversation has a new ID: writes as d are refused until resumed
         self.assertIn("bound to another session", self.refused(
             "mktask", "x", "--as", d, session="B"))
         self.assertIn("another one", self.ptt("whoami", d, session="B").stdout)
@@ -806,6 +806,32 @@ class Ptt(unittest.TestCase):
                     "record", "-m", "handover", str(status), check=False).stderr)
                 native("record", "-m", "handover", str(status), env=env_b)
                 native("leave", holder, env=env_b)
+
+    def test_hints_name_commands_in_the_calling_tools_notation(self):
+        """`/ptt-...` in Claude Code, `$ptt-...` in Codex, both when the
+        tool is unknown (PTT_SESSION_ID alone, or no session variable)."""
+        claude, codex = "/{}", "${}"
+        both = "/{0} in Claude Code, ${0} in Codex"
+        for key, form in (("CLAUDE_CODE_SESSION_ID", claude), ("CODEX_THREAD_ID", codex),
+                          ("CODEX_SESSION_ID", codex), ("PTT_SESSION_ID", both), (None, both)):
+            with self.subTest(key=key):
+                env_a = dict(self.env(), **({key: "A"} if key else {}))
+                env_b = dict(self.env(), **({key: "B"} if key else {}))
+
+                def native(*args, env=env_a, check=True):
+                    return run("python3", str(self.rec / "bin" / "ptt"), *args,
+                               env=env, check=check)
+
+                holder = native("take", "integrator").stdout.strip()
+                if key:
+                    refusal = native("leave", holder, env=env_b, check=False).stderr
+                    self.assertIn(f"continues {holder} in a new conversation, run "
+                                  f"`ptt resume {holder}` first "
+                                  f"({form.format(f'ptt-resume {holder}')})", refusal)
+                    self.assertNotIn("/clear", refusal)
+                handover = native("handover", holder).stdout
+                self.assertIn(f"({form.format('ptt-resume')}) and no name", handover)
+                native("leave", holder)
 
     def test_session_environment_precedence(self):
         keys = ("PTT_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID",
