@@ -159,6 +159,7 @@ project's development notes.
 | G17 | `ptt inbox` lists for a holder what changed in the records since it last looked (a subordinate's status, done report, or leave request; an amendment; a note to it; a review or decision on its request; for the integrator a new request or reply) and what waits on it, and tells the session last bound to a holder, once, that someone else ended its hold (a close, an approved leave, a freeing); in Claude Code and, once trusted, Codex, a prompt hook installed with the project runs it before each user message and adds only what is new; `ptt whoami` only says who a session is | Exercised |
 | G18 | Before telling the user who holds a role or task, or who acts next, a session runs `ptt who` at that moment; a view from earlier in the session may be stale | Proposed |
 | G19 | At a quiet point a holder leaves a handover marker (`ptt handover`, local, not a record); a fresh or cleared session continues it with `/ptt-resume` and no name, or, with none or several, is shown the holders ordered by their last write and the user names one; the marker lapses by events (the holder writes again, its binding moves, its hold ends), never by age; the session that was the holder is told once through its inbox that it continues elsewhere | Proposed |
+| G20 | A holder answers an amendment it has acted on with an adopt event (`ptt adopt`); an amendment waits in its inbox until adopted, across resumes; a new take reads them all and starts with none waiting; a disagreement is a note to the designer | Adopted |
 
 ## Nesting rules
 

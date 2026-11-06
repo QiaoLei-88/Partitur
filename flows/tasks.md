@@ -108,7 +108,7 @@ messages; there is no state file to go stale (C2).
 
 After acting on an amendment, the task's holder records an `adopt`
 event on the user's AtE. Each amendment is adopted only once.
-A disagreement goes to the designer as a note.
+A disagreement goes to the designer as a note *(Adopted, G20)*.
 
 The new `NNNN-adopt.md` contains `by`, `event: adopt`, `amends` (the
 comma-separated, four-digit amendment event numbers), `date`, and optional
