@@ -82,7 +82,7 @@ project's development notes.
 | --- | --- | --- |
 | D1 | A charter opens a track or worker: read-first list, scope, where results go, out of scope, acceptance; written by the designer | Exercised |
 | D2 | Only the holder of a task writes its status record (`status.md`; in the origin project, the brief's status section); the designer owns the charter | Exercised |
-| D3 | A temporary note names its recipient (`to:` a role or task; the designer without one) and waits in the recipient's inbox while it exists; only its author edits it; the recipient deletes it once read and any outcome recorded where it belongs, its author may withdraw it, the root designer may delete a stale one; its text stays reachable by commit | Exercised for notes to the designer, deleted once their outcome was recorded; Proposed for recipients and who deletes |
+| D3 | A temporary note names its recipient in its front matter (`to:` a role or an open task, required for a new note and checked when it is recorded; an older note without one goes to the designer) and waits in the recipient's inbox while it exists; only its author edits it; the recipient deletes it once read and any outcome recorded where it belongs, its author may withdraw it, the root designer may delete a stale one; its text stays reachable by commit | Exercised for notes to the designer, deleted once their outcome was recorded; Adopted for recipients in front matter, checked when recorded; Proposed for who deletes |
 | D4 | A charter is kept as history after its stage closes, marked closed and no longer maintained | Exercised |
 | D5 | Records locate things by repository and path, plus request number before integration and merge commit after; worktree paths and branches only as provenance | Exercised |
 | D6 | Status sections record no review state; after a decision the requesting session records the outcome and merge commit | Exercised |
@@ -132,6 +132,7 @@ project's development notes.
 | F13 | Partitur's rules live in a marked block of the project's rules file; an existing rules file gets the block only on the user's approval (`--merge-rules`), after the agent sorts the project's rules: duplicates removed and domain rules kept without asking, one question per real conflict (a kept one becomes a stated deviation outside the block), and one question for adopting the block; update and uninstall touch only the block | Exercised |
 | F14 | A forced update or uninstall copies every file it replaces or removes into a backup directory first | Exercised |
 | F15 | The installation session takes no role: it sets up, records, and ends; the roles start in fresh sessions from the records, and design agreements made during the setup go into T0000 first | Proposed |
+| F16 | A session names a skill command for the user in its own tool's notation (`/ptt-*` in Claude Code, `$ptt-*` in Codex); `ptt`'s hints follow the calling tool and give both forms where it is unknown | Adopted |
 | T1 | The rules template and request README include B5b, D13, D16, and C19 (withdrawal) as defaults, although none was exercised when they were chosen (B5b has been since); a project keeps or drops them | Proposed |
 | T2 | Domain-specific rules go in the rules file's "Project Rules"; the template carries only generic rules (interface contracts, independent verification, tolerance-based comparison) | Exercised |
 
@@ -158,6 +159,7 @@ project's development notes.
 | G17 | `ptt inbox` lists for a holder what changed in the records since it last looked (a subordinate's status, done report, or leave request; an amendment; a note to it; a review or decision on its request; for the integrator a new request or reply) and what waits on it, and tells the session last bound to a holder, once, that someone else ended its hold (a close, an approved leave, a freeing); in Claude Code and, once trusted, Codex, a prompt hook installed with the project runs it before each user message and adds only what is new; `ptt whoami` only says who a session is | Exercised |
 | G18 | Before telling the user who holds a role or task, or who acts next, a session runs `ptt who` at that moment; a view from earlier in the session may be stale | Proposed |
 | G19 | At a quiet point a holder leaves a handover marker (`ptt handover`, local, not a record); a fresh or cleared session continues it with `/ptt-resume` and no name, or, with none or several, is shown the holders ordered by their last write and the user names one; the marker lapses by events (the holder writes again, its binding moves, its hold ends), never by age; the session that was the holder is told once through its inbox that it continues elsewhere | Proposed |
+| G20 | A holder answers an amendment it has acted on with an adopt event (`ptt adopt`); an amendment waits in its inbox until adopted, across resumes; a new take reads them all and starts with none waiting; a disagreement is a note to the designer | Adopted |
 
 ## Nesting rules
 
