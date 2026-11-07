@@ -61,16 +61,25 @@ Usage:
 --tool auto (the default) installs for the agent tools found on this machine:
 Claude Code if the `claude` command or ~/.claude exists, Codex if the `codex`
 command or ~/.codex exists. It reports what it found, and stops if it finds
-neither; --tool claude, codex, or all chooses explicitly.
+neither; --tool claude, codex, or all chooses explicitly. That holds for a
+project's first install; the tools installed are recorded in the stamp
+(below), and every later run (install, --update, --uninstall) uses them,
+plus any --tool names, wherever it runs: a workspace may be shared with a
+machine that lacks one of the tools. A stamp written before tools were
+recorded counts the tools whose entries are present in the project.
+--uninstall --tool removes only that tool's side; the stamp goes with the
+last side. Each run prints the tools it uses and where each came from
+(stamp, project, detected, --tool).
 
-A project records which Partitur commit installed it, and from which clone,
-in <records>/.partitur-version. Git already knows what Partitur ships, so
-install rebuilds from that commit what it delivered then: "maintained" files
-(tools, skills, pr/README.md, the charter template), "seeded" files (the
-rules file, the root design task's charter and status, the integrator's
-file, repository table, directory markers: the project's once created), and
-links. A seeded file an earlier Partitur used but this one no longer does is
-reported "superseded", with where its content goes; it is never removed.
+A project records which Partitur commit installed it, from which clone, and
+for which tools, in <records>/.partitur-version. Git already knows what
+Partitur ships, so install rebuilds from that commit what it delivered then:
+"maintained" files (tools, skills, pr/README.md, the charter template),
+"seeded" files (the rules file, the root design task's charter and status,
+the integrator's file, repository table, directory markers: the project's
+once created), and links. A seeded file an earlier Partitur used but this
+one no longer does is reported "superseded", with where its content goes;
+it is never removed.
 Compared with the project:
   install            creates what is missing and reports the rest: "kept",
                      "outdated" (unchanged here, but this Partitur has a
@@ -79,10 +88,11 @@ Compared with the project:
   --update           also replaces outdated files and removes obsolete ones,
                      moves the `partitur` skill links from the clone that
                      installed the project to this one, then stamps the
-                     current commit and this clone.
+                     current commit, this clone, and the tools.
   --uninstall        removes every maintained file and link still as
                      delivered; keeps seeded files, files changed here, and
-                     every record (tasks, requests, roles).
+                     every record (tasks, requests, roles). With --tool, only
+                     that tool's links and hook, while another tool remains.
   --force            with --update or --uninstall: also replaces or removes
                      files changed here, after copying each into a backup
                      directory (PROJECT/partitur-backup-<UTC time>/, or
@@ -95,9 +105,11 @@ its output and the next steps, for an agent session to read ("Read
 partitur-install-report.md and help me finish the Partitur install"). It
 lies outside the records repository, is never committed, and is
 overwritten by the next run.
-The user scope is one link per tool, which --uninstall removes if it still
-points to this Partitur. Without --scope, nothing is changed and this text
-is printed.
+The user scope is one link per tool and keeps no stamp: its installed sides
+are the `partitur` links to a Partitur clone. Install adds the detected or
+--tool sides and reports the others present; --uninstall removes every
+present link, or only those --tool names, and leaves a link to anything
+else. Without --scope, nothing is changed and this text is printed.
 """
 import argparse
 import atexit
@@ -535,15 +547,35 @@ def detect(root, rec):
     return found
 
 
-def scope_user(a, tools, report):
-    for tool in tools:
-        link = Path.home() / TOOLS[tool][1] / "skills" / "partitur"
-        if a.uninstall:
-            if link.is_symlink() and Path(os.readlink(link)) == HERE:
+def scope_user(a, report):
+    """The user scope keeps no stamp: its installed sides are the `partitur`
+    links to a Partitur clone in the user's skill directories."""
+    links = {t: Path.home() / d / "skills" / "partitur" for t, (_, d) in TOOLS.items()}
+    present = [t for t, link in links.items()
+               if link.is_symlink() and is_partitur(link.parent / os.readlink(link))]
+    if a.uninstall:
+        tools = a.named or tuple(present)
+        print_tools({t: "--tool" if a.named else "present" for t in tools})
+        for tool in tools:
+            link = links[tool]
+            if tool in present:
                 link.unlink()
                 report("removed", link)
             elif link.exists() or link.is_symlink():
-                report("differs", link, "not a link to this Partitur; left alone")
+                report("differs", link, "not a link to a Partitur clone; left alone")
+        if not tools:
+            print("\nNo `partitur` link to a Partitur clone found; nothing to uninstall.")
+        return
+    sources = {t: "--tool" for t in a.named} if a.named else \
+        {t: "detected" for t in detect_tools()}
+    for tool in present:
+        sources.setdefault(tool, "present")
+    print_tools({t: sources[t] for t in TOOLS if t in sources})
+    for tool in [t for t in TOOLS if t in sources]:
+        link = links[tool]
+        if sources[tool] == "present":
+            report("kept", link, "installed already; --uninstall --tool "
+                   f"{tool} removes it")
         elif link.is_symlink() and Path(os.readlink(link)) == HERE:
             report("kept", link)
         elif link.exists() or link.is_symlink():
@@ -683,17 +715,80 @@ def set_repos(a, root, rec, table, repos, add_repos, report):
 
 
 def read_stamp(path):
-    """The installing commit and clone recorded in the stamp, each None when
-    unknown: uncommitted, or a stamp written before clones were recorded."""
+    """The installing commit, clone, and tools recorded in the stamp, each
+    None when unknown: uncommitted, or a stamp written before clones or
+    tools were recorded."""
     if not path.exists():
-        return None, None
+        return None, None, None
     found = {}
     for line in path.read_text().splitlines():
         key, _, value = line.partition(" ")
-        if key in ("partitur", "source") and key not in found:
+        if key in ("partitur", "source", "tools") and key not in found:
             found[key] = value.strip() or None
     commit = found.get("partitur")
-    return (None if commit == "uncommitted" else commit), found.get("source")
+    tools = found.get("tools")
+    if tools is not None:
+        tools = tuple(t for t in TOOLS if t in tools.split())
+    return (None if commit == "uncommitted" else commit), found.get("source"), tools
+
+
+def write_stamp(path, commit, clone, tools):
+    path.write_text(f"partitur {commit or 'uncommitted'}\n"
+                    + (f"source {clone}\n" if clone else "")
+                    + f"tools {' '.join(tools)}\n")
+
+
+def restamp_tools(path, tools):
+    """Record the tools in a stamp that keeps its installing commit and clone."""
+    lines = [line for line in path.read_text().splitlines() if line.partition(" ")[0] != "tools"]
+    path.write_text("\n".join(lines + [f"tools {' '.join(tools)}"]) + "\n")
+
+
+def is_partitur(path):
+    """Whether path is a Partitur clone (or a copy of one)."""
+    return (Path(path) / "bin" / "install").is_file() and \
+        (Path(path) / "project" / "bin" / "ptt").is_file()
+
+
+def present_sides(root, R):
+    """For a stamp without a tools line: the tools whose entries Partitur
+    installed are present in the project (the entry link to the rules file,
+    a skill link into the records or to a Partitur clone, the prompt hook)."""
+    found = []
+    for tool, (entry, tool_dir) in TOOLS.items():
+        e = root / entry
+        skills = root / tool_dir / "skills"
+        links = [p for p in skills.iterdir() if p.is_symlink()] if skills.is_dir() else []
+        settings = read_settings(root / {"claude": ".claude/settings.json",
+                                         "codex": ".codex/hooks.json"}[tool]) or {}
+        if ((e.is_symlink() and os.readlink(e) in (f"{R}/{RULES}", f"{R}/{LEGACY_RULES}"))
+                or any(os.readlink(p).startswith(f"../../{R}/skills/")
+                       or (p.name == "partitur" and is_partitur(p.parent / os.readlink(p)))
+                       for p in links)
+                or any(is_ours(x) for x in settings.get("hooks", {}).get(HOOK_EVENT, []))):
+            found.append(tool)
+    return tuple(found)
+
+
+NAMES = {"claude": "Claude Code", "codex": "Codex"}
+
+
+def detect_tools():
+    """The agent tools found on this machine; exits if none."""
+    found = {"claude": shutil.which("claude") or (Path.home() / ".claude").is_dir(),
+             "codex": shutil.which("codex") or (Path.home() / ".codex").is_dir()}
+    tools = tuple(t for t in TOOLS if found[t])
+    if not tools:
+        sys.exit("install: found neither Claude Code nor Codex on this machine; "
+                 "choose with --tool claude, codex, or all")
+    print("detected " + " and ".join(NAMES[t] for t in tools) + " (--tool chooses otherwise)")
+    return tools
+
+
+def print_tools(sources):
+    """Which tools this run uses, and where each came from."""
+    print("tools      " + (", ".join(f"{NAMES[t]} ({s})" for t, s in sources.items())
+                           or "none"))
 
 
 def stamped_clone(root, tools, commit):
@@ -768,7 +863,8 @@ def mentions_of_legacy_rules(a, rec, report):
             report("mentions", path, f"names {old}, now {a.records}/{RULES}: change it there")
 
 
-def scope_project(a, tools, report):
+def scope_project(a, report):
+    """Install, update, or uninstall the project; return the tools used."""
     root = a.project.resolve()
     if not root.is_dir():
         sys.exit(f"install: {root} is not a directory")
@@ -778,35 +874,61 @@ def scope_project(a, tools, report):
     stamp = rec / ".partitur-version"
     held = records_lock(rec) if (rec / ".git").exists() else None
     name = a.name or root.name
-    before, clone = read_stamp(stamp)
+    before, clone, stamped = read_stamp(stamp)
+    # the sides installed before: the stamp's, or for a stamp without them
+    # the project's; a later run keeps them wherever it runs
+    recorded, origin = (stamped, "stamp") if stamped is not None else \
+        (present_sides(root, a.records), "project") if stamp.exists() else ((), None)
     if before and not known_commit(before):
         print(f"warning    this Partitur clone does not have commit {before[:12]}, which "
               "installed the project; files no longer shipped cannot be found")
         before = None
     if before and not clone:
-        clone = stamped_clone(root, tools, before)
-    old = delivered(project_plan(a, tools, [], name, Source(before), quiet=True,
-                                 clone=clone)) if before else None
+        clone = stamped_clone(root, tuple(TOOLS), before)
 
     if a.uninstall:
         if not stamp.exists():
             sys.exit(f"install: {stamp.relative_to(root)} not found; nothing to uninstall")
-        if old is None:
+        tools = a.named or recorded
+        print_tools({t: "--tool" if a.named else origin for t in tools})
+        remaining = tuple(t for t in recorded if t not in tools)
+        src = Source(before)
+        if before is None:
             print("warning   unknown installing commit; comparing with this Partitur instead")
-            old = delivered(project_plan(a, tools, [], name, Source(), quiet=True))
+            src = Source()
+        old = delivered(project_plan(a, tools, [], name, src, quiet=True, clone=clone))
+        if remaining:             # only these sides: what the others share stays
+            shared = project_plan(a, remaining, [], name, src, quiet=True, clone=clone)
+            old = {rel: e for rel, e in old.items() if rel not in shared}
         kept = [rel for rel, e in old.items() if not remove_entry(root, rel, e, a, report)]
         for link in redundant_links(root, tools, clone):
             link.unlink()
             report("removed", link)
-        stamp.unlink()
-        report("removed", stamp)
+        if remaining:
+            restamp_tools(stamp, remaining)
+            report("updated", stamp, "tools " + " ".join(remaining))
+        else:
+            stamp.unlink()
+            report("removed", stamp)
         if kept:
             print(f"\n{len(kept)} path(s) kept: the project's own files, or files changed "
                   "here (--force removes changed ones). Records (tasks, requests, roles) are "
                   "never touched.")
-        print(f"\nRecord the change: {a.records}/bin/ptt record -m \"uninstall Partitur\" "
-              f"{a.records}  (or with git, if bin/ptt was removed)")
-        return
+        what = "uninstall Partitur" + (" for " + " and ".join(NAMES[t] for t in tools)
+                                       if remaining else "")
+        print(f"\nRecord the change: {a.records}/bin/ptt record -m \"{what}\" "
+              f"{a.records}" + ("" if remaining else "  (or with git, if bin/ptt was removed)"))
+        return tools
+
+    sources = {t: origin for t in recorded}
+    for t in a.named or ():
+        sources.setdefault(t, "--tool")
+    if not sources:               # first install, or no side known
+        sources = {t: "detected" for t in detect_tools()}
+    tools = tuple(t for t in TOOLS if t in sources)
+    print_tools({t: sources[t] for t in tools})
+    old = delivered(project_plan(a, recorded, [], name, Source(before), quiet=True,
+                                 clone=clone)) if before else None
 
     def parse(specs, option):
         out = []
@@ -855,7 +977,9 @@ def scope_project(a, tools, report):
     c = report.counts
     pending = any(c.get(k) for k in ("outdated", "obsolete", "superseded", "redundant"))
     if not stamp.exists() or a.update or not pending:
-        stamp.write_text("partitur " + (now or "uncommitted") + f"\nsource {HERE}\n")
+        write_stamp(stamp, now, HERE, tools)
+    elif stamped != tools:        # the installing commit stays until --update
+        restamp_tools(stamp, tools)
     if not now:
         print("\nwarning   this Partitur has uncommitted changes; a later update cannot find "
               "files it no longer ships. Install from a committed Partitur.")
@@ -879,6 +1003,7 @@ def scope_project(a, tools, report):
                               "renamed")):
         print(f"\nRecord the change: {a.records}/bin/ptt record -m \"install Partitur\" "
               f"{a.records}")
+    return tools
 
 
 def main():
@@ -917,27 +1042,16 @@ def main():
         sys.exit(2)
     if a.force and not (a.update or a.uninstall):
         sys.exit("install: --force goes with --update or --uninstall")
-    if a.tool == "auto":
-        found = {"claude": shutil.which("claude") or (Path.home() / ".claude").is_dir(),
-                 "codex": shutil.which("codex") or (Path.home() / ".codex").is_dir()}
-        tools = tuple(t for t in ("claude", "codex") if found[t])
-        if not tools:
-            sys.exit("install: found neither Claude Code nor Codex on this machine; "
-                     "choose with --tool claude, codex, or all")
-        print("detected " + " and ".join({"claude": "Claude Code", "codex": "Codex"}[t]
-                                          for t in tools) + "; using "
-              + ("both" if len(tools) == 2 else "it") + " (--tool chooses otherwise)")
-    else:
-        tools = ("claude", "codex") if a.tool == "all" else (a.tool,)
+    a.named = None if a.tool == "auto" else tuple(TOOLS) if a.tool == "all" else (a.tool,)
     report = Report(a.project.resolve() if a.scope == "project" else Path.home())
     if a.scope == "user":
-        scope_user(a, tools, report)
+        scope_user(a, report)
     elif a.uninstall:
-        scope_project(a, tools, report)
+        scope_project(a, report)
     else:
         out, sys.stdout = sys.stdout, Tee(sys.stdout)
         try:
-            scope_project(a, tools, report)
+            tools = scope_project(a, report)
         finally:
             output, sys.stdout = sys.stdout.text(), out
         write_report(a, tools, report, output)

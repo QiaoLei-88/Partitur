@@ -4,7 +4,7 @@
 
 | Choice | Option | Default |
 | --- | --- | --- |
-| Agent tools | `--tool auto`, `claude`, `codex`, or `all` | `auto`: the tools found on this machine |
+| Agent tools | `--tool auto`, `claude`, `codex`, or `all` | `auto`: on the first install, the tools found on this machine; later, the tools in the stamp |
 | Project name | `--name` | the workspace root's directory name |
 | Records repository | `--records` | `workspace`, directly in the workspace root |
 | Its main branch | `--branch` | `master` |
@@ -26,7 +26,7 @@ Changing one of these means changing the tools or skills that use it.
 | Task IDs | `T` + four-digit number + `.N` per level + `-slug` (`T0007.2-adapter-indexing`), the directory name, never changed; short forms `T0007.2`, `0007.2`, `7.2`, the slug | G10 |
 | Root design task | `<records>/tasks/open/T0000-design/`, held by the designer, supervised by the user, never closed; `designer` names it in commands | D8, G10 |
 | Role records | `<records>/roles/integrator/MMMM-<kind>.md` | G1 |
-| Installed version | `<records>/.partitur-version`: the Partitur commit that installed or last updated the project (`partitur <commit>`) and the clone it ran from (`source <path>`) | F12 |
+| Installed version | `<records>/.partitur-version`: the Partitur commit that installed or last updated the project (`partitur <commit>`), the clone it ran from (`source <path>`), and the tools installed (`tools <tool> [<tool>]`) | F12 |
 | Prompt hooks | `.claude/settings.json` (Claude Code) and `.codex/hooks.json` (Codex, trusted in Codex first) in the workspace root, each running `ptt inbox --quiet`; other settings there are kept | G17 |
 | Session IDs | `PTT_SESSION_ID`, else `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, `CODEX_SESSION_ID`; Codex's hook reads the event's `session_id` | G16 |
 | Handover markers | `<records>/.git/ptt-handover/<holder name>`: left at a quiet point (`ptt handover`), used by `ptt resume` without a name; lapse by events; not committed | G19 |
