@@ -116,6 +116,7 @@ project's development notes.
 | E6 | Reports give commands, environment, identifiers, exit status, and counts | Exercised |
 | E7 | Generated outputs go to an explicit isolated location outside every repository | Exercised |
 | E8 | A one-off probe's driver is kept in its run record; a reusable driver belongs in the code repository's tests | Exercised for probes; Adopted for reusable drivers |
+| E9 | A run record names its creator (`by:`); a session proposes removing only its own runs, once the development head they tested has a conclusion and nothing cites them (a cited run may lose its build directories), as static commands the user reviews and approves; any cleanup the user directs stays open | Adopted |
 
 ## Repositories and dependencies
 

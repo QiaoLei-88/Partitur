@@ -19,7 +19,7 @@ A claim without a label is a claim the reader cannot weigh.
 - Holds commands, environment, identifiers, exit status, counts, logs, and a
   report (E6). Small files in full; large outputs by hash, size, and a
   numerical summary, compared by tolerance (E2).
-- Lifetime *(Proposed)*: a run lives while the development head it tested
+- Lifetime *(Adopted, E9)*: a run lives while the development head it tested
   is open (a request not decided, a task open, or, without a request, its
   worktree still present). A run without a request belongs to the task
   whose worktree it ran in, `worktrees/<task slug>` by convention
