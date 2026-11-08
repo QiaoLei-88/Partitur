@@ -1141,9 +1141,9 @@ class Ptt(unittest.TestCase):
         self.ptt("take", n, session="00000000-0000-4000-8000-333333123456")
         self.ptt("take", "integrator", session="00000000-0000-4000-8000-444444abcdef")
         who = self.ptt("who").stdout
-        self.assertIn("designer    designer-g1  session prtr-dsgn-g1-123456\n", who)
-        self.assertIn("integrator  integrator-1  session prtr-intg-1-abcdef\n", who)
-        self.assertIn("worker-T0001  (worker, probe)  session prtr-wrkr-t1-123456\n", who)
+        self.assertIn("designer    designer-g1  session prtr-dsgn-g1-123456  unseen", who)
+        self.assertIn("integrator  integrator-1  session prtr-intg-1-abcdef  unseen", who)
+        self.assertIn("worker-T0001  (worker, probe)  session prtr-wrkr-t1-123456  unseen", who)
         me = self.ptt("whoami", session=a).stdout
         self.assertIn("session: this one\nsession name: prtr-dsgn-g1-123456\n", me)
         self.assertIn("to show it, type: /rename prtr-dsgn-g1-123456 in Claude Code", me)
@@ -1154,7 +1154,27 @@ class Ptt(unittest.TestCase):
         self.ptt("leave", "integrator-1")
         r = self.ptt("take", "integrator")
         self.assertNotIn("session name", r.stderr)
-        self.assertEqual(self.ptt("who").stdout.splitlines()[0], "integrator  integrator-2")
+        self.assertEqual(self.ptt("who").stdout.splitlines()[0],
+                         "integrator  integrator-2  unseen none")
+
+    def test_who_shows_unseen_items_since_the_inbox_mark(self):
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        n = self.task("probe", d)
+        w = self.ptt("take", n, session="W").stdout.strip()
+        # never looked: counted from its take (the worker's status.md is new to d)
+        who = self.ptt("who").stdout
+        self.assertRegex(who, rf"designer    {d}  session \S+  unseen 1, oldest (just now|\d+ min ago)\n")
+        self.assertIn(f"{w}  (track, probe)  session", who)
+        self.assertRegex(who, rf"{w} .*  unseen none\n")
+        # looking moves the mark; a later item is unseen again
+        self.ptt("inbox", d, session="D")
+        self.assertRegex(self.ptt("who").stdout, rf"designer    {d} .*  unseen none\n")
+        self.ptt("amend", n, "--as", d, "--text", "more", session="D")
+        self.ptt("amend", n, "--as", d, "--text", "and more", session="D")
+        self.assertRegex(self.ptt("who").stdout, rf"{w} .*  unseen 2, oldest ")
+        # a prompt hook's quiet inbox counts as seen
+        self.ptt("inbox", w, "--quiet", session="W")
+        self.assertRegex(self.ptt("who").stdout, rf"{w} .*  unseen none\n")
 
     def test_resume_names_a_session_bound_before_names(self):
         (self.rec / "project-code").write_text("prtr\n")

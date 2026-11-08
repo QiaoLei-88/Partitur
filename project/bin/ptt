@@ -4,7 +4,8 @@
 Usage (NAME is the holder name a session received when it took its role or
 task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
 `T0007.1`, by its full name `T0007-slug`, or by its slug):
-  ptt who                          who holds which role and task
+  ptt who                          who holds which role and task, its session name, and
+                                   its unseen items (new since its inbox last looked)
   ptt handover NAME                leave a handover marker: a fresh session continues
                                    NAME with `ptt resume` and no name
   ptt unlock [--force]             remove the records lock if its owner is gone
@@ -1414,20 +1415,32 @@ def cmd_show(a):
             print(f"\n==> {p.name} <==\n{p.read_text()}", end="")
 
 
+def unseen(name, held, d):
+    """NAME's unseen items: those its inbox would show as new, since its inbox
+    mark (or its take), as `unseen N, oldest T` or `unseen none`."""
+    commits = []
+    lines = news(name, held, inbox_base(name, d), commits)
+    if not lines:
+        return "unseen none"
+    oldest = min((int(git("log", "-1", "--format=%ct", c).stdout.strip()) for c in commits if c),
+                 default=None)
+    return f"unseen {len(lines)}" + (f", oldest {ago(oldest)}" if oldest else "")
+
+
 def cmd_who(a):
-    def named(d):
-        name = session_name_of(d)
-        return f"  session {name}" if name else ""
+    def state(name, held, d):
+        session = session_name_of(d)
+        return (f"  session {session}" if session else "") + "  " + unseen(name, held, d)
     holder = role_state("integrator")[0]
     print(f"{'integrator':11} {holder or '(free)'}"
-          + (named(ROLES / "integrator") if holder else ""))
+          + (state(holder, ("role", "integrator"), ROLES / "integrator") if holder else ""))
     root = get(ROOT)
     print(f"{'designer':11} {root['holder'] or '(free)'}"
-          + (named(root["dir"]) if root["holder"] else ""))
+          + (state(root["holder"], ("task", root), root["dir"]) if root["holder"] else ""))
     for i in infos():
         if i["holder"] and i["number"] != ROOT:
             print(f"task {tid(i['number']):10} {i['holder']}  ({i['kind']}, {i['slug']})"
-                  + named(i["dir"]))
+                  + state(i["holder"], ("task", i), i["dir"]))
 
 
 def cmd_whoami(a):
@@ -1512,8 +1525,9 @@ def inbox_base(name, d):
     return git("log", "-1", "--format=%H", "--", rel, check=False).stdout.strip() or None
 
 
-def news(name, held, base):
-    """Lines for what changed since `base` that concerns NAME."""
+def news(name, held, base, commits=None):
+    """Lines for what changed since `base` that concerns NAME; the commit of
+    each line is appended to `commits`, if given."""
     if not base:
         return []
     old, new = tree(base), tree("HEAD")
@@ -1523,8 +1537,11 @@ def news(name, held, base):
     def sha(area, d, f):
         place = new[(area, d, f)][0]
         path = f"{area}/{place}/{d}/{f}" if area != "notes" else f"handoff/notes/{f}"
-        return git("log", "-1", "--format=%h", f"{base}..HEAD", "--", path,
-                   check=False).stdout.strip()
+        commit = git("log", "-1", "--format=%h", f"{base}..HEAD", "--", path,
+                     check=False).stdout.strip()
+        if commits is not None:
+            commits.append(commit)
+        return commit
     out = []
     mine = held[1] if held[0] == "task" else None
     below = {i["dir"].name: i for i in subtree(name)}
@@ -1563,6 +1580,7 @@ def news(name, held, base):
     for (area, d, f), (place, _) in sorted(moved.items()):
         if area == "pr" and f == "0001-request.md" and \
                 front_matter(REC / "pr" / place / d / f)[0].get("session") == name:
+            sha(area, d, f)
             out.append(f"request {d[:6]}: now {place}; record the outcome in your status")
     return out
 

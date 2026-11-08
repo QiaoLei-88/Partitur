@@ -109,6 +109,11 @@ the address a later cross-session message would use. Without a session ID
 nothing is bound, and no name is given. A session bound before names
 existed gets one by `ptt resume <its holder>` in that session.
 
+`ptt who` shows for each holder its session name and its unseen items:
+those its inbox would show as new, counted since its inbox last looked (or
+its take), with the time of the oldest, or `unseen none`. Seen means shown
+to its session (a prompt hook counts), not handled.
+
 ## Stage close
 
 A stage closes when its tasks are closed or cancelled (D11). The designer
