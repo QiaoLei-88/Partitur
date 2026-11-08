@@ -54,6 +54,28 @@ A number that is not an option means the user may have seen another
 rendering: the session says so and asks again as the user saw it
 *(Adopted, A15)*.
 
+Two or more decisions in one message are labelled *(Proposed)*: each
+question gets a letter heading (A, B, ...), and its options follow it as a
+bulleted list, `- A1 ...`, `- A2 ...`, recommendation first and marked, the
+last `No decision, discuss further`. Bullets, not an ordered list, so
+nothing renumbers them; two numbered lists numbered 1-3 in one message once
+left "1 AtE" naming no question. The user answers with labels and AtE, any
+subset (`A1 B2 AtE`); an unanswered question stays open and is asked again
+later; a label without AtE is discussion, as a number is. A15 applies to
+labels: a label that is not an option, or a bare number when labels were
+shown, is said so and asked again as the user saw it.
+
+```
+A. Decide request 000015:
+- A1 Request changes (recommended): C1, C2
+- A2 Merge anyway
+- A3 No decision, discuss further
+
+B. Decide request 000016:
+- B1 Merge (recommended)
+- B2 No decision, discuss further
+```
+
 ```
 Decide request 000015:
 1. Request changes (recommended): C1, C2

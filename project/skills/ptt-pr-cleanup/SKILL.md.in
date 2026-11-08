@@ -43,7 +43,8 @@ from the decision list below.
 1. `<records>/bin/pr gc [--days N]` (read-only): report its table and
    commands, end with `1. Run all listed commands`, `2. Run them only for
    the requests or tags I name`, `3. No decision, discuss further`, and
-   stop.
+   stop. If the same message asks another decision (the run records'
+   removal), label both lists (`A1`, `B1`; rules file).
 2. On AtE (possibly limited to some requests or tags): run `pr gc` again
    with the same `--days`; if the plan changed for the approved items,
    report and stop.

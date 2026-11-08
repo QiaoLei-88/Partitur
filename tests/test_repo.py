@@ -116,7 +116,17 @@ class Repo(unittest.TestCase):
         self.assertIn("decision list right after its question line", text("project", "skills", "ptt-close", "SKILL.md.in"))
         review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
         self.assertIn("decision list right after its question line, never after another numbered list", review)
-        self.assertIn("a number that is not an option: ask again", review)
+        self.assertIn("one that is not an option: ask again", review)
+        # T0010 amendment 0002: several decisions in one message are labelled.
+        self.assertIn("Two or more decisions in one message are labelled", rules)
+        self.assertIn("(`A1 B2 AtE`)", rules)
+        self.assertIn("a bare number when labels were shown", rules)
+        self.assertIn("Two or more decisions in one message are labelled", flow)
+        self.assertIn("- A1 Request changes", flow)
+        for name in ("ptt-close", "ptt-pr-cleanup", "ptt-pr-reply", "ptt-pr-review"):
+            self.assertIn("rules file", text("project", "skills", name, "SKILL.md.in"))
+            self.assertIn("A1", text("project", "skills", name, "SKILL.md.in"), name)
+        self.assertIn("label them (`A1`, `B2`)", text("SKILL.md"))
 
     def test_reply_is_drafted_and_released_by_its_own_commands(self):
         """Replies to a review: /ptt-pr-draft-reply writes nothing, /ptt-pr-reply

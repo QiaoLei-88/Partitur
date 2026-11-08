@@ -76,8 +76,12 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    3. Reject
    4. No decision, discuss further
    ```
-7. On the user's decision (an option number with AtE, possibly with changed
-   comments; a number that is not an option: ask again, rules file), write
+
+   With `all`, or any other decision in the same message, label each
+   question instead (`A. Decide request NNNNNN:`, `- A1 ...`; rules file).
+7. On the user's decision (an option number or label with AtE, possibly
+   with changed comments; one that is not an option: ask again, rules
+   file), write
    `MMMM-decision.md` and record it before anything else:
    `<records>/bin/ptt record -m "pr NNNNNN: decision <merge|changes
    requested|reject|withdraw>" <file>`. Then:
