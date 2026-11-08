@@ -96,6 +96,16 @@ class Repo(unittest.TestCase):
         for name in ("ptt-done", "ptt-leave", "ptt-pr-review", "ptt-pr-cleanup"):
             text = (ROOT / "project" / "skills" / name / "SKILL.md.in").read_text()
             self.assertIn("ptt-disk", text, name)
+        # T0010 amendment 0008: the rules block says the same as the skills.
+        rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
+        self.assertIn("`test-run new` records the run's creator (`by:`)", rules)
+        self.assertIn("a run nobody cites may go whole and a cited one keeps all but its build directories", rules)
+        self.assertIn("as static removal commands run only on the user's AtE", rules)
+        self.assertIn("Run records or a scratchpad the user names, any session removes.", rules)
+        self.assertIn("a task's: `worktrees/<task slug>`", rules)
+        self.assertIn("`by:`", evidence)
+        self.assertIn("worktrees/<task slug>", evidence)
+        self.assertIn("Run all listed commands", disk)
 
     def test_rules_name_commands_in_the_sessions_tool(self):
         rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
