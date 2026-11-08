@@ -62,6 +62,7 @@ Six ideas decide everything else; when in doubt, ask which one applies.
 | turn automatic nudges between sessions on or off | any | `/ptt-nudges on` / `/ptt-nudges off` |
 | stop holding a role or task | that session | `/ptt-leave` (a task needs the supervisor's `/ptt-leave approve N`) |
 | clean up merged branches | the integrator | `/ptt-pr-cleanup` |
+| free disk space: your run records, your scratchpad | any holder | `/ptt-disk` |
 
 In Codex, commands start with `$` instead of `/`. For anything not in this
 table, ask a session: it reads Partitur's documents and explains, for

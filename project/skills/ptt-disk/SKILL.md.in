@@ -1,0 +1,57 @@
+---
+name: ptt-disk
+description: "Show disk use and what may be removed: your run records (test-run gc), this session's scratchpad, and for the integrator decided requests (pr gc); runs the reviewed, static removal commands only on AtE. Use to free disk space or clean up run records or a scratchpad. Arguments: none, or paths the user names."
+disable-model-invocation: true
+---
+
+# Disk cleanup
+
+The command, or an AtE naming these records, approves the records this skill
+writes (it writes none); removing anything needs AtE (rules file). Any
+holder; `<name>` is your holder name. Other skills (`ptt-done`,
+`ptt-pr-review`, `ptt-pr-cleanup`, `ptt-leave`) follow these steps too.
+
+The user's direction comes first: when the user names run records or a
+scratchpad to clean up, do it, whatever their `by:`, and use
+`test-run gc PATH...` to inventory them. The rules below limit only what a
+session proposes by itself.
+
+## Inventory (read-only)
+
+1. Run records: `<records>/bin/test-run gc --scratch <scratchpad>` (add the
+   paths the user named; `--as <name>` when this session is not bound). It
+   shows every run with its head, citations, and what may go, and gives
+   commands only for runs whose `by:` is you: a run whose head (request or
+   task) is open stays whole; once it is concluded, a run cited nowhere goes
+   whole and a cited one only its build directories. Runs of others, runs
+   without `by:`, and runs with no head are for information: report them;
+   the user decides who handles them.
+2. Scratchpad: only this session's own. Claude Code names it in the system
+   prompt (the scratchpad directory); in Codex, state what you find (a
+   temporary directory this session made), or that it is Unknown. Never
+   anything outside it. From `--scratch`'s list, propose only what you no
+   longer need; say what you keep and why.
+3. The integrator also runs `<records>/bin/pr gc` and reports its table; its
+   removals follow `/ptt-pr-cleanup`, which writes the cleanup messages.
+4. Disk use: `df -h <workspace root> <scratchpad>`.
+5. Report the tables, the disk use, and the commands exactly as printed.
+   With more than about 20 commands, show their count, the total they free,
+   and the first five, and ask whether to expand them all. End with the
+   decision list right after its question line (rules file):
+
+   ```
+   Remove what is listed:
+   1. Run all listed commands (recommended)
+   2. Run only the ones I name
+   3. Show all commands first
+   4. No decision, discuss further
+   ```
+
+## Removal (on AtE)
+
+6. Run the inventory again with the same arguments; if an approved command
+   is gone or changed, report and stop.
+7. Run the approved commands exactly as printed, one at a time; never edit,
+   combine, or glob them. If one fails, stop and report.
+8. Run the inventory again and `df -h`; report what was freed and what
+   remains, and why.

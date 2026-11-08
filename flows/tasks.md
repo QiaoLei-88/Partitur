@@ -131,6 +131,7 @@ with `ptt show`.
 | `/ptt-close N`, `reopen N`, `cancel N` | supervisor | `ptt close`, `ptt reopen`, `ptt cancel` |
 | `/ptt-leave`, `approve N`, `free N\|ROLE` | holder; supervisor; supervisor or user | `ptt leave`, `ptt approve-leave`, `ptt free` |
 | `/ptt-pr-submit`, `/ptt-pr-draft-reply`, `/ptt-pr-reply`, `/ptt-pr-review`, `/ptt-pr-cleanup` | holder; integrator | requests ([requests](requests.md)) |
+| `/ptt-disk [PATH...]` | any holder | `test-run gc`, `pr gc` (integrator), the scratchpad, `df`: removal commands run only on AtE ([evidence](evidence.md)) |
 
 In Codex the commands start with `$` instead of `/`.
 

@@ -13,11 +13,16 @@ writes; other work needs AtE (rules file).
    (`<records>/bin/ptt show <N>`) against records: merged requests with merge
    commits, run records, notes. A criterion without a record is not met;
    state unknowns and skipped work as such.
-2. Write that check, criterion by criterion, into `status.md` and record it:
+2. Disk: follow `/ptt-disk` for your own run records and your scratchpad
+   (`<records>/skills/ptt-disk/SKILL.md`, steps 1-8): inventory, the
+   reviewed commands, removal only on AtE. Runs whose head is still open
+   (an undecided request) stay; say so.
+3. Write that check, criterion by criterion, into `status.md`, with what was
+   removed or kept and why, and record it:
    `<records>/bin/ptt record -m "task <N>: status" <status.md>`.
-3. `<records>/bin/ptt done <N> --as <name> --requests <numbers> --text
+4. `<records>/bin/ptt done <N> --as <name> --requests <numbers> --text
    "<one-line summary>"`.
-4. Tell the user that the supervisor (named by `<records>/bin/ptt whoami
+5. Tell the user that the supervisor (named by `<records>/bin/ptt whoami
    <name>`) closes it with `/ptt-close <N>` or reopens it; you hold the task
    until then. The close reaches this session through its inbox (with an
    active prompt hook, at the user's next message; otherwise `/ptt-inbox`),

@@ -85,6 +85,18 @@ class Repo(unittest.TestCase):
                 self.assertIn("The command, or an AtE naming these records, approves", text,
                               skill.parent.name)
 
+    def test_user_direction_overrides_cleanup_limits(self):
+        """T0010: ownership and head rules limit only what a session proposes
+        by itself; what the user names, any session cleans up."""
+        disk = " ".join((ROOT / "project" / "skills" / "ptt-disk" / "SKILL.md.in").read_text().split())
+        self.assertIn("when the user names run records or a scratchpad to clean up, do it", disk)
+        evidence = " ".join((ROOT / "flows" / "evidence.md").read_text().split())
+        self.assertIn("when the user names run records or a scratchpad to clean up, any session does it",
+                      evidence)
+        for name in ("ptt-done", "ptt-leave", "ptt-pr-review", "ptt-pr-cleanup"):
+            text = (ROOT / "project" / "skills" / name / "SKILL.md.in").read_text()
+            self.assertIn("ptt-disk", text, name)
+
     def test_rules_name_commands_in_the_sessions_tool(self):
         rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
         self.assertIn("Name a command for the user in your own tool's notation.", rules)
