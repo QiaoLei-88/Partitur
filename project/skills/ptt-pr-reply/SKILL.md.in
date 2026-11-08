@@ -39,8 +39,8 @@ No draft for request NNNNNN in this conversation. Decide:
 3. No decision, discuss further
 ```
 
-For several requests in one message, label each question (`A1`, `B2`;
-rules file) instead of numbering.
+For several requests in one message, label each question (`A1`, `B2`)
+instead of numbering, and end with the `ALL1 AtE` line (rules file).
 
 ## Carrying it out
 

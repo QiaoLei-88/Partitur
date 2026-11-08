@@ -144,6 +144,15 @@ class Repo(unittest.TestCase):
         review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
         self.assertIn("decision list right after its question line, never after another numbered list", review)
         self.assertIn("one that is not an option: ask again", review)
+        # T0010 amendment 0011: ALL1 takes every recommendation; not for one decision.
+        self.assertIn("\"`ALL1 AtE`: accept every recommendation\"", rules)
+        self.assertIn("(`ALL1 B2 AtE`: B takes 2, the rest 1)", rules)
+        self.assertIn("A single decision has no labels and no `ALL1` line", rules)
+        self.assertIn("A single decision has no labels and no `ALL1` line", flow)
+        self.assertIn("`ALL1 AtE`: accept every recommendation ```", flow)
+        for name in ("ptt-close", "ptt-pr-cleanup", "ptt-pr-reply", "ptt-pr-review"):
+            self.assertIn("ALL1 AtE", text("project", "skills", name, "SKILL.md.in"), name)
+        self.assertIn("`ALL1 AtE` line", text("SKILL.md"))
         # T0010 amendment 0002: several decisions in one message are labelled.
         self.assertIn("Two or more decisions in one message are labelled", rules)
         self.assertIn("(`A1 B2 AtE`)", rules)
