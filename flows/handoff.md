@@ -89,8 +89,8 @@ event (`session_name:`), and print the line that renames the session. In
 Claude Code it gives the reason: "So that automatic messages reach this
 session, rename it: /rename <name>"; a session not renamed gets no nudges,
 since `ListAgents` does not list it by that name. In Codex, which gets no
-nudges, it only shows the name: `/rename`, then the name (Codex documents
-`/rename` for the current chat, not an argument to it). Renaming stays the
+nudges, it only shows the name: `/rename <name>` (Codex's `/rename` takes
+the name inline, as its source shows). Renaming stays the
 user's act: `ptt` can neither see nor set a session's name. The name
 is chosen once and never recomputed; `ptt who` and `ptt whoami` show it. It
 is `<project>-<holder>-<hash>`, lowercase:

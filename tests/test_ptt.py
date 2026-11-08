@@ -1147,8 +1147,8 @@ class Ptt(unittest.TestCase):
         me = self.ptt("whoami", session=a).stdout
         self.assertIn("session: this one\nsession name: prtr-dsgn-g1-123456\n", me)
         self.assertIn("In Claude Code, so that automatic messages reach this session, rename it: "
-                      "/rename prtr-dsgn-g1-123456; in Codex, to show it, type: /rename, then "
-                      "enter prtr-dsgn-g1-123456\n", me)
+                      "/rename prtr-dsgn-g1-123456; in Codex, to show it, type: /rename "
+                      "prtr-dsgn-g1-123456\n", me)
         other = self.ptt("whoami", "designer-g1", session=b).stdout
         self.assertIn("session name: prtr-dsgn-g1-123456\n", other)
         self.assertNotIn("/rename", other)
@@ -1262,7 +1262,7 @@ class Ptt(unittest.TestCase):
         (self.rec / "project-code").write_text("prtr\n")
         for key, line in (("CLAUDE_CODE_SESSION_ID", "So that automatic messages reach this "
                            "session, rename it: /rename prtr-intg-{n}-abcdef\n"),
-                          ("CODEX_THREAD_ID", "to show it, type: /rename, then enter "
+                          ("CODEX_THREAD_ID", "to show it, type: /rename "
                            "prtr-intg-{n}-abcdef\n")):
             with self.subTest(key=key):
                 env = dict(self.env(), **{key: f"0-0-0-0-{key[:2].lower()}00abcdef"})
