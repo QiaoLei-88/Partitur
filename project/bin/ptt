@@ -88,6 +88,21 @@ elsewhere. Without a session ID (for example a plain terminal), nothing is
 bound or checked. Hints name a skill command in the calling tool's notation,
 known from those variables: `/ptt-...` in Claude Code, `$ptt-...` in Codex,
 and both where neither is set (PTT_SESSION_ID alone names no tool).
+
+Session names: `take` and `resume` with a session ID also give the session a
+name, recorded in that event as `session_name` and never recomputed, and
+print the line that shows it in the tool (`/rename NAME`). The name is
+`<project>-<holder>-<hash>`, lowercase: the project code is
+<records>/project-code (one line) if present, else the workspace root's
+directory name shortened (keep the first letter, drop later vowels and `y`,
+collapse repeated letters, keep four; a name of four characters or fewer is
+kept: Partitur `prtr`); the holder part is the holder name shortened the same
+way (designer-g2 `dsgn-g2`, integrator-1 `intg-1`, worker-T0008-2
+`wrkr-t8-2`, track-T0007.1 `trck-t7.1`); the hash is six digits of the
+session ID's last group of twelve (the last group of a UUID, else its last
+twelve letters and digits), by default the last six. If another session has
+recorded the same name, the window moves one digit towards the start, at
+most seven windows, and only then grows longer.
 """
 import argparse
 import fcntl
@@ -626,6 +641,106 @@ def session_id():
             or os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID") or None)
 
 
+def short_code(word):
+    """WORD in at most four letters: lowercase letters and digits, the first
+    kept, later vowels and `y` dropped, repeated letters collapsed; a WORD of
+    four or fewer is kept (Partitur `prtr`, worker `wrkr`)."""
+    w = re.sub(r"[^a-z0-9]", "", word.lower())
+    if len(w) <= 4:
+        return w
+    out = w[0]
+    for c in w[1:]:
+        if c not in "aeiouy" and c != out[-1]:
+            out += c
+    return out[:4]
+
+
+def project_code():
+    f = REC / "project-code"
+    if f.exists():
+        lines = f.read_text().split("\n")
+        code = lines[0].strip().lower()
+        need(re.fullmatch(r"[a-z0-9]+", code), f"{f.relative_to(REC)}: one line of letters "
+             "and digits, the project's code in session names")
+        return code
+    return short_code(REC.resolve().parent.name) or "ptt"
+
+
+def holder_code(name):
+    """The holder part of a session name: designer-g2 `dsgn-g2`, integrator-1
+    `intg-1`, worker-T0008-2 `wrkr-t8-2`, track-T0007.1 `trck-t7.1`."""
+    m = re.fullmatch(r"designer-g(\d+)", name)
+    if m:
+        return f"dsgn-g{m.group(1)}"
+    m = re.fullmatch(r"integrator-(\d+)", name)
+    if m:
+        return f"intg-{m.group(1)}"
+    m = re.fullmatch(r"([a-z]+)-T(\d+)((?:\.\d+)*)(-\d+)?", name)
+    if m:
+        return f"{short_code(m.group(1))}-t{int(m.group(2))}{m.group(3)}{m.group(4) or ''}"
+    return re.sub(r"[^a-z0-9.]+", "-", name.lower()).strip("-")
+
+
+UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-([0-9a-f]{12})")
+
+
+def hash_windows(sid):
+    """The candidate hashes of session ID `sid`, in order: six digits of
+    its last group of twelve (random in UUIDv4 and v7), the last six first,
+    each next one a digit towards the start; then longer ones."""
+    m = UUID.fullmatch(sid.lower())
+    group = m.group(1) if m else re.sub(r"[^a-z0-9]", "", sid.lower())[-12:]
+    out = [group[i:i + 6] for i in range(len(group) - 6, -1, -1)]
+    out += [group[-n:] for n in range(7, len(group) + 1)]
+    return out or [group]
+
+
+def recorded_session_names(sid):
+    """Session names recorded by sessions other than `sid`."""
+    dirs = [d for d in ROLES.iterdir() if d.is_dir()] if ROLES.is_dir() else []
+    dirs += [d for _, _, d in all_tasks()]
+    return {e["session_name"] for d in dirs for e in events(d)
+            if e.get("session_name") and e.get("session_id") != sid}
+
+
+def new_session_name(holder, sid):
+    """The name for session `sid` of `holder`, unique in the records; the
+    caller holds the lock."""
+    prefix = f"{project_code()}-{holder_code(holder)}"
+    taken = recorded_session_names(sid)
+    for h in hash_windows(sid):
+        if f"{prefix}-{h}" not in taken:
+            return f"{prefix}-{h}"
+    die(f"no unique session name for {holder} from session ID {sid}")
+
+
+def session_name_of(d):
+    """The session name the current hold in `d` last recorded, or None."""
+    name = None
+    for e in events(d):
+        if e["kind"] in ("take", "resume"):
+            name = e.get("session_name")
+        elif e["kind"] in ("leave", "close", "cancel"):
+            name = None
+    return name
+
+
+def rename_line(name):
+    """What the user types to show session name NAME in the calling tool."""
+    if os.environ.get("CLAUDE_CODE_SESSION_ID"):
+        return f"/rename {name}"
+    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID"):
+        return f"/rename, then enter {name}"
+    return f"/rename {name} in Claude Code; /rename, then enter {name}, in Codex"
+
+
+def show_session_name(name):
+    """Print this session's name and the line that shows it in the tool, on
+    standard error (standard output stays the holder name)."""
+    if name:
+        print(f"session name: {name}\nto show it, type: {rename_line(name)}", file=sys.stderr)
+
+
 def skill(command):
     """COMMAND (`ptt-resume NAME`) as the user types it in the calling tool:
     `/ptt-...` in Claude Code, `$ptt-...` in Codex, both when neither is known."""
@@ -786,14 +901,14 @@ def need(cond, msg):
 
 # --- commands -----------------------------------------------------------------
 
-def bind():
-    """The session field of a take or resume event; refuses a session that
-    already holds something."""
+def bind(holder):
+    """The session fields of a take or resume event by `holder`: the session
+    ID and its new name; refuses a session that already holds something."""
     here = bound_here()
     need(not here, f"this session is {here}; one session holds one role or task (to work on "
          "another, use a fresh session, or leave first)")
     sid = session_id()
-    return dict(session_id=sid) if sid else {}
+    return dict(session_id=sid, session_name=new_session_name(holder, sid)) if sid else {}
 
 
 def bind_note(name):
@@ -861,11 +976,12 @@ def cmd_resume(a):
     if sid and sessions[-1] == sid:
         print(f"this session is already {a.name}")
         return
-    fields = dict(by=a.name, **bind())
+    fields = dict(by=a.name, **bind(a.name))
     what = f"role {d.name}" if d.parent == ROLES else f"task {tid(TASK_DIR.match(d.name).group(1))}"
     add_event(d, "resume", fields, "", f"{what}: {a.name} continues in a new session")
     (handover_dir() / a.name).unlink(missing_ok=True)
     print(f"this session is {a.name}")
+    show_session_name(fields.get("session_name"))
     bind_note(a.name)
     if sid:
         note(f"the session that was {a.name} before must no longer be used: its writes are "
@@ -878,9 +994,10 @@ def cmd_take(a):
         need(not holder, f"{a.what} is held by {holder}; it must leave first "
              "(or the user frees it)")
         name = role_name(a.what, gen + 1)
-        add_event(ROLES / a.what, "take", dict(by=name, generation=gen + 1, **bind()), "",
-                  f"role {a.what}: taken by {name}")
+        fields = dict(by=name, generation=gen + 1, **bind(name))
+        add_event(ROLES / a.what, "take", fields, "", f"role {a.what}: taken by {name}")
         print(name)
+        show_session_name(fields.get("session_name"))
         bind_note(name)
         return
     i = get(a.what)
@@ -895,9 +1012,11 @@ def cmd_take(a):
                           "done (request numbers and merge commits), what is open, where it "
                           "stands. No review states.\n")
         extra = [status]
-    add_event(i["dir"], "take", dict(by=name, **bind()), "",
-              f"task {tid(i['number'])}: taken by {name}", also=extra)
+    fields = dict(by=name, **bind(name))
+    add_event(i["dir"], "take", fields, "", f"task {tid(i['number'])}: taken by {name}",
+              also=extra)
     print(name)
+    show_session_name(fields.get("session_name"))
     bind_note(name)
     if i["number"] == ROOT:
         unfilled = [f for f in ("charter.md", "status.md")
@@ -1289,11 +1408,19 @@ def cmd_show(a):
 
 
 def cmd_who(a):
-    print(f"{'integrator':11} {role_state('integrator')[0] or '(free)'}")
-    print(f"{'designer':11} {get(ROOT)['holder'] or '(free)'}")
+    def named(d):
+        name = session_name_of(d)
+        return f"  session {name}" if name else ""
+    holder = role_state("integrator")[0]
+    print(f"{'integrator':11} {holder or '(free)'}"
+          + (named(ROLES / "integrator") if holder else ""))
+    root = get(ROOT)
+    print(f"{'designer':11} {root['holder'] or '(free)'}"
+          + (named(root["dir"]) if root["holder"] else ""))
     for i in infos():
         if i["holder"] and i["number"] != ROOT:
-            print(f"task {tid(i['number']):10} {i['holder']}  ({i['kind']}, {i['slug']})")
+            print(f"task {tid(i['number']):10} {i['holder']}  ({i['kind']}, {i['slug']})"
+                  + named(i["dir"]))
 
 
 def cmd_whoami(a):
@@ -1316,11 +1443,16 @@ def cmd_whoami(a):
               f"{level(i['number'])}, generation {i['takes']}; supervisor "
               + (sup or "vacant (the user acts until it is taken)"))
         print(f"charter: {(i['dir'] / 'charter.md').relative_to(REC.parent)}")
-    sessions = [h[2] for h in holdings() if h[0] == a.name][0]
+    _, d, sessions = [h for h in holdings() if h[0] == a.name][0]
     sid = session_id()
     if sessions[-1]:
         print("session: " + ("this one" if sessions[-1] == sid else
                              f"another one; continue here with `ptt resume {a.name}`"))
+    name = session_name_of(d)
+    if name:
+        print(f"session name: {name}")
+        if sessions[-1] == sid:
+            print(f"to show it, type: {rename_line(name)}")
 
 
 def tree(rev):

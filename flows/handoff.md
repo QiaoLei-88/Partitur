@@ -82,6 +82,32 @@ the binding and prevents the earlier session from writing *(Proposed,
 G13, G16)*. A session never clears in the middle of a multi-round review or
 a design discussion only to save tokens: re-reading costs too.
 
+## Session names *(Proposed)*
+
+`ptt take` and `ptt resume` give the session a name, record it in that
+event (`session_name:`), and print the line that shows it in the tool:
+`/rename <name>` in Claude Code; in Codex `/rename`, then the name (Codex
+documents `/rename` for the current chat, not an argument to it). The name
+is chosen once and never recomputed; `ptt who` and `ptt whoami` show it. It
+is `<project>-<holder>-<hash>`, lowercase:
+
+- project: `<records>/project-code` (one line) if present, else the
+  workspace root's directory name shortened: keep the first letter, drop
+  later vowels (and `y`), collapse repeated letters, keep four (Partitur
+  `prtr`, Fynamiq `fnmq`); a name of four characters or fewer is kept;
+- holder: the holder name shortened the same way (`designer-g2`
+  `dsgn-g2`, `integrator-1` `intg-1`, `worker-T0008-2` `wrkr-t8-2`,
+  `track-T0007.1` `trck-t7.1`);
+- hash: six digits of the session ID's last group of twelve (a UUID's last
+  group, random in versions 4 and 7; another ID's last twelve letters and
+  digits), by default the last six. If another session has recorded the
+  same name, the window moves one digit towards the start, at most seven
+  windows; only then is it lengthened.
+
+Any session can derive a holder's current session name from the records:
+the address a later cross-session message would use. Without a session ID
+nothing is bound, and no name is given.
+
 ## Stage close
 
 A stage closes when its tasks are closed or cancelled (D11). The designer

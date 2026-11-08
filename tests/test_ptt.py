@@ -1094,6 +1094,80 @@ class Ptt(unittest.TestCase):
             "mktask", "y", "--as", d, session="C"))
         self.assertTrue(list((self.rec / "tasks" / "open" / "T0000-design").glob("*-resume.md")))
 
+    def test_session_name_codes(self):
+        ptt = runpy.run_path(str(self.rec / "bin" / "ptt"))
+        for word, code in (("Partitur", "prtr"), ("Fynamiq", "fnmq"), ("Wobbleggs", "wblg"),
+                           ("iConverge", "icnv"), ("abc", "abc"), ("Ab-c", "abc"),
+                           ("worker", "wrkr"), ("track", "trck"), ("design", "dsgn")):
+            self.assertEqual(ptt["short_code"](word), code, word)
+        for holder, code in (("designer-g1", "dsgn-g1"), ("integrator-1", "intg-1"),
+                             ("worker-T0008", "wrkr-t8"), ("worker-T0008-2", "wrkr-t8-2"),
+                             ("track-T0007.1", "trck-t7.1"), ("design-T0012-3", "dsgn-t12-3")):
+            self.assertEqual(ptt["holder_code"](holder), code, holder)
+        self.assertEqual(ptt["project_code"](), ptt["short_code"](self.root.name))
+        (self.rec / "project-code").write_text("Mine\n")
+        self.assertEqual(ptt["project_code"](), "mine")
+        (self.rec / "project-code").write_text("my code\n")
+        with self.assertRaises(SystemExit):
+            ptt["project_code"]()
+
+    def test_session_name_hash_windows(self):
+        windows = runpy.run_path(str(self.rec / "bin" / "ptt"))["hash_windows"]
+        v4 = windows("d28136ab-07f9-4957-bb62-fc56522ba145")
+        self.assertEqual(v4[:8], ["2ba145", "22ba14", "522ba1", "6522ba", "56522b", "c56522",
+                                  "fc5652", "22ba145"])
+        self.assertEqual(v4[-1], "fc56522ba145")
+        v7 = windows("01A1A3DB-A88F-7251-8000-0123456789AB")
+        self.assertEqual(v7[:2], ["6789ab", "56789a"])
+        self.assertEqual(windows("thread:42-Abcdefghijklm")[:2], ["hijklm", "ghijkl"])
+        self.assertEqual(windows("A"), ["a"])
+
+    def test_session_name_recorded_once_and_moves_on_collision(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        a = "00000000-0000-4000-8000-111111123456"
+        b = "00000000-0000-4000-8000-222222123456"
+        r = self.ptt("take", "designer", session=a)
+        self.assertEqual(r.stdout, "designer-g1\n")
+        self.assertIn("session name: prtr-dsgn-g1-123456\n", r.stderr)
+        take = self.rec / "tasks" / "open" / "T0000-design" / "0001-take.md"
+        self.assertIn("\nsession_name: prtr-dsgn-g1-123456\n", take.read_text())
+        # another session of the same holder with the same last six digits
+        r = self.ptt("resume", "designer-g1", session=b)
+        self.assertIn("session name: prtr-dsgn-g1-212345\n", r.stderr)
+        # the first session's own earlier name is not a collision
+        r = self.ptt("resume", "designer-g1", session=a)
+        self.assertIn("session name: prtr-dsgn-g1-123456\n", r.stderr)
+        n = self.task("probe", "designer-g1", kind="worker")
+        self.ptt("take", n, session="00000000-0000-4000-8000-333333123456")
+        self.ptt("take", "integrator", session="00000000-0000-4000-8000-444444abcdef")
+        who = self.ptt("who").stdout
+        self.assertIn("designer    designer-g1  session prtr-dsgn-g1-123456\n", who)
+        self.assertIn("integrator  integrator-1  session prtr-intg-1-abcdef\n", who)
+        self.assertIn("worker-T0001  (worker, probe)  session prtr-wrkr-t1-123456\n", who)
+        me = self.ptt("whoami", session=a).stdout
+        self.assertIn("session: this one\nsession name: prtr-dsgn-g1-123456\n", me)
+        self.assertIn("to show it, type: /rename prtr-dsgn-g1-123456 in Claude Code", me)
+        other = self.ptt("whoami", "designer-g1", session=b).stdout
+        self.assertIn("session name: prtr-dsgn-g1-123456\n", other)
+        self.assertNotIn("to show it", other)
+        # no session ID: no name
+        self.ptt("leave", "integrator-1")
+        r = self.ptt("take", "integrator")
+        self.assertNotIn("session name", r.stderr)
+        self.assertEqual(self.ptt("who").stdout.splitlines()[0], "integrator  integrator-2")
+
+    def test_rename_line_in_the_calling_tools_notation(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        for key, line in (("CLAUDE_CODE_SESSION_ID", "/rename prtr-intg-{n}-abcdef\n"),
+                          ("CODEX_THREAD_ID", "/rename, then enter prtr-intg-{n}-abcdef\n")):
+            with self.subTest(key=key):
+                env = dict(self.env(), **{key: f"0-0-0-0-{key[:2].lower()}00abcdef"})
+                r = run("python3", str(self.rec / "bin" / "ptt"), "take", "integrator", env=env)
+                n = r.stdout.strip().rsplit("-", 1)[1]
+                self.assertIn("to show it, type: " + line.format(n=n), r.stderr)
+                run("python3", str(self.rec / "bin" / "ptt"), "leave", f"integrator-{n}",
+                    env=env)
+
 
 if __name__ == "__main__":
     unittest.main()

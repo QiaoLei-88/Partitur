@@ -27,7 +27,10 @@ Six ideas decide everything else; when in doubt, ask which one applies.
    record, nothing more, unless it carries out a draft you have seen.
 2. **Take a role before working.** A session is the designer, the
    integrator, or the holder of one task, and only because it took that
-   role with a command. A role someone holds cannot be taken.
+   role with a command. A role someone holds cannot be taken. Taking or
+   resuming also names the session (`prtr-wrkr-t8-d6ddbc`: project, holder,
+   part of the session ID) and prints the line that shows the name in your
+   tool, `/rename <name>`.
 3. **Records, not memory.** What matters is in files in the records
    repository, so a session can be cleared or replaced at any time and the
    next one continues from them.
