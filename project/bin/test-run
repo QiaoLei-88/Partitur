@@ -1,28 +1,58 @@
 #!/usr/bin/env python3
-"""Create a run record directory for a checkout (Partitur, flows/evidence.md).
+"""Create and clean up run records (Partitur, flows/evidence.md).
 
 Usage:
   test-run new REPO_PATH [--root DIR]
+  test-run gc [PATH...] [--root DIR] [--as NAME] [--request N] [--scratch DIR]
 
-Creates <root>/<id>/ with id = <UTC timestamp>-<short commit SHA>, for example
-20261009T061500Z-7099ba2, writes run.md with the checkout's identity, and
-prints the directory path. run.md names its creator in `by:`, the holder
-bound to this session by `ptt` (beside this tool), or `unknown` without
-one. The caller puts the command, logs, outputs, exit status and counts
-there; large outputs are recorded by SHA-256, size, and a compact
-numerical summary. A run directory is written by one run and never
-reused. The default root is test-runs/ in the workspace root (the parent
-of the records repository holding this tool's directory).
+`new` creates <root>/<id>/ with id = <UTC timestamp>-<short commit SHA>, for
+example 20261009T061500Z-7099ba2, writes run.md with the checkout's identity
+and its creator (`by:`, the holder bound to this session by `ptt`, beside this
+tool; `unknown` without one), and prints the directory path. The caller puts
+the command, logs, outputs, exit status and counts there; large outputs are
+recorded by SHA-256, size, and a compact numerical summary. A run directory is
+written by one run and never reused. The default root is test-runs/ in the
+workspace root (the parent of the records repository holding this tool's
+directory).
+
+`gc` is read-only: it prints a table of the run records and the commands that
+would remove what may go, and removes nothing. A run's head is the request
+whose branch or head it tested, else the task whose worktree it ran in
+(named in the task's charter or amendments as worktrees/<name>); without a
+request, a worktree still present keeps the head open. The head is concluded
+when its request is merged or closed, or its task done or cancelled. A run is
+cited when its id appears in a file of the records repository at HEAD, in a
+records commit message, or in a commit message of a main branch in pr/repos.
+- head open: the run is kept whole;
+- cited, head concluded: its build directories may go (a directory named
+  build or build-*, or holding CMakeCache.txt);
+- not cited, head concluded: the whole directory may go;
+- no head (a main branch, detached, or not found) and not cited: listed
+  apart, never in the commands unless named.
+Commands are given only for runs whose `by` is the caller (the holder bound
+to this session, or --as NAME); others' runs and runs without `by` are shown
+for information. PATHs (run records or other paths the user named) are
+listed alone and given commands whatever their `by`. --request N limits the table
+to runs whose head is request N. --scratch DIR lists the top-level entries of
+a session's scratchpad with their sizes and the commands that would remove
+them. Every command is static: `rm -rf -- '<absolute path>'` for a directory,
+`rm -- '<absolute path>'` for anything else, without globs or variables.
 """
 import argparse
 import importlib.machinery
 import importlib.util
+import os
+import re
+import shlex
+import stat
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+REC = HERE.parent
+WS = REC.parent
 
 
 def git(repo, *args):
@@ -30,11 +60,17 @@ def git(repo, *args):
                           capture_output=True, text=True).stdout.strip()
 
 
+def git_quiet(repo, *args):
+    r = subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True)
+    return r.returncode, r.stdout
+
+
 def sibling(name):
     """The tool `name` beside this one, loaded as a module, or None."""
     path = HERE / name
     if not path.is_file():
         return None
+    sys.dont_write_bytecode = True    # no __pycache__ in the records' bin/
     loader = importlib.machinery.SourceFileLoader(f"partitur_{name}", str(path))
     spec = importlib.util.spec_from_loader(loader.name, loader)
     module = importlib.util.module_from_spec(spec)
@@ -56,16 +92,7 @@ def bound_holder():
         return None
 
 
-def main():
-    ap = argparse.ArgumentParser(prog="test-run", description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("new")
-    p.add_argument("repo", type=Path)
-    p.add_argument("--root", type=Path,
-                    default=Path(__file__).resolve().parent.parent.parent / "test-runs")
-    a = ap.parse_args()
-
+def cmd_new(a):
     try:
         sha = git(a.repo, "rev-parse", "HEAD")
         branch = git(a.repo, "branch", "--show-current") or "(detached)"
@@ -101,13 +128,336 @@ def main():
         "## Results\nExit status and passed/failed/skipped counts.\n\n"
         "## Files\nSmall files (logs, reports, diagnostic tables), kept in full.\n\n"
         "## Large outputs\n"
-        "Not kept once the run is no longer needed for a pending decision; record\n"
+        "Not kept once the run's head is concluded and nothing cites it; record\n"
         "each with its hash and a compact numerical summary for tolerance-based\n"
         "comparison.\n\n"
         "| File | SHA-256 | Bytes | Summary |\n"
         "| --- | --- | --- | --- |\n"
     )
     print(run)
+
+
+# --- gc ---------------------------------------------------------------------
+
+def disk_usage(path, seen):
+    """Bytes allocated under `path`, symbolic links not followed; files already
+    in `seen` (device, inode) are not counted again."""
+    total = 0
+    try:
+        st = os.lstat(path)
+    except OSError:
+        return 0
+    stack = [(path, st)]
+    while stack:
+        p, st = stack.pop()
+        if (st.st_dev, st.st_ino) in seen:
+            continue
+        seen.add((st.st_dev, st.st_ino))
+        total += st.st_blocks * 512
+        if stat.S_ISDIR(st.st_mode):
+            try:
+                with os.scandir(p) as it:
+                    for e in it:
+                        try:
+                            stack.append((e.path, e.stat(follow_symlinks=False)))
+                        except OSError:
+                            pass
+            except OSError:
+                pass
+    return total
+
+
+def build_dirs(run):
+    """Build directories inside a run record: named build or build-*, or
+    holding CMakeCache.txt; nothing below one is searched."""
+    found = []
+    for directory, dirs, files in os.walk(run):
+        if Path(directory) == run:
+            continue
+        name = os.path.basename(directory)
+        if name == "build" or name.startswith("build-") or "CMakeCache.txt" in files:
+            found.append(Path(directory))
+            dirs[:] = []
+        dirs.sort()
+    return sorted(found)
+
+
+def human(n):
+    for unit in ("B", "K", "M", "G", "T"):
+        if n < 1024 or unit == "T":
+            return f"{n:.0f}{unit}" if unit == "B" else f"{n:.1f}{unit}"
+        n /= 1024
+
+
+def removal(path):
+    rm = ["rm", "-rf", "--"] if path.is_dir() and not path.is_symlink() else ["rm", "--"]
+    return shlex.join(rm + [str(path)])
+
+
+def run_header(run):
+    path = run / "run.md"
+    if not path.is_file():
+        return None
+    fields = {}
+    lines = path.read_text(errors="replace").splitlines()
+    if lines and lines[0] == "---":
+        for line in lines[1:]:
+            if line == "---":
+                break
+            key, sep, value = line.partition(":")
+            if sep:
+                fields[key.strip()] = value.strip()
+    return fields
+
+
+class Heads:
+    """Requests, tasks, and main branches, to find a run's head."""
+
+    def __init__(self):
+        self.requests, self.mains, self.tasks, self.notes = [], {}, [], []
+        pr = sibling("pr")
+        root = REC / "pr"
+        if pr is None or not (root / "repos").is_file():
+            self.notes.append(f"no request table ({root / 'repos'}): requests not consulted")
+        else:
+            try:
+                pr.load_repos(root)
+            except SystemExit as e:
+                self.notes.append(f"request table unreadable: {e}")
+            else:
+                for name in pr.REPOS:
+                    self.mains[name] = (pr.MAIN[name], (WS / pr.CHECKOUT[name]).resolve())
+                for state, d in pr.requests(root, pr.STATES):
+                    info, _ = pr.summarize(state, d)
+                    if info is None:
+                        continue
+                    heads = {pr.front_matter(p).get("head", "") for p in pr.messages(d)}
+                    self.requests.append(dict(number=d.name[:6], state=state, repo=info["repo"],
+                                              branch=info["branch"], heads=heads - {"", "?"}))
+        ptt = sibling("ptt")
+        if ptt is None:
+            self.notes.append("no ptt beside this tool: tasks not consulted")
+            return
+        try:
+            for i in ptt.infos():
+                text = "".join(p.read_text(errors="replace") for p in
+                               [i["dir"] / "charter.md"]
+                               + [e["path"] for e in ptt.events(i["dir"]) if e["kind"] == "amend"]
+                               if p.is_file())
+                self.tasks.append(dict(id=ptt.tid(i["number"]), state=i["state"], text=text))
+        except (Exception, SystemExit) as e:
+            self.notes.append(f"tasks unreadable: {e}")
+
+    def repo_of(self, checkout):
+        """The repository name whose checkout or worktree `checkout` is, or None."""
+        if not checkout.is_dir():
+            for name, (_, primary) in self.mains.items():
+                if checkout == primary:
+                    return name
+            return None
+        rc, common = git_quiet(checkout, "rev-parse", "--path-format=absolute", "--git-common-dir")
+        if rc:
+            return None
+        for name, (_, primary) in self.mains.items():
+            rc, other = git_quiet(primary, "rev-parse", "--path-format=absolute",
+                                  "--git-common-dir")
+            if rc == 0 and other.strip() == common.strip():
+                return name
+        return None
+
+    def find(self, h):
+        """(head label, state, request number or None) for a run header; state
+        is open, concluded, or none."""
+        checkout = Path(h.get("checkout", "")).expanduser() if h.get("checkout") else None
+        branch, commit = h.get("branch", ""), h.get("commit", "")
+        repo = self.repo_of(checkout) if checkout else None
+        mains = {self.mains[repo][0]} if repo else {m for m, _ in self.mains.values()}
+        hits = [r for r in self.requests
+                if (repo is None or r["repo"] == repo)
+                and ((commit and commit in r["heads"])
+                     or (branch and branch not in mains and branch != "(detached)"
+                         and r["branch"] == branch))]
+        if hits:
+            open_ = [r for r in hits if r["state"] == "open"]
+            r = (open_ or sorted(hits, key=lambda r: r["number"]))[-1]
+            state = "open" if open_ else "concluded"
+            return f"pr {r['number']} ({r['state']})", state, r["number"]
+        if checkout and branch not in mains and branch != "(detached)":
+            try:
+                rel = checkout.resolve().relative_to(WS.resolve())
+            except ValueError:
+                rel = None
+            if rel is not None and rel.parts[:1] == ("worktrees",):
+                mention = re.compile(re.escape(str(rel)) + r"(?![\w.-])")
+                for t in self.tasks:
+                    if mention.search(t["text"]):
+                        concluded = t["state"] in ("closed", "cancelled")
+                        return (f"{t['id']} ({t['state']})", "concluded" if concluded else "open",
+                                None)
+            if checkout.is_dir() and checkout != (self.mains[repo][1] if repo else None):
+                return f"worktree {checkout}", "open", None
+        return "none", "none", None
+
+
+def citations(ids, mains):
+    """Map run id -> places citing it: records files at HEAD, records commit
+    messages, and commit messages of the main branches."""
+    cited = {i: [] for i in ids}
+    if not ids:
+        return cited
+    args = []
+    for i in sorted(ids):
+        args += ["-e", i]
+    rc, out = git_quiet(REC, "grep", "-I", "-F", "-o", *args, "HEAD", "--")
+    if rc == 0:
+        for line in out.splitlines():
+            rest, found = line.rsplit(":", 1)
+            path = rest[len("HEAD:"):]
+            if found in cited and path not in cited[found]:
+                cited[found].append(path)
+    logs = [("records", REC, "HEAD")] + [(name, path, main) for name, (main, path) in mains.items()]
+    for name, repo, ref in logs:
+        rc, out = git_quiet(repo, "log", "--format=%h%x00%B%x01", ref)
+        if rc:
+            continue
+        for entry in out.split("\x01"):
+            sha, _, body = entry.strip("\n").partition("\x00")
+            for i in ids:
+                if i in body:
+                    cited[i].append(f"{name} {sha}")
+    return cited
+
+
+def scan(roots, named):
+    """The run records to consider: every directory under the roots, and the
+    named paths."""
+    runs = []
+    for root in roots:
+        if root.is_dir():
+            runs += sorted(p for p in root.iterdir() if p.is_dir() and not p.is_symlink())
+    for p in named:
+        if p not in runs:
+            runs.append(p)
+    return runs
+
+
+def plan(a):
+    """Rows and commands; nothing is executed."""
+    caller = a.as_ or bound_holder()
+    # Resolve the parent only: a named symbolic link is removed, not its target.
+    named = [Path(os.path.realpath(os.path.dirname(os.path.abspath(p))),
+                  os.path.basename(os.path.abspath(p))) for p in a.paths]
+    for p in named:
+        if not os.path.lexists(p):
+            sys.exit(f"test-run: {p} does not exist")
+    heads = Heads()
+    runs = scan([] if named and a.request is None else [a.root.resolve()], named)
+    headers = {r: run_header(r) for r in runs}
+    cited = citations({r.name for r, h in headers.items() if h is not None}, heads.mains)
+    seen = set()
+    rows, apart, commands = [], [], []
+    for r in runs:
+        h = headers[r]
+        is_named = r in named
+        if h is None:
+            if not is_named:
+                continue
+            size = disk_usage(r, seen)
+            rows.append((r.name, "-", human(size), "not a run record", "-", "-", "all", size))
+            commands.append((removal(r), size))
+            continue
+        label, state, number = heads.find(h)
+        if a.request is not None and number != a.request:
+            continue
+        by = h.get("by", "") or "-"
+        cites = cited.get(r.name, [])
+        size = disk_usage(r, set())
+        mine = is_named or (caller is not None and by == caller)
+        if state == "open":
+            goes, targets = "nothing (head open)", []
+        elif state == "concluded" and not cites:
+            goes, targets = "all", [r]
+        elif state == "concluded":
+            builds = build_dirs(r)
+            goes = ("build: " + ", ".join(str(b.relative_to(r)) for b in builds)
+                    if builds else "nothing (cited, no build directory)")
+            targets = builds
+        elif cites:
+            goes, targets = "nothing (cited, no head)", []
+        else:
+            goes, targets = ("all", [r]) if is_named else ("nothing (no head, not cited)", [])
+        if targets and not mine:
+            goes, targets = f"nothing (not yours; would go: {goes})", []
+        sizes = [size if t == r else disk_usage(t, seen) for t in targets]
+        commands += [(removal(t), s) for t, s in zip(targets, sizes)]
+        freed = sum(sizes)
+        row = (r.name, by, human(size), label, state,
+               ", ".join(cites[:2]) + (f" +{len(cites) - 2}" if len(cites) > 2 else "")
+               if cites else "none", goes, freed)
+        (apart if state == "none" and not cites and not is_named else rows).append(row)
+    return caller, heads.notes, rows, apart, commands
+
+
+def table(rows, header):
+    rows = [header] + [tuple(str(c) for c in row[:-1]) + (human(row[-1]) if row[-1] else "-",)
+                       for row in rows]
+    widths = [max(len(x[i]) for x in rows) for i in range(len(header))]
+    for x in rows:
+        print("  ".join(c.ljust(w) for c, w in zip(x, widths)).rstrip())
+
+
+def cmd_gc(a):
+    if a.request is not None:
+        m = re.fullmatch(r"(?:pr-?)?0*(\d{1,6})", a.request.strip(), re.IGNORECASE)
+        if not m:
+            sys.exit(f"test-run: invalid request number: {a.request!r}")
+        a.request = m.group(1).zfill(6)
+    caller, notes, rows, apart, commands = plan(a)
+    print(f"caller: {caller or 'unknown (no bound holder; --as NAME)'}")
+    for n in notes:
+        print(f"note: {n}")
+    header = ("run", "by", "size", "head", "state", "cited by", "goes", "frees")
+    if rows:
+        print()
+        table(rows, header)
+    if apart:
+        print("\nno head, not cited (information only; removed only when named):")
+        table(apart, header)
+    if not rows and not apart:
+        print("no run records")
+    if a.scratch:
+        scratch = Path(os.path.abspath(a.scratch))
+        entries = sorted(scratch.iterdir()) if scratch.is_dir() else []
+        print(f"\nscratchpad {scratch}:")
+        if not entries:
+            print("  empty or not found")
+        for p in entries:
+            size = disk_usage(p, set())
+            print(f"  {human(size):>7}  {p.name}{'/' if p.is_dir() and not p.is_symlink() else ''}")
+            commands.append((removal(p), size))
+    total = sum(size for _, size in commands)
+    print(f"\ncommands ({len(commands)}, frees {human(total)}):" if commands
+          else "\ncommands: none")
+    for c, _ in commands:
+        print(f"  {c}")
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="test-run", description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    p = sub.add_parser("new")
+    p.add_argument("repo", type=Path)
+    p.add_argument("--root", type=Path, default=WS / "test-runs")
+    p = sub.add_parser("gc")
+    p.add_argument("paths", nargs="*", help="run records or other paths the user named")
+    p.add_argument("--root", type=Path, default=WS / "test-runs")
+    p.add_argument("--as", dest="as_", metavar="NAME",
+                   help="the caller's holder name (default: the holder bound to this session)")
+    p.add_argument("--request", metavar="N", help="only runs whose head is request N")
+    p.add_argument("--scratch", metavar="DIR", help="the session's scratchpad")
+    a = ap.parse_args()
+    cmd_new(a) if a.cmd == "new" else cmd_gc(a)
 
 
 if __name__ == "__main__":
