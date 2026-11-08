@@ -1,0 +1,20 @@
+---
+name: ptt-nudges
+description: "Turn nudges (automatic cross-session messages telling a session that its inbox has news) on or off for every session of this project, or show the switch. Arguments: on, off, or none."
+disable-model-invocation: true
+---
+
+# Nudges on or off
+
+The command, or an AtE naming these records, approves the records this skill
+writes (it writes none: the switch is a local setting beside the records);
+other work needs AtE (rules file).
+
+- No argument: `<records>/bin/ptt nudges`: report whether nudges are on.
+- `on` or `off`: `<records>/bin/ptt nudges on|off`, then report the state.
+  The switch is shared by every session of the project.
+
+Off, `ptt` prints no nudge targets, and a session that subscribed before
+sends nothing on the idle notice. Nothing is lost: the inbox and the unseen
+items in `<records>/bin/ptt who` show every item. Turning nudges on sends
+nothing for earlier items.

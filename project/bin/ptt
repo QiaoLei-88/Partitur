@@ -4,8 +4,10 @@
 Usage (NAME is the holder name a session received when it took its role or
 task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
 `T0007.1`, by its full name `T0007-slug`, or by its slug):
-  ptt who                          who holds which role and task, its session name, and
-                                   its unseen items (new since its inbox last looked)
+  ptt who                          whether nudges are on; who holds which role and task,
+                                   its session name, and its unseen items (new since its
+                                   inbox last looked)
+  ptt nudges [on|off]              turn nudges on or off for every session, or show them
   ptt handover NAME                leave a handover marker: a fresh session continues
                                    NAME with `ptt resume` and no name
   ptt unlock [--force]             remove the records lock if its owner is gone
@@ -106,6 +108,17 @@ twelve letters and digits), by default the last six. If another session has
 recorded the same name, the window moves one digit towards the start, at
 most seven windows, and only then grows longer. `resume` in the session
 already bound records a name if the hold has none yet (bound before names).
+
+Nudges: after each commit, every command that records prints a `nudge:`
+line for each holder other than the writer to whom the commit gave news:
+an item its inbox shows as new (a subordinate's status.md update aside), or
+the end of its hold by someone else. The line gives the holder's recorded
+session name and the text to send; in Claude Code the writer subscribes to
+that session with notify_when_idle and sends the text on the notice, if
+nudges are still on. `ptt nudges on|off` (default on) is kept in the
+records' Git directory, beside the inbox marks; off, no targets are printed.
+Holders without a recorded session name get no line; the inbox and `ptt
+who`'s unseen items show every item either way.
 """
 import argparse
 import fcntl
@@ -389,7 +402,59 @@ def record(message, add=(), remove=(), created=(), undo=None):
     if len(changes) > 10:
         listed.append(f"... ({len(changes)} files total)")
     print(f"recorded {commit}: {', '.join(listed)}", file=sys.stderr)
+    announce_nudges(commit)
     return True
+
+
+def nudges_on():
+    f = git_dir() / "ptt-nudges"
+    return not f.exists() or f.read_text().strip() != "off"
+
+
+def nudge_targets(commit):
+    """(holder, session name) of each holder other than the writer to whom
+    records `commit` gave news: an item its inbox shows as new, a
+    subordinate's status.md update aside, or the end of its hold by someone
+    else. The session name is None if none was recorded."""
+    if not git("rev-parse", "-q", "--verify", f"{commit}^", check=False).stdout.strip():
+        return []
+    out = []
+    for name, d, _ in holdings():
+        held = held_by(name)
+        if name == ACTOR or not held:
+            continue
+        lines = news(name, held, f"{commit}^")
+        if [x for x in lines if not re.match(r"read T\S+ status\.md:", x)]:
+            out.append((name, session_name_of(d)))
+    changed = set(git("diff-tree", "--root", "--no-commit-id", "--name-only", "-r",
+                      commit).stdout.split())
+    for e in ended_holds():
+        if str(e["path"].relative_to(REC)) in changed and e["name"] != ACTOR:
+            out.append((e["name"], e["session_name"]))
+    return list(dict.fromkeys(out))
+
+
+def announce_nudges(commit):
+    """Print the nudges records `commit` calls for, if nudges are on: one
+    `nudge:` line per holder with a recorded session name, then how to send
+    them. A failure here never undoes the commit."""
+    try:
+        if not nudges_on():
+            return
+        targets = [(n, s) for n, s in nudge_targets(commit) if s]
+    except Exception as err:
+        note(f"nudge targets not computed: {err}")
+        return
+    if not targets:
+        return
+    inbox = REC.relative_to(REC.parent) / "bin" / "ptt"
+    for name, session in targets:
+        print(f"nudge: {session}: new in your inbox (records {commit}); run "
+              f"`{inbox} inbox {name}`", file=sys.stderr)
+    print("nudges: in Claude Code, for each session above that ListAgents lists, subscribe "
+          "with SendMessage notify_when_idle (no message); on its idle notice, if `ptt nudges` "
+          "still says on, send it the text after its name, and nothing else. Codex sends none.",
+          file=sys.stderr)
 
 
 def events(d):
@@ -1432,7 +1497,15 @@ def unseen(name, held, d):
     return f"unseen {len(lines)}" + (f", oldest {ago(oldest)}" if oldest else "")
 
 
+def cmd_nudges(a):
+    if a.state:
+        (git_dir() / "ptt-nudges").write_text(a.state + "\n")
+    print(f"nudges {'on' if nudges_on() else 'off'}")
+
+
 def cmd_who(a):
+    print(f"{'nudges':11} {'on' if nudges_on() else 'off'}")
+
     def state(name, held, d):
         session = session_name_of(d)
         return (f"  session {session}" if session else "") + "  " + unseen(name, held, d)
@@ -1592,19 +1665,22 @@ def news(name, held, base, commits=None):
 
 def ended_holds():
     """Holds that someone else ended (a close, an approved leave, a freeing):
-    dicts with the holder's name, its sessions, the ending event, and a line
-    saying so. A holder's own leave is not listed; it ran the command."""
+    dicts with the holder's name, its sessions and last session name, the
+    ending event, and a line saying so. A holder's own leave is not listed;
+    it ran the command."""
     out = []
     dirs = [("the integrator role", ROLES / "integrator")]
     dirs += [(tid(n), d) for _, n, d in all_tasks()]
     for what, d in dirs:
-        name, sessions = None, []
+        name, sessions, session_name = None, [], None
         for e in events(d):
             k = e["kind"]
             if k == "take":
                 name, sessions = e["by"], [e.get("session_id")]
+                session_name = e.get("session_name")
             elif k == "resume":
                 sessions.append(e.get("session_id"))
+                session_name = e.get("session_name")
             elif k in ("leave", "close") and name:
                 who = lambda f: "the user" if e.get(f) == "user" else e.get(f)
                 if k == "close":
@@ -1616,7 +1692,8 @@ def ended_holds():
                 else:
                     line = None
                 if line:
-                    out.append(dict(name=name, sessions=sessions, path=e["path"], line=line))
+                    out.append(dict(name=name, sessions=sessions, path=e["path"], line=line,
+                                    session_name=session_name))
                 name, sessions = None, []
     return out
 
@@ -1775,6 +1852,8 @@ def run_main():
             p.add_argument("--" + opt, **kw)
         return p
     add("who")
+    add("nudges")
+    sub.choices["nudges"].add_argument("state", nargs="?", choices=("on", "off"))
     add("whoami")
     sub.choices["whoami"].add_argument("name", nargs="?")
     add("tasks", all=dict(action="store_true"))

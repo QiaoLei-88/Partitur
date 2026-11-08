@@ -18,6 +18,7 @@ writes (it writes none); other work needs AtE (rules file).
   `/ptt-resume NAME` continues one.
 - `NAME`: `<records>/bin/ptt whoami NAME`: the same about NAME. It does not
   make this session NAME; that is `/ptt-resume NAME`.
-- `all`: `<records>/bin/ptt who` and `<records>/bin/ptt tasks`: who holds
-  what, each holder's session name and unseen items (new in the records
-  since its inbox last looked), which tasks are ready, blocked, or waiting.
+- `all`: `<records>/bin/ptt who` and `<records>/bin/ptt tasks`: whether
+  nudges are on, who holds what, each holder's session name and unseen
+  items (new in the records since its inbox last looked), which tasks are
+  ready, blocked, or waiting.

@@ -53,6 +53,7 @@ Partitur 是一种由一位用户和多个 AI 代理会话共同开展软件项�
 | 回复审查意见 | 任务持有者 | 先用 `/ptt-pr-draft-reply` 查看修改计划和回复全文，再用 `/ptt-pr-reply` 发布（提交前同样可以先用 `/ptt-pr-submit draft`） |
 | 审查并执行你的决定 | 集成者（通过 `/ptt-take integrator` 领取） | `/ptt-pr-review` |
 | 报告任务完成／验收任务 | 持有者／其上级 | `/ptt-done` / `/ptt-close N` |
+| 开启或关闭会话之间的自动提醒 | 任意会话 | `/ptt-nudges on` / `/ptt-nudges off` |
 | 不再持有角色或任务 | 持有它的会话 | `/ptt-leave`（任务需要上级执行 `/ptt-leave approve N` 批准） |
 | 清理已合并的分支 | 集成者 | `/ptt-pr-cleanup` |
 

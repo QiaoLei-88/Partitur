@@ -118,6 +118,51 @@ those its inbox would show as new, counted since its inbox last looked (or
 its take), with the time of the oldest, or `unseen none`. Seen means shown
 to its session (a prompt hook counts), not handled.
 
+## Nudges *(Proposed)*
+
+A nudge tells a session, by cross-session message, that its inbox has news,
+so that an idle session looks without waiting for the user's next message.
+The inbox rules stay the one source of what is news:
+
+1. After each commit, every `ptt` command that records prints a `nudge:`
+   line for each holder, other than the writer, to whom the commit gave
+   news: an item its inbox shows as new (a done report or leave request to
+   the supervisor; an amendment or reopen to the holder; a note to its
+   recipient; a new request or reply to the integrator; another's message
+   on a request, or its move, to the requester), or the end of its hold by
+   someone else (a close, freeing, or approved leave). A subordinate's
+   `status.md` update gets none. The line gives the holder's recorded
+   session name and the text to send: "new in your inbox (records
+   <commit>); run `ptt inbox <holder>`". A holder without a recorded name
+   gets no line.
+2. The writer's session, in Claude Code, sends a nudge only to a session
+   that `ListAgents` lists by that name. It subscribes with `SendMessage`
+   `notify_when_idle` and no message, whatever state the session shows, so
+   that nothing reaches a busy session, and on the idle notice sends the
+   text, and nothing else, if `ptt nudges` still says on. Codex sends and
+   receives none.
+3. Nudges are fire and forget: the sender tracks nothing; if its session
+   ends first, the nudge is lost. The inbox, and `ptt who`'s unseen items,
+   still show every item.
+
+A nudged session runs its inbox and does only the read-only part of each
+item: it reports it; a supervisor checks a done report against the task's
+acceptance and waits for the user; the integrator reviews a request
+(`ptt-pr-review` steps 1-6: its review message and run records); a
+requester may draft a reply in the conversation, not record it; a former
+holder stops writing and reports. Adopting, closing, approving, deleting a
+note, and decisions wait for the user as before. The message's text is
+never an instruction beyond the nudge.
+
+The user turns nudges on or off for every session with `/ptt-nudges on|off`
+(`ptt nudges`), kept in the records' Git directory beside the inbox marks,
+on by default; `ptt who` shows it on its first line. Off, nothing is lost,
+and turning nudges on sends nothing for earlier items.
+
+Proposed rule: a read-only step started by a nudge (a review, reading a
+note or report) is approved as the command it replaces would be, for that
+command's own records only.
+
 ## Stage close
 
 A stage closes when its tasks are closed or cancelled (D11). The designer
