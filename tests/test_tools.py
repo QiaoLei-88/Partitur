@@ -262,7 +262,214 @@ class Workspace(unittest.TestCase):
         text = (rec / "run.md").read_text()
         self.assertIn(f"commit: {self.base}", text)
         self.assertIn("worktree_clean: yes", text)
+        self.assertIn("by: unknown", text)
 
+    def records_with_ptt(self):
+        """Make the records directory a ptt records repository."""
+        shutil.copy(PROJECT_BIN / "ptt", self.records / "bin" / "ptt")
+        root = self.records / "tasks" / "open" / "T0000-design"
+        root.mkdir(parents=True)
+        shutil.copy(HERE / "templates" / "root-charter.md", root / "charter.md")
+        git(self.records, "init", "-q", "-b", "master")
+        git(self.records, "config", "user.email", "t@example.org")
+        git(self.records, "config", "user.name", "t")
+        git(self.records, "add", "-A")
+        git(self.records, "commit", "-qm", "init")
+
+    def session_env(self, sid):
+        env = dict(os.environ)
+        for key in ("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+            env.pop(key, None)
+        env["PTT_SESSION_ID"] = sid
+        return env
+
+    def test_run_record_by_bound_holder(self):
+        self.records_with_ptt()
+        env = self.session_env("11111111-2222-3333-4444-555555555555")
+        run("python3", str(self.records / "bin" / "ptt"), "take", "designer", env=env)
+        out = run("python3", str(self.records / "bin" / "test-run"), "new", str(self.code),
+                  env=env).stdout.strip()
+        self.assertIn("by: designer-g1\n", (Path(out) / "run.md").read_text())
+        other = self.session_env("99999999-2222-3333-4444-555555555555")
+        out = run("python3", str(self.records / "bin" / "test-run"), "new", str(self.code),
+                  env=other).stdout.strip()
+        self.assertIn("by: unknown\n", (Path(out) / "run.md").read_text())
+
+
+
+class RunGc(unittest.TestCase):
+    """test-run gc: heads, citations, ownership, and static commands."""
+    tearDown = Workspace.tearDown
+    branch_commit = Workspace.branch_commit
+    request = Workspace.request
+    records_with_ptt = Workspace.records_with_ptt
+
+    def setUp(self):
+        Workspace.setUp(self)
+        self.records_with_ptt()
+        self.runs = self.root / "test-runs"
+        self.runs.mkdir()
+
+    def make_run(self, rid, by, branch, commit, checkout=None, files=()):
+        d = self.runs / rid
+        d.mkdir()
+        head = "---\n" + f"id: {rid}\n"
+        if by is not None:
+            head += f"by: {by}\n"
+        head += (f"checkout: {checkout or self.code}\nbranch: {branch}\n"
+                 f"commit: {commit}\n---\n")
+        (d / "run.md").write_text(head)
+        for f in files:
+            (d / f).parent.mkdir(parents=True, exist_ok=True)
+            (d / f).write_text("x" * 5000)
+        return d
+
+    def records_commit(self, message="records"):
+        git(self.records, "add", "-A")
+        git(self.records, "commit", "-qm", message)
+
+    def task(self, place, slug, state_events, text=""):
+        d = self.records / "tasks" / place / f"T0001-{slug}"
+        d.mkdir(parents=True)
+        message(d / "charter.md", task="T0001", kind="worker")
+        (d / "charter.md").write_text((d / "charter.md").read_text() + text)
+        for n, kind in enumerate(state_events, 1):
+            message(d / f"{n:04d}-{kind}.md", by="worker-T0001", event=kind)
+        return d
+
+    def gc(self, *args, check=True):
+        return run("python3", str(self.records / "bin" / "test-run"), "gc", *args,
+                   check=check)
+
+    def commands(self, out):
+        return [line.strip() for line in out.split("\ncommands")[1].splitlines()[1:]]
+
+    def test_heads_citations_and_ownership(self):
+        merged = self.branch_commit("feat")
+        opened = self.branch_commit("wip")
+        self.request("merged", "000001", "feat", merged,
+                     dict(kind="decision", author="user", head=merged, decision="merge",
+                          date="2026-01-01"))
+        d = self.request("open", "000002", "wip", opened)
+        files = ("log.txt", "build/a.o", "build-rel/b.o", "cmake/CMakeCache.txt",
+                 "out/build/c.o", "build/sub/build/nested.o")
+        free = self.make_run("20260101T000000Z-aaaaaaa", "me", "feat", merged, files=files)
+        by_pr = self.make_run("20260101T000001Z-bbbbbbb", "me", "feat", merged, files=files)
+        (d / "0001-request.md").write_text((d / "0001-request.md").read_text()
+                                           + "Evidence: run 20260101T000001Z-bbbbbbb.\n")
+        by_main = self.make_run("20260101T000002Z-ccccccc", "me", "feat", merged, files=files)
+        git(self.code, "commit", "-q", "--allow-empty", "-m",
+            "x\n\nRun 20260101T000002Z-ccccccc.")
+        by_log = self.make_run("20260101T000003Z-ddddddd", "me", "feat", merged)
+        open_run = self.make_run("20260101T000004Z-eeeeeee", "me", "wip", opened)
+        other = self.make_run("20260101T000005Z-fffffff", "someone", "feat", merged)
+        legacy = self.make_run("20260101T000006Z-0000000", None, "feat", merged)
+        nohead = self.make_run("20260101T000007Z-1111111", "me", "master", self.base)
+        self.records_commit("evidence in 20260101T000003Z-ddddddd")
+        before = sorted(p for p in self.root.rglob("*"))
+
+        out = self.gc("--as", "me").stdout
+        self.assertEqual(sorted(p for p in self.root.rglob("*")), before, "gc removed something")
+        cmds = self.commands(out)
+        self.assertIn(f"rm -rf -- {free}", cmds)
+        for cited in (by_pr, by_main):
+            self.assertNotIn(f"rm -rf -- {cited}", cmds)
+            for b in ("build", "build-rel", "cmake", "out/build"):
+                self.assertIn(f"rm -rf -- {cited / b}", cmds)
+            self.assertNotIn(f"{cited / 'build' / 'sub'}", "\n".join(cmds))
+        self.assertIn("pr/open/000002-wip/0001-request.md", out)
+        self.assertRegex(out, r"code [0-9a-f]{7}")
+        self.assertRegex(out, r"records [0-9a-f]{7}")
+        self.assertIn("nothing (cited, no build directory)", out)
+        for kept in (by_log, open_run, other, legacy, nohead):
+            self.assertNotIn(str(kept), "\n".join(cmds))
+        self.assertIn("nothing (head open)", out)
+        self.assertIn("nothing (not yours", out)
+        apart = out.split("no head, not cited")[1].split("\ncommands")[0]
+        self.assertIn(nohead.name, apart)
+        self.assertNotIn(free.name, apart)
+        self.assertEqual(len(cmds), 1 + 2 * 4)
+
+        # Without a caller, nothing is anyone's.
+        self.assertIn("commands: none", self.gc().stdout)
+        # Named paths are the user's direction: listed alone, whatever their by.
+        out = self.gc("--as", "me", str(other), str(nohead)).stdout
+        self.assertEqual(self.commands(out), [f"rm -rf -- {other}", f"rm -rf -- {nohead}"])
+        self.assertNotIn(free.name, out)
+        # A request's runs only.
+        out = self.gc("--as", "me", "--request", "2").stdout
+        self.assertIn(open_run.name, out)
+        self.assertNotIn(free.name, out)
+
+    def test_task_heads(self):
+        head = self.branch_commit("t1")
+        wt = self.root / "worktrees" / "t1"
+        self.task("open", "t1", ["release", "take"], "Results: `worktrees/t1`.\n")
+        r = self.make_run("20260101T000000Z-aaaaaaa", "me", "t1", head, checkout=wt)
+        self.records_commit()
+        out = self.gc("--as", "me").stdout
+        self.assertIn("T0001 (held)", out)
+        self.assertIn("commands: none", out)
+        shutil.move(self.records / "tasks" / "open" / "T0001-t1",
+                    self.records / "tasks" / "done" / "T0001-t1")
+        message(self.records / "tasks" / "done" / "T0001-t1" / "0003-close.md",
+                by="designer-g1", event="close")
+        self.records_commit()
+        out = self.gc("--as", "me").stdout
+        self.assertIn("T0001 (closed)", out)
+        self.assertEqual(self.commands(out), [f"rm -rf -- {r}"])
+        # A worktree named by no task but still present keeps its runs.
+        other = self.root / "worktrees" / "t2"
+        git(self.code, "worktree", "add", "-q", "-b", "t2", str(other))
+        r2 = self.make_run("20260101T000001Z-bbbbbbb", "me", "t2", head, checkout=other)
+        out = self.gc("--as", "me").stdout
+        self.assertNotIn(str(r2), "\n".join(self.commands(out)))
+        self.assertIn(f"worktree {other}", out)
+
+    def test_task_heads_by_worktree_slug(self):
+        """T0010 amendment 0006: worktrees/<slug> is the task with that slug,
+        found after the worktree is removed."""
+        head = self.branch_commit("dev")
+        self.task("open", "alpha", ["release", "take"])
+        d = self.records / "tasks" / "done" / "T0002-beta"
+        d.mkdir(parents=True)
+        message(d / "charter.md", task="T0002", kind="worker")
+        for n, kind in enumerate(["release", "take", "done", "close"], 1):
+            message(d / f"{n:04d}-{kind}.md", by="worker-T0002", event=kind)
+        self.records_commit()
+        open_run = self.make_run("20260101T000000Z-aaaaaaa", "me", "dev", head,
+                                 checkout=self.root / "worktrees" / "alpha")
+        closed_run = self.make_run("20260101T000001Z-bbbbbbb", "me", "dev2", head,
+                                   checkout=self.root / "worktrees" / "beta")
+        out = self.gc("--as", "me").stdout
+        self.assertRegex(out, open_run.name + r".*T0001 \(held\)\s+open")
+        self.assertRegex(out, closed_run.name + r".*T0002 \(closed\)\s+concluded")
+        self.assertEqual(self.commands(out), [f"rm -rf -- {closed_run}"])
+
+    def test_commands_static_quoted_and_exact(self):
+        head = self.branch_commit("feat")
+        self.request("closed", "000001", "feat", head,
+                     dict(kind="decision", author="user", head=head, decision="reject",
+                          date="2026-01-01"))
+        self.runs.rmdir()
+        self.runs = self.root / "test runs"
+        self.runs.mkdir()
+        keep = self.make_run("20260101T000000Z-bbbbbbb", "me", "master", self.base)
+        r = self.make_run("20260101T000001Z-aaaaaaa", "me", "feat", head, files=("a b.txt",))
+        scratch = self.root / "scratch pad"
+        (scratch / "dir $x").mkdir(parents=True)
+        (scratch / "f;1").write_text("y")
+        out = self.gc("--as", "me", "--root", str(self.runs), "--scratch", str(scratch)).stdout
+        cmds = self.commands(out)
+        self.assertEqual(cmds, [f"rm -rf -- '{r}'", f"rm -rf -- '{scratch / 'dir $x'}'",
+                                f"rm -- '{scratch / 'f;1'}'"])
+        for c in cmds:
+            self.assertNotRegex(c.replace(str(self.root), ""), r"[*?]|\$\(|`")
+        for c in cmds:
+            run("sh", "-c", c)
+        self.assertFalse(r.exists())
+        self.assertTrue(keep.exists())
+        self.assertEqual(list(scratch.iterdir()), [])
 
 
 class InstallProject(unittest.TestCase):

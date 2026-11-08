@@ -29,16 +29,22 @@ is checked out in the primary checkout, whose merged head is not in the main
 branch, or whose `archive/` tag points elsewhere, and every branch of a
 repository whose primary checkout is not on its main branch. A branch name
 used by several requests goes only when none is open, waiting, or skipped;
-its recovery tags likewise. Never touched: branches without a request, open
-requests, `test-runs/`, `archive/` tags, main branches and their tags. Never
-use `--force`; never edit a message.
+its recovery tags likewise. Never touched by `pr gc`: branches without a
+request, open requests, `test-runs/`, `archive/` tags, main branches and
+their tags. Never use `--force`; never edit a message.
+
+Run records have no cooldown: right after a decision, and again here,
+`<records>/bin/test-run gc --request NNNNNN` lists your review runs of each
+decided request; their removal follows `/ptt-disk` (steps 5-8), separately
+from the decision list below.
 
 ## Procedure
 
 1. `<records>/bin/pr gc [--days N]` (read-only): report its table and
    commands, end with `1. Run all listed commands`, `2. Run them only for
    the requests or tags I name`, `3. No decision, discuss further`, and
-   stop.
+   stop. If the same message asks another decision (the run records'
+   removal), label both lists (`A1`, `B1`; rules file).
 2. On AtE (possibly limited to some requests or tags): run `pr gc` again
    with the same `--days`; if the plan changed for the approved items,
    report and stop.

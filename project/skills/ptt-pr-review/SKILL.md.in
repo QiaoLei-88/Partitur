@@ -76,8 +76,12 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    3. Reject
    4. No decision, discuss further
    ```
-7. On the user's decision (an option number with AtE, possibly with changed
-   comments; a number that is not an option: ask again, rules file), write
+
+   With `all`, or any other decision in the same message, label each
+   question instead (`A. Decide request NNNNNN:`, `- A1 ...`; rules file).
+7. On the user's decision (an option number or label with AtE, possibly
+   with changed comments; one that is not an option: ask again, rules
+   file), write
    `MMMM-decision.md` and record it before anything else:
    `<records>/bin/ptt record -m "pr NNNNNN: decision <merge|changes
    requested|reject|withdraw>" <file>`. Then:
@@ -90,6 +94,10 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    - **Request changes**: the request stays open; the author replies.
    - **Reject** or **withdraw**: `<records>/bin/ptt pr-move NNNNNN closed -m
      "pr NNNNNN: <rejected|withdrawn>"`.
+   - After a merge, reject, or withdrawal: `<records>/bin/test-run gc
+     --request NNNNNN` lists your review runs of this request; offer their
+     removal as in `/ptt-disk` (`<records>/skills/ptt-disk/SKILL.md`, steps
+     5-8), at once: no cooldown for run records.
 8. Before the session ends, or when the user asks: open concerns and pending
    housekeeping go into `<records>/handoff/integrator.md`, recorded. When you
    name who acts next (the designer, a worker), run `<records>/bin/ptt who`

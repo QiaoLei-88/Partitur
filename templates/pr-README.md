@@ -34,7 +34,8 @@ A review never changes a code repository and only recommends. Merging,
 requesting changes, rejecting, and withdrawing follow the user's decision,
 which is recorded as its own message before anything is merged or moved.
 Test runs made for a review are kept under `test-runs/` in the workspace
-root and cited by id (see `bin/test-run`).
+root and cited by id (see `bin/test-run`); once the request is decided,
+`bin/test-run gc --request NNNNNN` lists the ones that may go.
 
 Rules:
 

@@ -14,7 +14,11 @@ writes; other work needs AtE (rules file). `<name>` is your holder name.
 1. Bring your status record up to date: your task's `status.md` (the
    designer's: of `T0000`), or `<records>/handoff/integrator.md`: what is
    done (requests with merge commits), what is open, where it stands;
-   nothing only in this conversation. Record it with
+   nothing only in this conversation. When the task is to be cancelled
+   (the user or the supervisor says so), first follow `/ptt-disk` for your
+   own run records of the task and your scratchpad: the task is not yet
+   cancelled, so name its runs (`test-run gc PATH...`) for the user to
+   approve; say in the status what was removed or kept. Record it with
    `<records>/bin/ptt record -m "<message>" <file>`.
 2. `<records>/bin/ptt leave <name> --status "<one-line summary>"`.
    - Refused while something waits on you as a supervisor (a leave request

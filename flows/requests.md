@@ -58,7 +58,10 @@ repository, and a table maps repositories to checkouts and main branches
     the request directory is then moved and recorded in one step
     (`ptt pr-move`) (C10, C18, F11).
 11. **Cleanup** after a cooldown: worktrees, branches, recovery tags;
-    rejected heads kept as `archive/pr-NNNNNN` (C11).
+    rejected heads kept as `archive/pr-NNNNNN` (C11). Run records have no
+    cooldown: once the request is decided, each session offers to remove
+    its own runs of it that nothing cites, and the build directories of
+    those cited (`test-run gc`, [evidence](evidence.md)) *(Proposed)*.
 12. **Withdrawal**: the user may withdraw a request; the integrator records
     it as a decision and moves the request to `closed/` *(Proposed, C19)*.
 13. **No AI attribution** in commits, merges, or messages, unless the

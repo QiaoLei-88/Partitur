@@ -85,6 +85,28 @@ class Repo(unittest.TestCase):
                 self.assertIn("The command, or an AtE naming these records, approves", text,
                               skill.parent.name)
 
+    def test_user_direction_overrides_cleanup_limits(self):
+        """T0010: ownership and head rules limit only what a session proposes
+        by itself; what the user names, any session cleans up."""
+        disk = " ".join((ROOT / "project" / "skills" / "ptt-disk" / "SKILL.md.in").read_text().split())
+        self.assertIn("when the user names run records or a scratchpad to clean up, do it", disk)
+        evidence = " ".join((ROOT / "flows" / "evidence.md").read_text().split())
+        self.assertIn("when the user names run records or a scratchpad to clean up, any session does it",
+                      evidence)
+        for name in ("ptt-done", "ptt-leave", "ptt-pr-review", "ptt-pr-cleanup"):
+            text = (ROOT / "project" / "skills" / name / "SKILL.md.in").read_text()
+            self.assertIn("ptt-disk", text, name)
+        # T0010 amendment 0008: the rules block says the same as the skills.
+        rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
+        self.assertIn("`test-run new` records the run's creator (`by:`)", rules)
+        self.assertIn("a run nobody cites may go whole and a cited one keeps all but its build directories", rules)
+        self.assertIn("as static removal commands run only on the user's AtE", rules)
+        self.assertIn("Run records or a scratchpad the user names, any session removes.", rules)
+        self.assertIn("a task's: `worktrees/<task slug>`", rules)
+        self.assertIn("`by:`", evidence)
+        self.assertIn("worktrees/<task slug>", evidence)
+        self.assertIn("Run all listed commands", disk)
+
     def test_rules_name_commands_in_the_sessions_tool(self):
         rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
         self.assertIn("Name a command for the user in your own tool's notation.", rules)
@@ -104,7 +126,17 @@ class Repo(unittest.TestCase):
         self.assertIn("decision list right after its question line", text("project", "skills", "ptt-close", "SKILL.md.in"))
         review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
         self.assertIn("decision list right after its question line, never after another numbered list", review)
-        self.assertIn("a number that is not an option: ask again", review)
+        self.assertIn("one that is not an option: ask again", review)
+        # T0010 amendment 0002: several decisions in one message are labelled.
+        self.assertIn("Two or more decisions in one message are labelled", rules)
+        self.assertIn("(`A1 B2 AtE`)", rules)
+        self.assertIn("a bare number when labels were shown", rules)
+        self.assertIn("Two or more decisions in one message are labelled", flow)
+        self.assertIn("- A1 Request changes", flow)
+        for name in ("ptt-close", "ptt-pr-cleanup", "ptt-pr-reply", "ptt-pr-review"):
+            self.assertIn("rules file", text("project", "skills", name, "SKILL.md.in"))
+            self.assertIn("A1", text("project", "skills", name, "SKILL.md.in"), name)
+        self.assertIn("label them (`A1`, `B2`)", text("SKILL.md"))
 
     def test_reply_is_drafted_and_released_by_its_own_commands(self):
         """Replies to a review: /ptt-pr-draft-reply writes nothing, /ptt-pr-reply

@@ -39,6 +39,9 @@ No draft for request NNNNNN in this conversation. Decide:
 3. No decision, discuss further
 ```
 
+For several requests in one message, label each question (`A1`, `B2`;
+rules file) instead of numbering.
+
 ## Carrying it out
 
 Reply whenever the branch changes or a review needs an answer, without

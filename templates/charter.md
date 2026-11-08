@@ -21,9 +21,9 @@ commits, and requests need the user's AtE as usual.
 ## Where results go
 
 - {{OUTPUTS: notes, code, run records}}.
-- Delivery: {{REPOSITORY from pr/repos}}, on branches in `worktrees/<topic>`,
-  through requests (`/ptt-pr-submit`, naming this task); run records under
-  `test-runs/`.
+- Delivery: {{REPOSITORY from pr/repos}}, on branches in
+  `worktrees/<task slug>`, through requests (`/ptt-pr-submit`, naming this
+  task); run records under `test-runs/`.
 - Findings that affect the design: `status.md`, or a note to the designer.
 
 ## Out of scope

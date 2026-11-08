@@ -36,14 +36,14 @@ Changing one of these means changing the tools or skills that use it.
 | Stale holder | no record for 7 days, listed for the supervisor | G6 |
 | Request directories | `<records>/pr/{open,merged,closed}/NNNNNN-short-name/`, six-digit numbers | C1, C3a |
 | Message files | `MMMM-<kind>.md`, four digits; kinds request, review, decision, reply, cleanup | C1 |
-| Worktrees | `worktrees/<topic>` in the workspace root | F2 |
+| Worktrees | `worktrees/<topic>` in the workspace root; a task's: `worktrees/<task slug>` | F2 |
 | Run records | `test-runs/<UTC yyyymmddTHHMMSSZ>-<7-char sha>/` in the workspace root | E1, E7 |
 | Recovery tags | `recovery/<reason>/<branch, / as ->`, then `-2`, `-3` | C8 |
 | Archive tags | `archive/pr-NNNNNN` | C11 |
 | Merge message | `Merge <branch> (pr NNNNNN)` | C18 |
 | Cleanup cooldown | 14 days after the decision (`bin/pr gc --days N` overrides) | C11 |
 | Authorization words | `AtE`, `AtEiYA` | A2, A3 |
-| Skills | `ptt-take`, `ptt-resume`, `ptt-leave`, `ptt-whoami`, `ptt-inbox`, `ptt-mktask`, `ptt-done`, `ptt-close`; `ptt-pr-submit`, `ptt-pr-draft-reply`, `ptt-pr-reply`, `ptt-pr-review`, `ptt-pr-cleanup` | G1, C1 |
+| Skills | `ptt-take`, `ptt-resume`, `ptt-leave`, `ptt-whoami`, `ptt-inbox`, `ptt-mktask`, `ptt-done`, `ptt-close`; `ptt-pr-submit`, `ptt-pr-draft-reply`, `ptt-pr-reply`, `ptt-pr-review`, `ptt-pr-cleanup`; `ptt-disk` | G1, C1 |
 | Tools | `<records>/bin/ptt` (roles and tasks), `bin/pr` (requests), `bin/test-run` | |
 
 ## Project choices with a default

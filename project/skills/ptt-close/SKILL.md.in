@@ -21,7 +21,8 @@ acts with `--as user`.
    missing and ask `1. Reopen` (the missing criteria) / `2. Wait` (the
    holder completes it) / `3. No decision, discuss further`, your
    recommendation first, as a decision list right after its question line
-   (rules file).
+   (rules file); with other decisions in the same message (several tasks),
+   labelled `A1`, `B2` (rules file).
 3. Carry its findings into the design (a request against the design
    document); offer the holder's session to be cleared.
 
