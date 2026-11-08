@@ -426,6 +426,26 @@ class RunGc(unittest.TestCase):
         self.assertNotIn(str(r2), "\n".join(self.commands(out)))
         self.assertIn(f"worktree {other}", out)
 
+    def test_task_heads_by_worktree_slug(self):
+        """T0010 amendment 0006: worktrees/<slug> is the task with that slug,
+        found after the worktree is removed."""
+        head = self.branch_commit("dev")
+        self.task("open", "alpha", ["release", "take"])
+        d = self.records / "tasks" / "done" / "T0002-beta"
+        d.mkdir(parents=True)
+        message(d / "charter.md", task="T0002", kind="worker")
+        for n, kind in enumerate(["release", "take", "done", "close"], 1):
+            message(d / f"{n:04d}-{kind}.md", by="worker-T0002", event=kind)
+        self.records_commit()
+        open_run = self.make_run("20260101T000000Z-aaaaaaa", "me", "dev", head,
+                                 checkout=self.root / "worktrees" / "alpha")
+        closed_run = self.make_run("20260101T000001Z-bbbbbbb", "me", "dev2", head,
+                                   checkout=self.root / "worktrees" / "beta")
+        out = self.gc("--as", "me").stdout
+        self.assertRegex(out, open_run.name + r".*T0001 \(held\)\s+open")
+        self.assertRegex(out, closed_run.name + r".*T0002 \(closed\)\s+concluded")
+        self.assertEqual(self.commands(out), [f"rm -rf -- {closed_run}"])
+
     def test_commands_static_quoted_and_exact(self):
         head = self.branch_commit("feat")
         self.request("closed", "000001", "feat", head,

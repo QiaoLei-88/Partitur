@@ -18,8 +18,9 @@ directory).
 `gc` is read-only: it prints a table of the run records and the commands that
 would remove what may go, and removes nothing. A run's head is the request
 whose branch or head it tested, else the task whose worktree it ran in
-(named in the task's charter or amendments as worktrees/<name>); without a
-request, a worktree still present keeps the head open. The head is concluded
+(worktrees/<task slug> by convention, or a path the task's charter or
+amendments name); without a request, a worktree still present keeps the
+head open. The head is concluded
 when its request is merged or closed, or its task done or cancelled. A run is
 cited when its id appears in a file of the records repository at HEAD, in a
 records commit message, or in a commit message of a main branch in pr/repos.
@@ -244,7 +245,8 @@ class Heads:
                                [i["dir"] / "charter.md"]
                                + [e["path"] for e in ptt.events(i["dir"]) if e["kind"] == "amend"]
                                if p.is_file())
-                self.tasks.append(dict(id=ptt.tid(i["number"]), state=i["state"], text=text))
+                self.tasks.append(dict(id=ptt.tid(i["number"]), slug=i["slug"],
+                                       state=i["state"], text=text))
         except (Exception, SystemExit) as e:
             self.notes.append(f"tasks unreadable: {e}")
 
@@ -264,6 +266,19 @@ class Heads:
             if rc == 0 and other.strip() == common.strip():
                 return name
         return None
+
+    def task_of(self, rel):
+        """The task whose worktree is `rel` (worktrees/<name>): by convention
+        the task with slug <name>, the one not closed or cancelled if several
+        share it; else a task whose charter or amendments name the path."""
+        if len(rel.parts) == 2:
+            same = [t for t in self.tasks if t["slug"] == rel.parts[1]]
+            live = [t for t in same if t["state"] not in ("closed", "cancelled")]
+            if len(same) == 1 or len(live) == 1:
+                return same[0] if len(same) == 1 else live[0]
+        mention = re.compile(re.escape(str(rel)) + r"(?![\w.-])")
+        named = [t for t in self.tasks if mention.search(t["text"])]
+        return named[0] if len(named) == 1 else None
 
     def find(self, h):
         """(head label, state, request number or None) for a run header; state
@@ -288,12 +303,11 @@ class Heads:
             except ValueError:
                 rel = None
             if rel is not None and rel.parts[:1] == ("worktrees",):
-                mention = re.compile(re.escape(str(rel)) + r"(?![\w.-])")
-                for t in self.tasks:
-                    if mention.search(t["text"]):
-                        concluded = t["state"] in ("closed", "cancelled")
-                        return (f"{t['id']} ({t['state']})", "concluded" if concluded else "open",
-                                None)
+                task = self.task_of(rel)
+                if task:
+                    concluded = task["state"] in ("closed", "cancelled")
+                    return (f"{task['id']} ({task['state']})",
+                            "concluded" if concluded else "open", None)
             if checkout.is_dir() and checkout != (self.mains[repo][1] if repo else None):
                 return f"worktree {checkout}", "open", None
         return "none", "none", None

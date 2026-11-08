@@ -101,6 +101,11 @@ directory name. It never changes once the task exists; commands accept the
 short forms `T0007`, `0007`, `7`, or the slug alone while it is unique among
 unfinished tasks (G10).
 
+A task's code work is in `worktrees/<task slug>` by convention
+(`T0010-disk-cleanup` in `worktrees/disk-cleanup`); a task that departs
+from it names its worktree in its charter or an amendment. `test-run gc`
+finds a run's task this way once the worktree is gone *(Proposed)*.
+
 A task's state is derived from its events, as a request's is from its
 messages; there is no state file to go stale (C2).
 

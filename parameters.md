@@ -36,7 +36,7 @@ Changing one of these means changing the tools or skills that use it.
 | Stale holder | no record for 7 days, listed for the supervisor | G6 |
 | Request directories | `<records>/pr/{open,merged,closed}/NNNNNN-short-name/`, six-digit numbers | C1, C3a |
 | Message files | `MMMM-<kind>.md`, four digits; kinds request, review, decision, reply, cleanup | C1 |
-| Worktrees | `worktrees/<topic>` in the workspace root | F2 |
+| Worktrees | `worktrees/<topic>` in the workspace root; a task's: `worktrees/<task slug>` | F2 |
 | Run records | `test-runs/<UTC yyyymmddTHHMMSSZ>-<7-char sha>/` in the workspace root | E1, E7 |
 | Recovery tags | `recovery/<reason>/<branch, / as ->`, then `-2`, `-3` | C8 |
 | Archive tags | `archive/pr-NNNNNN` | C11 |
