@@ -165,6 +165,7 @@ project's development notes.
 | G18 | Before telling the user who holds a role or task, or who acts next, a session runs `ptt who` at that moment; a view from earlier in the session may be stale | Proposed |
 | G19 | At a quiet point a holder leaves a handover marker (`ptt handover`, local, not a record); a fresh or cleared session continues it with `/ptt-resume` and no name, or, with none or several, is shown the holders ordered by their last write and the user names one; the marker lapses by events (the holder writes again, its binding moves, its hold ends), never by age; the session that was the holder is told once through its inbox that it continues elsewhere | Proposed |
 | G20 | A holder answers an amendment it has acted on with an adopt event (`ptt adopt`); an amendment waits in its inbox until adopted, across resumes; a new take reads them all and starts with none waiting; a disagreement is a note to the designer | Adopted |
+| G21 | Taking or resuming names the session `<project>-<holder>-<hash>` (four-letter codes; the session ID's last six hex digits, the window sliding on a collision), recorded once in that event; the user applies it with the printed `/rename` line so that nudges reach the session | Exercised |
 
 ## Nesting rules
 

@@ -82,7 +82,7 @@ the binding and prevents the earlier session from writing *(Proposed,
 G13, G16)*. A session never clears in the middle of a multi-round review or
 a design discussion only to save tokens: re-reading costs too.
 
-## Session names *(Proposed)*
+## Session names (G21)
 
 `ptt take` and `ptt resume` give the session a name, record it in that
 event (`session_name:`), and print the line that renames the session. In
