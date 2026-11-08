@@ -110,7 +110,8 @@ is `<project>-<holder>-<hash>`, lowercase:
 
 When a task becomes ready (`ptt ready`, `ptt approve-leave`, `ptt free`) or
 a role becomes free (the designer or integrator leaving or freed), `ptt`
-prints lines to paste in the workspace root that start a session taking it:
+prints lines to paste in the workspace root that start a session taking
+it *(Adopted, G22)*:
 
 ```
 to take it in a new session, in <workspace root>:
