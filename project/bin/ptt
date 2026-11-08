@@ -102,7 +102,8 @@ way (designer-g2 `dsgn-g2`, integrator-1 `intg-1`, worker-T0008-2
 session ID's last group of twelve (the last group of a UUID, else its last
 twelve letters and digits), by default the last six. If another session has
 recorded the same name, the window moves one digit towards the start, at
-most seven windows, and only then grows longer.
+most seven windows, and only then grows longer. `resume` in the session
+already bound records a name if the hold has none yet (bound before names).
 """
 import argparse
 import fcntl
@@ -973,11 +974,17 @@ def cmd_resume(a):
     need(hits, f"{a.name} holds nothing; nothing to continue (`ptt who` lists the holders)")
     _, d, sessions = hits[0]
     sid = session_id()
+    what = f"role {d.name}" if d.parent == ROLES else f"task {tid(TASK_DIR.match(d.name).group(1))}"
     if sid and sessions[-1] == sid:
         print(f"this session is already {a.name}")
+        named = session_name_of(d)
+        if not named:             # bound before session names existed
+            named = new_session_name(a.name, sid)
+            add_event(d, "resume", dict(by=a.name, session_id=sid, session_name=named), "",
+                      f"{what}: {a.name} names its session")
+        show_session_name(named)
         return
     fields = dict(by=a.name, **bind(a.name))
-    what = f"role {d.name}" if d.parent == ROLES else f"task {tid(TASK_DIR.match(d.name).group(1))}"
     add_event(d, "resume", fields, "", f"{what}: {a.name} continues in a new session")
     (handover_dir() / a.name).unlink(missing_ok=True)
     print(f"this session is {a.name}")

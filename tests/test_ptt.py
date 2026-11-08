@@ -1156,6 +1156,27 @@ class Ptt(unittest.TestCase):
         self.assertNotIn("session name", r.stderr)
         self.assertEqual(self.ptt("who").stdout.splitlines()[0], "integrator  integrator-2")
 
+    def test_resume_names_a_session_bound_before_names(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        sid = "00000000-0000-4000-8000-aaaaaa123456"
+        self.ptt("take", "integrator", session=sid)
+        # as a release before session names recorded it
+        take = self.rec / "roles" / "integrator" / "0001-take.md"
+        take.write_text(take.read_text().replace("session_name: prtr-intg-1-123456\n", ""))
+        run("git", "-C", str(self.rec), "commit", "-qam", "old take")
+        self.assertNotIn("session prtr", self.ptt("who").stdout)
+        r = self.ptt("resume", "integrator-1", session=sid)
+        self.assertIn("this session is already integrator-1", r.stdout)
+        self.assertIn("session name: prtr-intg-1-123456\n", r.stderr)
+        resume = self.rec / "roles" / "integrator" / "0002-resume.md"
+        self.assertIn("\nsession_name: prtr-intg-1-123456\n", resume.read_text())
+        self.assertIn("integrator-1  session prtr-intg-1-123456", self.ptt("who").stdout)
+        # already named: printed again, nothing recorded
+        r = self.ptt("resume", "integrator-1", session=sid)
+        self.assertIn("session name: prtr-intg-1-123456\n", r.stderr)
+        self.assertFalse((self.rec / "roles" / "integrator" / "0003-resume.md").exists())
+        self.ptt("leave", "integrator-1", session=sid)
+
     def test_rename_line_in_the_calling_tools_notation(self):
         (self.rec / "project-code").write_text("prtr\n")
         for key, line in (("CLAUDE_CODE_SESSION_ID", "/rename prtr-intg-{n}-abcdef\n"),

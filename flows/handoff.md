@@ -106,7 +106,8 @@ is `<project>-<holder>-<hash>`, lowercase:
 
 Any session can derive a holder's current session name from the records:
 the address a later cross-session message would use. Without a session ID
-nothing is bound, and no name is given.
+nothing is bound, and no name is given. A session bound before names
+existed gets one by `ptt resume <its holder>` in that session.
 
 ## Stage close
 

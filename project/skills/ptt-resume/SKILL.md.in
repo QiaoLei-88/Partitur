@@ -22,7 +22,8 @@ writes; other work needs AtE (rules file).
    tool gives a session ID. If the binding moved to a different session,
    the earlier session can no longer write as it: remind the user to stop
    using that earlier session. If already bound here, continue to read the
-   handover without taking again. Report every `note:` the tool printed,
+   handover without taking again; a session bound before session names
+   existed gets its name now. Report every `note:` the tool printed,
    and tell the user to type the printed `to show it, type:` line, which
    names this session (`/ptt-take`, step 3).
 4. Read what NAME starts from (`/ptt-take`, step 4) and its status record
