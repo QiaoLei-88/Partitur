@@ -1235,7 +1235,15 @@ class InstallUser(unittest.TestCase):
             codex.symlink_to(other)
             out = user()                           # only ~/.claude: Claude Code detected
             self.assertIn("tools      Claude Code (detected), Codex (present)", out)
-            self.assertRegex(out, r"kept\s+\.agents/skills/partitur\s+\(installed already")
+            self.assertRegex(out, rf"kept\s+\.agents/skills/partitur\s+\(installed already, "
+                                  rf"links {re.escape(str(other))}, not this Partitur; "
+                                  r"--uninstall --tool codex removes it\)")
+            codex.unlink()
+            codex.symlink_to(HERE)
+            out = user()
+            self.assertRegex(out, r"kept\s+\.agents/skills/partitur\s+\(installed already; "
+                                  r"--uninstall --tool codex removes it\)")
+            self.assertTrue(codex.is_symlink())
             out = user("--uninstall")
             self.assertIn("tools      Claude Code (present), Codex (present)", out)
             self.assertRegex(out, r"removed\s+\.agents/skills/partitur")

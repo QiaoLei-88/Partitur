@@ -574,8 +574,10 @@ def scope_user(a, report):
     for tool in [t for t in TOOLS if t in sources]:
         link = links[tool]
         if sources[tool] == "present":
-            report("kept", link, "installed already; --uninstall --tool "
-                   f"{tool} removes it")
+            other = Path(os.readlink(link)) != HERE   # an old release stays visible
+            report("kept", link, "installed already"
+                   + (f", links {os.readlink(link)}, not this Partitur" if other else "")
+                   + f"; --uninstall --tool {tool} removes it")
         elif link.is_symlink() and Path(os.readlink(link)) == HERE:
             report("kept", link)
         elif link.exists() or link.is_symlink():
