@@ -108,6 +108,23 @@ is `<project>-<holder>-<hash>`, lowercase:
   same name, the window moves one digit towards the start, at most seven
   windows; only then is it lengthened.
 
+When a task becomes ready (`ptt ready`, `ptt approve-leave`, `ptt free`) or
+a role becomes free (the designer or integrator leaving or freed), `ptt`
+prints lines to paste in the workspace root that start a session taking it:
+
+```
+to take it in a new session, in <workspace root>:
+  Claude Code: claude -n prtr-wrkr-t10 "/ptt-take 10"
+  Codex: codex '$ptt-take 10'
+```
+
+In Claude Code, `-n` gives the new session its session name without the
+hash, the part known before the take; the take then prints the full name
+and its `/rename` line. Codex cannot name a session at start (no such
+option), so its line only takes; its prompt names the skill as `$ptt-take`
+in single quotes, so that the shell leaves the `$` alone. A blocked task
+gets no lines until it can be taken.
+
 Any session can derive a holder's current session name from the records:
 the address a later cross-session message would use. Without a session ID
 nothing is bound, and no name is given. A session bound before names

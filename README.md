@@ -51,7 +51,7 @@ Six ideas decide everything else; when in doubt, ask which one applies.
 | --- | --- | --- |
 | start the design, or take it over | any free session | `/ptt-take designer` |
 | turn a discussion into a task | the designer | `/ptt-mktask`, then `/ptt-mktask release N` |
-| have a session work on a task | any free session | `/ptt-take N` (or the task's name) |
+| have a session work on a task | any free session | `/ptt-take N` (or the task's name), or in a new one the line `ptt ready` printed: `claude -n <name> "/ptt-take N"` |
 | know who a session is | any | `/ptt-whoami`; `/ptt-whoami all` for everyone |
 | know what is new for a session and what waits on it | any holder | `/ptt-inbox` (with an active prompt hook, it also arrives with your next message) |
 | continue a role after `/clear` or in a fresh session | the continuing session | `/ptt-resume` (the holder that left a handover at its quiet point; otherwise name it) |

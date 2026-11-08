@@ -108,6 +108,11 @@ twelve letters and digits), by default the last six. If another session has
 recorded the same name, the window moves one digit towards the start, at
 most seven windows, and only then grows longer. `resume` in the session
 already bound records a name if the hold has none yet (bound before names).
+`ready`, and the commands that free a role or task (`leave` of the designer
+or integrator, `approve-leave`, `free`), print ready-to-paste lines that
+start a session taking it: `claude -n <project>-<holder> "/ptt-take N"`
+(the session name without its hash, until take gives the full one) and
+`codex '$ptt-take N'`.
 
 Nudges: after each commit, every command that records prints a `nudge:`
 line for each holder other than the writer to whom the commit gave news:
@@ -806,6 +811,33 @@ def rename_line(name):
     return f"In Claude Code, {claude}; in Codex, {codex}"
 
 
+def take_lines(what, holder):
+    """Print ready-to-paste lines that start a session in the workspace root
+    taking WHAT (`designer`, `integrator`, or a task as typed: `10`, `7.1`),
+    whose holder will be `holder`. Claude Code names the new session by its
+    session name without the hash, until take prints the full name and its
+    /rename line; Codex cannot name a session at start, so its line only
+    takes."""
+    name = f"{project_code()}-{holder_code(holder)}"
+    print(f"to take it in a new session, in {REC.parent}:\n"
+          f"  Claude Code: claude -n {name} \"/ptt-take {what}\"\n"
+          f"  Codex: codex '$ptt-take {what}'")
+
+
+def offer_task(number):
+    """The take lines for task `number`, if it can be taken now."""
+    i = get(tid(number))
+    if i["state"] == "ready":
+        first, *rest = number.split(".")
+        take_lines("designer" if number == ROOT else ".".join([str(int(first)), *rest]),
+                   holder_name(i))
+
+
+def offer_role(role):
+    """The take lines for `role`, now free."""
+    take_lines(role, role_name(role, role_state(role)[1] + 1))
+
+
 def show_session_name(name):
     """Print this session's name and the line that renames the session, on
     standard error (standard output stays the holder name)."""
@@ -1117,6 +1149,7 @@ def cmd_leave(a):
                   f"task {tid(ROOT)}: {a.name} leaves the root design")
         print(f"{a.name} left the root design; the next `ptt take designer` is "
               f"designer-g{i['takes'] + 1}")
+        offer_task(ROOT)
         return
     if held[0] == "role":
         role = held[1]
@@ -1133,6 +1166,7 @@ def cmd_leave(a):
         add_event(ROLES / role, "leave", dict(by=a.name), a.status or "",
                   f"role {role}: {a.name} leaves")
         print(f"{a.name} left the {role} role")
+        offer_role(role)
         return
     i = held[1]
     need(not i["leave_request"], f"{a.name} already asked to leave task {tid(i['number'])}")
@@ -1154,6 +1188,7 @@ def cmd_approve_leave(a):
     add_event(i["dir"], "leave", dict(by=i["holder"], approved_by=a.as_), "",
               f"task {tid(i['number'])}: {i['holder']} leaves, approved by {a.as_}")
     print(f"task {tid(i['number'])} is ready again")
+    offer_task(i["number"])
 
 
 def cmd_free(a):
@@ -1164,6 +1199,7 @@ def cmd_free(a):
         add_event(ROLES / a.what, "leave", dict(by=holder, freed_by="user"), a.reason,
                   f"role {a.what}: {holder} freed by the user")
         print(f"{a.what} is free")
+        offer_role(a.what)
         return
     i = get(a.what)
     must_supervise(a.as_, i["number"])
@@ -1178,6 +1214,7 @@ def cmd_free(a):
               a.reason,
               f"task {tid(i['number'])}: {i['holder']} freed by {a.as_}")
     print(f"task {tid(i['number'])} is ready again; its status.md shows where it stood")
+    offer_task(i["number"])
 
 
 def cmd_mktask(a):
@@ -1224,6 +1261,7 @@ def cmd_ready(a):
     record(f"task {tid(i['number'])}: charter as released", add=[i["dir"] / "charter.md"])
     add_event(i["dir"], "release", dict(by=a.as_), "", f"task {tid(i['number'])}: released by {a.as_}")
     print(f"task {tid(i['number'])} is ready to take")
+    offer_task(i["number"])
 
 
 def cmd_amend(a):

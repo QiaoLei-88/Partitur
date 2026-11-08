@@ -30,7 +30,9 @@ subtasks of its scope. `<name>` is your holder name.
 ## Release (`release N`)
 
 For a complete draft: `<records>/bin/ptt ready <N> --as <name>`: the charter
-is committed and frozen; the task can be taken (`/ptt-take <N>`).
+is committed and frozen; the task can be taken (`/ptt-take <N>`). Pass on
+the printed lines that start a new session taking it (Claude Code, Codex),
+for the user to paste in the workspace root.
 
 ## Amend (`amend N`)
 
