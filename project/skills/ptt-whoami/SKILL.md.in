@@ -11,7 +11,9 @@ writes (it writes none); other work needs AtE (rules file).
 - No argument: `<records>/bin/ptt whoami` (the holder bound to this
   session), or `ptt whoami <name>` with the holder name this session got from
   `/ptt-take` or `/ptt-resume`; report the holder name, role or task,
-  supervisor, charter, and whether this session is bound to it. If it holds
+  supervisor, charter, whether this session is bound to it, and its session
+  name with the printed `to show it, type:` line, for the user to type if
+  the session does not show that name yet. If it holds
   nothing, say so: `/ptt-take` gives it a role or task, `/ptt-resume NAME`
   continues one.
 - `NAME`: `<records>/bin/ptt whoami NAME`: the same about NAME. It does not
