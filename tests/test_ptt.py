@@ -1147,8 +1147,8 @@ class Ptt(unittest.TestCase):
         me = self.ptt("whoami", session=a).stdout
         self.assertIn("session: this one\nsession name: prtr-dsgn-g1-123456\n", me)
         self.assertIn("In Claude Code, so that automatic messages reach this session, rename it: "
-                      "/rename prtr-dsgn-g1-123456; in Codex, to show it, type: /rename, then "
-                      "enter prtr-dsgn-g1-123456\n", me)
+                      "/rename prtr-dsgn-g1-123456; in Codex, to show it, type: /rename "
+                      "prtr-dsgn-g1-123456\n", me)
         other = self.ptt("whoami", "designer-g1", session=b).stdout
         self.assertIn("session name: prtr-dsgn-g1-123456\n", other)
         self.assertNotIn("/rename", other)
@@ -1258,11 +1258,50 @@ class Ptt(unittest.TestCase):
         r = self.ptt("record", "-m", "n", str(notes / "g.md"), session=sd)
         self.assertNotIn("nudge", r.stderr)
 
+    def test_freed_roles_and_tasks_print_take_lines(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        root = self.root.resolve()
+
+        def lines(out, name, what):
+            self.assertIn(f"to take it in a new session, in {root}:\n"
+                          f"  Claude Code: claude -n {name} \"/ptt-take {what}\"\n"
+                          f"  Codex: codex '$ptt-take {what}'\n", out)
+        d = self.designer()
+        path = Path(self.ptt("mktask", "probe", "--as", d, "--kind", "worker").stdout.strip())
+        self.fill(path)
+        lines(self.ptt("ready", "1", "--as", d).stdout, "prtr-wrkr-t1", "1")
+        # a blocked task cannot be taken yet: no lines
+        path = Path(self.ptt("mktask", "later", "--as", d, "--depends", "T0001").stdout.strip())
+        self.fill(path)
+        self.assertNotIn("new session", self.ptt("ready", "2", "--as", d).stdout)
+        # a task left or freed: the next holder's name
+        w = self.ptt("take", "1").stdout.strip()
+        self.ptt("leave", w)
+        lines(self.ptt("approve-leave", "1", "--as", d).stdout, "prtr-wrkr-t1-2", "1")
+        self.ptt("take", "1")
+        lines(self.ptt("free", "1", "--as", d, "--reason", "gone", "--force").stdout,
+              "prtr-wrkr-t1-3", "1")
+        # a sub-designer's subtask
+        s = self.task("sub", d, kind="design")
+        sd = self.ptt("take", s).stdout.strip()
+        path = Path(self.ptt("mktask", "part", "--as", sd).stdout.strip())
+        self.fill(path)
+        lines(self.ptt("ready", "3.1", "--as", sd).stdout, "prtr-trck-t3.1", "3.1")
+        # the roles
+        i = self.ptt("take", "integrator").stdout.strip()
+        lines(self.ptt("leave", i).stdout, "prtr-intg-2", "integrator")
+        self.ptt("take", "integrator")
+        lines(self.ptt("free", "integrator", "--as", "user", "--reason", "gone").stdout,
+              "prtr-intg-3", "integrator")
+        self.ptt("leave", sd)
+        self.ptt("approve-leave", s, "--as", d)
+        lines(self.ptt("leave", d).stdout, "prtr-dsgn-g2", "designer")
+
     def test_rename_line_in_the_calling_tools_notation(self):
         (self.rec / "project-code").write_text("prtr\n")
         for key, line in (("CLAUDE_CODE_SESSION_ID", "So that automatic messages reach this "
                            "session, rename it: /rename prtr-intg-{n}-abcdef\n"),
-                          ("CODEX_THREAD_ID", "to show it, type: /rename, then enter "
+                          ("CODEX_THREAD_ID", "to show it, type: /rename "
                            "prtr-intg-{n}-abcdef\n")):
             with self.subTest(key=key):
                 env = dict(self.env(), **{key: f"0-0-0-0-{key[:2].lower()}00abcdef"})
