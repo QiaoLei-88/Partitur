@@ -33,6 +33,9 @@ project's development notes.
 | A13 | A session asks for a decision with a numbered list, its recommendation first, always ending with `No decision, discuss further`; a decision is an option number with AtE, anything else is discussion | Exercised |
 | A14 | The decision list follows its question line directly, never another numbered list (Markdown renders adjacent lists as one and renumbers the second) | Adopted |
 | A15 | A number that is not an option means the user may have seen another rendering: the session says so and asks again as the user saw it | Adopted |
+| A16 | A read-only step started by a nudge (reporting an item, reading a note, checking a done report, a review by `ptt-pr-review` steps 1-6, a reply drafted but not recorded) is approved as the command it replaces would be, for that command's own records only; everything else waits for the user | Adopted |
+| A17 | Two or more decisions in one message are labelled: a letter per question, its options a bulleted list (`A1`, `A2`; bullets, which nothing renumbers), recommendation first, the last `No decision, discuss further`; the user answers with labels and AtE, any subset; a label without AtE is discussion; the message ends with the line `ALL1 AtE`: accept every recommendation, which takes option 1 of every question, exceptions following (`ALL1 B2 AtE`) | Adopted |
+| A18 | After taking or resuming a role or task, a session goes on read-only by itself: a task holder reads its charter's sources and amendments, inspects the code, and presents a plan ending in a decision list; the integrator lists requests and `pr gc`; a designer reports what waits on it; writing still waits for AtE | Adopted |
 
 ## Roles
 
@@ -91,6 +94,7 @@ project's development notes.
 | D9 | Findings meant for another session go into a file, not only into chat | Exercised |
 | D10 | Two label axes. Decisions: Agreed, Proposed, Open. Evidence: Documented, Source, Inferred, Tested, Unknown | Exercised for the decision axis and for Source, Inferred, Tested, Unknown; Adopted for Documented |
 | D17 | Agreed applies only to the wording the user agreed; an agreed intent with changed wording goes back to the user | Exercised |
+| D18 | After a record, the writing session nudges each holder it gave inbox news (except a subordinate's `status.md`) by a cross-session message to its recorded session name, if listed: it subscribes to the recipient's idle notice and on it sends only "new in your inbox"; fire-and-forget, the inbox stays the source of truth and `ptt who` shows unseen items; a master switch (`ptt nudges`) turns nudges off; Claude Code only | Exercised by hand; Adopted as printed by `ptt` |
 | D11 | A stage closes with a written close: results, carried-forward items, and the next stage's charter | Exercised |
 | D12 | Findings travel between sessions as files; the user carries notices between sessions | Exercised |
 | D12b | Sessions message each other directly | Proposed |
@@ -112,6 +116,7 @@ project's development notes.
 | E6 | Reports give commands, environment, identifiers, exit status, and counts | Exercised |
 | E7 | Generated outputs go to an explicit isolated location outside every repository | Exercised |
 | E8 | A one-off probe's driver is kept in its run record; a reusable driver belongs in the code repository's tests | Exercised for probes; Adopted for reusable drivers |
+| E9 | A run record names its creator (`by:`); a session proposes removing only its own runs, once the development head they tested has a conclusion and nothing cites them (a cited run may lose its build directories), as static commands the user reviews and approves; any cleanup the user directs stays open | Adopted |
 
 ## Repositories and dependencies
 
@@ -160,6 +165,8 @@ project's development notes.
 | G18 | Before telling the user who holds a role or task, or who acts next, a session runs `ptt who` at that moment; a view from earlier in the session may be stale | Proposed |
 | G19 | At a quiet point a holder leaves a handover marker (`ptt handover`, local, not a record); a fresh or cleared session continues it with `/ptt-resume` and no name, or, with none or several, is shown the holders ordered by their last write and the user names one; the marker lapses by events (the holder writes again, its binding moves, its hold ends), never by age; the session that was the holder is told once through its inbox that it continues elsewhere | Proposed |
 | G20 | A holder answers an amendment it has acted on with an adopt event (`ptt adopt`); an amendment waits in its inbox until adopted, across resumes; a new take reads them all and starts with none waiting; a disagreement is a note to the designer | Adopted |
+| G21 | Taking or resuming names the session `<project>-<holder>-<hash>` (four-letter codes; the session ID's last six hex digits, the window sliding on a collision), recorded once in that event; the user applies it with the printed `/rename` line so that nudges reach the session | Exercised |
+| G22 | When a task is released or a role becomes free, `ptt` prints a ready-to-paste start line: `claude -n <project>-<holder part> "/ptt-take N"` (a provisional name until take prints the full one) and, for Codex, `codex '$ptt-take N'` | Adopted |
 
 ## Nesting rules
 

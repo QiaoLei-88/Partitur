@@ -82,7 +82,7 @@ the binding and prevents the earlier session from writing *(Proposed,
 G13, G16)*. A session never clears in the middle of a multi-round review or
 a design discussion only to save tokens: re-reading costs too.
 
-## Session names *(Proposed)*
+## Session names (G21)
 
 `ptt take` and `ptt resume` give the session a name, record it in that
 event (`session_name:`), and print the line that renames the session. In
@@ -110,7 +110,8 @@ is `<project>-<holder>-<hash>`, lowercase:
 
 When a task becomes ready (`ptt ready`, `ptt approve-leave`, `ptt free`) or
 a role becomes free (the designer or integrator leaving or freed), `ptt`
-prints lines to paste in the workspace root that start a session taking it:
+prints lines to paste in the workspace root that start a session taking
+it *(Adopted, G22)*:
 
 ```
 to take it in a new session, in <workspace root>:
@@ -135,7 +136,7 @@ those its inbox would show as new, counted since its inbox last looked (or
 its take), with the time of the oldest, or `unseen none`. Seen means shown
 to its session (a prompt hook counts), not handled.
 
-## Nudges *(Proposed)*
+## Nudges (D18)
 
 A nudge tells a session, by cross-session message, that its inbox has news,
 so that an idle session looks without waiting for the user's next message.
@@ -151,7 +152,7 @@ The inbox rules stay the one source of what is news:
    `status.md` update gets none. The line gives the holder's recorded
    session name and the text to send: "new in your inbox (records
    <commit>); run `ptt inbox <holder>`". A holder without a recorded name
-   gets no line.
+   gets no line *(Adopted)*.
 2. The writer's session, in Claude Code, sends a nudge only to a session
    that `ListAgents` lists by that name. It subscribes with `SendMessage`
    `notify_when_idle` and no message, whatever state the session shows, so
@@ -176,9 +177,9 @@ The user turns nudges on or off for every session with `/ptt-nudges on|off`
 on by default; `ptt who` shows it on its first line. Off, nothing is lost,
 and turning nudges on sends nothing for earlier items.
 
-Proposed rule: a read-only step started by a nudge (a review, reading a
-note or report) is approved as the command it replaces would be, for that
-command's own records only.
+A read-only step started by a nudge (a review, reading a note or report)
+is approved as the command it replaces would be, for that command's own
+records only *(Adopted, A16)*.
 
 ## Stage close
 

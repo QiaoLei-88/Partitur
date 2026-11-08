@@ -18,7 +18,7 @@
   session goes on read-only by itself: a task holder reads its charter's
   sources and amendments, inspects the code, and presents a plan ending in
   a decision list; the integrator lists requests and `pr gc`; a designer
-  reports what waits on it *(Proposed)*.
+  reports what waits on it *(Adopted, A18)*.
 - An authorized task includes its necessary edits and verification; work
   outside it, or a major change within it, needs its own authorization
   *(Adopted, A5)*.
@@ -59,7 +59,7 @@ A number that is not an option means the user may have seen another
 rendering: the session says so and asks again as the user saw it
 *(Adopted, A15)*.
 
-Two or more decisions in one message are labelled *(Proposed)*: each
+Two or more decisions in one message are labelled *(Adopted, A17)*: each
 question gets a letter heading (A, B, ...), and its options follow it as a
 bulleted list, `- A1 ...`, `- A2 ...`, recommendation first and marked, the
 last `No decision, discuss further`. Bullets, not an ordered list, so
@@ -71,7 +71,7 @@ labels: a label that is not an option, or a bare number when labels were
 shown, is said so and asked again as the user saw it.
 
 A labelled message ends with the line "`ALL1 AtE`: accept every
-recommendation" *(Proposed)*. `ALL1 AtE` takes option 1, the marked
+recommendation" *(Adopted, A17)*. `ALL1 AtE` takes option 1, the marked
 recommendation, of every question; exceptions may follow (`ALL1 B2 AtE`:
 B takes 2, the rest 1). Without AtE it is discussion, as any label. A
 single decision has no labels and no `ALL1` line; it is decided with
