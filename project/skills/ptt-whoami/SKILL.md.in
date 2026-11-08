@@ -12,11 +12,13 @@ writes (it writes none); other work needs AtE (rules file).
   session), or `ptt whoami <name>` with the holder name this session got from
   `/ptt-take` or `/ptt-resume`; report the holder name, role or task,
   supervisor, charter, whether this session is bound to it, and its session
-  name with the printed `to show it, type:` line, for the user to type if
-  the session does not show that name yet. If it holds
-  nothing, say so: `/ptt-take` gives it a role or task, `/ptt-resume NAME`
-  continues one.
+  name with the printed line that renames the session, for the user to
+  type, with its reason, if the session does not have that name yet. If
+  it holds nothing, say so: `/ptt-take` gives it a role or task,
+  `/ptt-resume NAME` continues one.
 - `NAME`: `<records>/bin/ptt whoami NAME`: the same about NAME. It does not
   make this session NAME; that is `/ptt-resume NAME`.
-- `all`: `<records>/bin/ptt who` and `<records>/bin/ptt tasks`: who holds
-  what, which tasks are ready, blocked, or waiting.
+- `all`: `<records>/bin/ptt who` and `<records>/bin/ptt tasks`: whether
+  nudges are on, who holds what, each holder's session name and unseen
+  items (new in the records since its inbox last looked), which tasks are
+  ready, blocked, or waiting.

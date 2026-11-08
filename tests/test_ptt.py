@@ -1141,30 +1141,134 @@ class Ptt(unittest.TestCase):
         self.ptt("take", n, session="00000000-0000-4000-8000-333333123456")
         self.ptt("take", "integrator", session="00000000-0000-4000-8000-444444abcdef")
         who = self.ptt("who").stdout
-        self.assertIn("designer    designer-g1  session prtr-dsgn-g1-123456\n", who)
-        self.assertIn("integrator  integrator-1  session prtr-intg-1-abcdef\n", who)
-        self.assertIn("worker-T0001  (worker, probe)  session prtr-wrkr-t1-123456\n", who)
+        self.assertIn("designer    designer-g1  session prtr-dsgn-g1-123456  unseen", who)
+        self.assertIn("integrator  integrator-1  session prtr-intg-1-abcdef  unseen", who)
+        self.assertIn("worker-T0001  (worker, probe)  session prtr-wrkr-t1-123456  unseen", who)
         me = self.ptt("whoami", session=a).stdout
         self.assertIn("session: this one\nsession name: prtr-dsgn-g1-123456\n", me)
-        self.assertIn("to show it, type: /rename prtr-dsgn-g1-123456 in Claude Code", me)
+        self.assertIn("In Claude Code, so that automatic messages reach this session, rename it: "
+                      "/rename prtr-dsgn-g1-123456; in Codex, to show it, type: /rename, then "
+                      "enter prtr-dsgn-g1-123456\n", me)
         other = self.ptt("whoami", "designer-g1", session=b).stdout
         self.assertIn("session name: prtr-dsgn-g1-123456\n", other)
-        self.assertNotIn("to show it", other)
+        self.assertNotIn("/rename", other)
         # no session ID: no name
         self.ptt("leave", "integrator-1")
         r = self.ptt("take", "integrator")
         self.assertNotIn("session name", r.stderr)
-        self.assertEqual(self.ptt("who").stdout.splitlines()[0], "integrator  integrator-2")
+        self.assertEqual(self.ptt("who").stdout.splitlines()[1],
+                         "integrator  integrator-2  unseen none")
+
+    def test_who_shows_unseen_items_since_the_inbox_mark(self):
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        n = self.task("probe", d)
+        w = self.ptt("take", n, session="W").stdout.strip()
+        # never looked: counted from its take (the worker's status.md is new to d)
+        who = self.ptt("who").stdout
+        self.assertRegex(who, rf"designer    {d}  session \S+  unseen 1, oldest (just now|\d+ min ago)\n")
+        self.assertIn(f"{w}  (track, probe)  session", who)
+        self.assertRegex(who, rf"{w} .*  unseen none\n")
+        # looking moves the mark; a later item is unseen again
+        self.ptt("inbox", d, session="D")
+        self.assertRegex(self.ptt("who").stdout, rf"designer    {d} .*  unseen none\n")
+        self.ptt("amend", n, "--as", d, "--text", "more", session="D")
+        self.ptt("amend", n, "--as", d, "--text", "and more", session="D")
+        self.assertRegex(self.ptt("who").stdout, rf"{w} .*  unseen 2, oldest ")
+        # a prompt hook's quiet inbox counts as seen
+        self.ptt("inbox", w, "--quiet", session="W")
+        self.assertRegex(self.ptt("who").stdout, rf"{w} .*  unseen none\n")
+
+    def test_resume_names_a_session_bound_before_names(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        sid = "00000000-0000-4000-8000-aaaaaa123456"
+        self.ptt("take", "integrator", session=sid)
+        # as a release before session names recorded it
+        take = self.rec / "roles" / "integrator" / "0001-take.md"
+        take.write_text(take.read_text().replace("session_name: prtr-intg-1-123456\n", ""))
+        run("git", "-C", str(self.rec), "commit", "-qam", "old take")
+        self.assertNotIn("session prtr", self.ptt("who").stdout)
+        r = self.ptt("resume", "integrator-1", session=sid)
+        self.assertIn("this session is already integrator-1", r.stdout)
+        self.assertIn("session name: prtr-intg-1-123456\n", r.stderr)
+        resume = self.rec / "roles" / "integrator" / "0002-resume.md"
+        self.assertIn("\nsession_name: prtr-intg-1-123456\n", resume.read_text())
+        self.assertIn("integrator-1  session prtr-intg-1-123456", self.ptt("who").stdout)
+        # already named: printed again, nothing recorded
+        r = self.ptt("resume", "integrator-1", session=sid)
+        self.assertIn("session name: prtr-intg-1-123456\n", r.stderr)
+        self.assertFalse((self.rec / "roles" / "integrator" / "0003-resume.md").exists())
+        self.ptt("leave", "integrator-1", session=sid)
+
+    def test_nudge_targets_per_event_kind(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        sd, sw, si = (f"00000000-0000-4000-8000-0000000{x}" for x in ("0d0d0", "0eeee", "0abcd"))
+        d = self.ptt("take", "designer", session=sd).stdout.strip()
+        n = self.task("probe", d)
+        w = self.ptt("take", n, session=sw).stdout.strip()
+        i = self.ptt("take", "integrator", session=si).stdout.strip()
+        names = {d: "prtr-dsgn-g1-00d0d0", w: "prtr-trck-t1-00eeee", i: "prtr-intg-1-00abcd"}
+
+        def nudged(r):
+            found = re.findall(r"^nudge: (\S+): new in your inbox \(records [0-9a-f]+\); run "
+                               r"`workspace/bin/ptt inbox (\S+)`$", r.stderr, re.M)
+            if found:
+                self.assertIn("\nnudges: in Claude Code, for each session above that ListAgents "
+                              "lists, subscribe with SendMessage notify_when_idle", r.stderr)
+            for session, holder in found:
+                self.assertEqual(session, names[holder])
+            return [holder for _, holder in found]
+        # an amendment, to the holder; never to the writer
+        self.assertEqual(nudged(self.ptt("amend", n, "--as", d, "--text", "x", session=sd)), [w])
+        # a subordinate's status update: none
+        status = self.rec / "tasks" / "open" / "T0001-probe" / "status.md"
+        status.write_text("progress\n")
+        self.assertEqual(nudged(self.ptt("record", "-m", "s", str(status), session=sw)), [])
+        # a note, to its recipient
+        notes = self.rec / "handoff" / "notes"
+        notes.mkdir(parents=True)
+        (notes / "f.md").write_text("---\nto: designer\n---\n\nA finding.\n")
+        self.assertEqual(nudged(self.ptt("record", "-m", "n", str(notes / "f.md"), session=sw)), [d])
+        # a new request, to the integrator; a review, to the requester
+        pr = self.rec / "pr" / "open" / "000001-probe"
+        pr.mkdir(parents=True)
+        (pr / "0001-request.md").write_text(f"---\nkind: request\nsession: {w}\n---\n")
+        self.assertEqual(nudged(self.ptt("record", "-m", "pr", str(pr), session=sw)), [i])
+        (pr / "0002-review.md").write_text(f"---\nkind: review\nsession: {i}\n---\n")
+        self.assertEqual(nudged(self.ptt("record", "-m", "rv", str(pr / "0002-review.md"),
+                                         session=si)), [w])
+        # switched off: no targets, nothing lost; `who` shows the switch
+        self.assertEqual(self.ptt("nudges").stdout, "nudges on\n")
+        self.assertEqual(self.ptt("nudges", "off").stdout, "nudges off\n")
+        r = self.ptt("amend", n, "--as", d, "--text", "y", session=sd)
+        self.assertNotIn("nudge", r.stderr)
+        who = self.ptt("who").stdout
+        self.assertEqual(who.splitlines()[0], "nudges      off")
+        self.assertRegex(who, rf"{w} .*  unseen 3, ")
+        self.assertEqual(self.ptt("nudges", "on").stdout, "nudges on\n")
+        self.assertEqual(self.ptt("who").stdout.splitlines()[0], "nudges      on")
+        # a done report, to the supervisor; a request moved, to its requester
+        self.assertEqual(nudged(self.ptt("done", n, "--as", w, session=sw)), [d])
+        self.assertEqual(nudged(self.ptt("pr-move", "1", "merged", "-m", "m", session=si)), [w])
+        # a close, to the former holder
+        self.assertEqual(nudged(self.ptt("close", n, "--as", d, session=sd)), [w])
+        # a holder without a recorded session name gets no line
+        self.ptt("leave", i, session=si)
+        self.ptt("take", "integrator")
+        (notes / "g.md").write_text("---\nto: integrator\n---\n\nLate.\n")
+        r = self.ptt("record", "-m", "n", str(notes / "g.md"), session=sd)
+        self.assertNotIn("nudge", r.stderr)
 
     def test_rename_line_in_the_calling_tools_notation(self):
         (self.rec / "project-code").write_text("prtr\n")
-        for key, line in (("CLAUDE_CODE_SESSION_ID", "/rename prtr-intg-{n}-abcdef\n"),
-                          ("CODEX_THREAD_ID", "/rename, then enter prtr-intg-{n}-abcdef\n")):
+        for key, line in (("CLAUDE_CODE_SESSION_ID", "So that automatic messages reach this "
+                           "session, rename it: /rename prtr-intg-{n}-abcdef\n"),
+                          ("CODEX_THREAD_ID", "to show it, type: /rename, then enter "
+                           "prtr-intg-{n}-abcdef\n")):
             with self.subTest(key=key):
                 env = dict(self.env(), **{key: f"0-0-0-0-{key[:2].lower()}00abcdef"})
                 r = run("python3", str(self.rec / "bin" / "ptt"), "take", "integrator", env=env)
                 n = r.stdout.strip().rsplit("-", 1)[1]
-                self.assertIn("to show it, type: " + line.format(n=n), r.stderr)
+                self.assertIn("\n" + line.format(n=n), r.stderr)
                 run("python3", str(self.rec / "bin" / "ptt"), "leave", f"integrator-{n}",
                     env=env)
 

@@ -31,6 +31,10 @@ branches, worktrees, or tags (that is `ptt-pr-cleanup`, after a decision).
 
 ## Review request N
 
+A nudge (a cross-session message "new in your inbox", see `/ptt-inbox`)
+starts steps 1-6 for a request waiting for review; then stop for the
+user's decision.
+
 At the start of an integration session, read `<records>/handoff/integrator.md`.
 
 1. Read the whole conversation in order: `<records>/bin/pr show N`. Review

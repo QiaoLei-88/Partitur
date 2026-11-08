@@ -28,7 +28,10 @@ same skills as `$ptt-*` (for example `$ptt-take designer`).
    references ([model](model.md), [references](flows/references.md)).
 5. Changes reach a main branch only through requests:
    [requests](flows/requests.md) and the `ptt-*` skills.
-6. At a quiet point, offer once to be cleared; clearing keeps what you hold:
+6. When a `ptt` command prints `nudge:` lines, nudge those sessions as its
+   `nudges:` line says; when nudged, do only the read-only part
+   ([nudges](flows/handoff.md#nudges-proposed)).
+7. At a quiet point, offer once to be cleared; clearing keeps what you hold:
    [handoff](flows/handoff.md#clearing-context-proposed-d16).
 
 ## Installing Partitur for a project
