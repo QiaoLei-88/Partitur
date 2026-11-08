@@ -171,14 +171,18 @@ to check the binding, and resume to reload the handover when needed.
 
 To bring a project up to a newer Partitur, pull this repository and rerun
 step 1's command with `--update`. The project remembers which Partitur
-commit and clone installed it (`workspace/.partitur-version`), so the update
-replaces what is outdated, removes what Partitur no longer ships, and moves
+commit and clone installed it, and for which tools
+(`workspace/.partitur-version`), so the update replaces what is outdated, removes what Partitur no longer ships, and moves
 the `partitur` skill link when you run it from another clone, but leaves your
 rules, your records, and any file you changed (`--force` replaces those,
 after copying each into a backup directory).
-`--uninstall` removes what was installed the same way. For the user link,
-`--scope user --uninstall` covers the detected tools; add `--tool all` if
-you installed for both.
+`--uninstall` removes what was installed the same way. Every later run
+serves the recorded tools, also on a machine that lacks one of them (a
+workspace shared between machines); `--tool` adds a tool, and with
+`--uninstall` removes only that tool's side. For the user link,
+`--scope user --uninstall` removes every `partitur` link to a Partitur
+clone in `~/.claude/skills` and `~/.agents/skills`, or only those `--tool`
+names.
 
 Both tools link `partitur` to this repository for its entry skill and
 documents. Command templates in `project/skills/` are named `SKILL.md.in`;

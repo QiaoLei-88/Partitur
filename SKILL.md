@@ -45,7 +45,9 @@ absolute path) and wait for the user's go-ahead on the location; then:
 
 It detects the agent tools on this machine and installs for those; if the
 project should serve a tool that is not installed here, add `--tool all` (ask
-the user). The command is in use (F9, F10); report anything unexpected.
+the user). The tools are recorded in `<records>/.partitur-version`; later
+runs (install, `--update`, `--uninstall`) follow them on any machine, and
+`--tool` adds one (with `--uninstall`, removes only that one). The command is in use (F9, F10); report anything unexpected.
 Everything else has a default (see [parameters](parameters.md)); `--repo` is
 needed only for checkouts not directly in the workspace root, which can also
 be added later as lines in `<records>/pr/repos`. Report the output to the

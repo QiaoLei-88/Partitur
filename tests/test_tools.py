@@ -542,15 +542,21 @@ class InstallProject(unittest.TestCase):
         self.assertFalse((self.root / "CLAUDE.md").is_symlink())
         self.assertNotIn("partitur rules begin", new.read_text())
 
-    def update_one_tool_after_rename(self, tool, other, custom=False):
+    def update_one_tool_after_rename(self, tool, other, custom=False, recorded=None):
         """Install for both tools when the rules file was <records>/CLAUDE.md,
-        then --update for one tool only; return the other tool's entry."""
+        then --update for one tool only; return the other tool's entry. The
+        stamp records `recorded` (default: `tool` alone, so that the other
+        tool's entry lies outside the update's plan)."""
         clone = self.partitur_clone()
         for name in ("rules.md", "root-charter.md"):
             path = clone / "templates" / name
             path.write_text(path.read_text().replace("PROJECT-RULES.md", "CLAUDE.md"))
         self.commit_clone(clone, "rules file named CLAUDE.md")
         self.install_from(clone, tool="all")
+        stamp = self.root / "workspace" / ".partitur-version"
+        lines = stamp.read_text().splitlines()
+        self.assertEqual(lines[-1], "tools claude codex")
+        stamp.write_text("\n".join(lines[:-1] + [f"tools {recorded or tool}"]) + "\n")
         entry = self.root / other
         if custom:
             entry.unlink()
@@ -576,6 +582,149 @@ class InstallProject(unittest.TestCase):
         entry, out = self.update_one_tool_after_rename("claude", "AGENTS.md", custom=True)
         self.assertNotIn("relinked", out)
         self.assertEqual(os.readlink(entry), "notes.md")
+
+    def test_update_for_one_tool_updates_both_recorded_sides(self):
+        entry, out = self.update_one_tool_after_rename("claude", "AGENTS.md",
+                                                       recorded="claude codex")
+        self.assertIn("tools      Claude Code (stamp), Codex (stamp)", out)
+        self.assertRegex(out, r"updated\s+AGENTS.md\s+\(was workspace/CLAUDE.md\)")
+        self.assertEqual(os.readlink(entry), "workspace/PROJECT-RULES.md")
+
+    def detect_only(self, *tools):
+        """An environment where auto detection finds only these tools: a
+        scratch PATH with git and python3, and the tools' home directories."""
+        bin_dir = self.home / "bin"
+        bin_dir.mkdir(exist_ok=True)
+        for name in ("git", "python3"):
+            if not (bin_dir / name).exists():
+                (bin_dir / name).symlink_to(shutil.which(name))
+        for tool, d in (("claude", ".claude"), ("codex", ".codex")):
+            if tool in tools:
+                (self.home / d).mkdir(exist_ok=True)
+            elif (self.home / d).is_dir():
+                shutil.rmtree(self.home / d)
+        return dict(self.env, PATH=str(bin_dir))
+
+    def auto(self, clone, *extra, env, tool=None, check=True):
+        return run(str(self.home / "bin" / "python3"), str(clone / "bin" / "install"),
+                   *(["--tool", tool] if tool else []), "--scope", "project",
+                   str(self.root), *extra, env=env, check=check)
+
+    def sides(self):
+        """The tool sides' entries present in the project."""
+        paths = ("CLAUDE.md", ".claude/skills/partitur", ".claude/skills/ptt-take",
+                 ".claude/settings.json", "AGENTS.md", ".agents/skills/partitur",
+                 ".agents/skills/ptt-take", ".codex/hooks.json")
+        return {p for p in paths if (self.root / p).is_symlink() or (self.root / p).exists()}
+
+    CLAUDE_SIDE = {"CLAUDE.md", ".claude/skills/partitur", ".claude/skills/ptt-take",
+                   ".claude/settings.json"}
+    CODEX_SIDE = {"AGENTS.md", ".agents/skills/partitur", ".agents/skills/ptt-take",
+                  ".codex/hooks.json"}
+
+    def check_both_sides_where_only_claude(self, old_stamp):
+        """A project installed for both tools, then updated and uninstalled
+        where only Claude Code is detected."""
+        clone = self.partitur_clone()
+        self.install_from(clone, tool="all")
+        stamp = self.root / "workspace" / ".partitur-version"
+        self.assertEqual(stamp.read_text().splitlines()[-1], "tools claude codex")
+        (clone / "project/skills/ptt-take/SKILL.md.in").write_text("changed\n")
+        self.commit_clone(clone, "v2")
+        if old_stamp:
+            stamp.write_text("\n".join(stamp.read_text().splitlines()[:2]) + "\n")
+        env = self.detect_only("claude")
+        out = self.auto(clone, env=env).stdout
+        origin = "project" if old_stamp else "stamp"
+        self.assertIn(f"tools      Claude Code ({origin}), Codex ({origin})", out)
+        self.assertNotIn("detected", out)
+        self.assertRegex(out, r"outdated\s+workspace/skills/ptt-take/SKILL.md")
+        self.assertEqual(stamp.read_text().splitlines()[-1], "tools claude codex")
+        out = self.auto(clone, "--update", env=env).stdout
+        self.assertRegex(out, r"updated\s+workspace/skills/ptt-take/SKILL.md")
+        self.assertEqual(self.sides(), self.CLAUDE_SIDE | self.CODEX_SIDE)
+        self.assertEqual(stamp.read_text().splitlines()[-1], "tools claude codex")
+        self.assertIn(git(clone, "rev-parse", "HEAD"), stamp.read_text())
+        self.assertIn("tools      Claude Code (stamp), Codex (stamp)",
+                      (self.root / "partitur-install-report.md").read_text())
+        self.auto(clone, "--uninstall", env=env)
+        self.assertEqual(self.sides(), set())
+        self.assertFalse(stamp.exists())
+
+    def test_both_sides_kept_where_only_claude_detected(self):
+        self.check_both_sides_where_only_claude(old_stamp=False)
+
+    def test_both_sides_kept_where_only_claude_detected_with_old_stamp(self):
+        self.check_both_sides_where_only_claude(old_stamp=True)
+
+    def test_old_stamp_records_present_sides_only(self):
+        clone = self.partitur_clone()
+        self.install_from(clone, tool="codex")
+        stamp = self.root / "workspace" / ".partitur-version"
+        stamp.write_text(f"partitur {git(clone, 'rev-parse', 'HEAD')}\n")
+        out = self.auto(clone, env=self.detect_only("claude", "codex")).stdout
+        self.assertIn("tools      Codex (project)\n", out)
+        self.assertEqual(self.sides(), self.CODEX_SIDE)
+        self.assertEqual(stamp.read_text().splitlines()[-1], "tools codex")
+
+    def test_update_adds_side_with_tool(self):
+        clone = self.partitur_clone()
+        self.install_from(clone, tool="claude")
+        stamp = self.root / "workspace" / ".partitur-version"
+        env = self.detect_only("claude")
+        out = self.auto(clone, "--update", env=env, tool="codex").stdout
+        self.assertIn("tools      Claude Code (stamp), Codex (--tool)", out)
+        self.assertEqual(self.sides(), self.CLAUDE_SIDE | self.CODEX_SIDE)
+        self.assertEqual(stamp.read_text().splitlines()[-1], "tools claude codex")
+        out = self.auto(clone, env=env).stdout
+        self.assertIn("tools      Claude Code (stamp), Codex (stamp)", out)
+
+    def test_install_adds_side_and_records_it_while_pending(self):
+        """A plain install that adds a side records it even when it keeps
+        the installing commit for a later --update."""
+        clone = self.partitur_clone()
+        self.install_from(clone, tool="claude")
+        stamp = self.root / "workspace" / ".partitur-version"
+        first = stamp.read_text().splitlines()[0]
+        (clone / "project/skills/ptt-take/SKILL.md.in").write_text("changed\n")
+        self.commit_clone(clone, "v2")
+        out = self.install_from(clone, tool="codex").stdout
+        self.assertRegex(out, r"outdated\s+workspace/skills/ptt-take/SKILL.md")
+        self.assertEqual(stamp.read_text().splitlines()[0], first)
+        self.assertEqual(stamp.read_text().splitlines()[-1], "tools claude codex")
+
+    def test_uninstall_one_side(self):
+        clone = self.partitur_clone()
+        self.install_from(clone, tool="all")
+        stamp = self.root / "workspace" / ".partitur-version"
+        env = self.detect_only("claude")
+        out = self.auto(clone, "--uninstall", env=env, tool="codex").stdout
+        self.assertIn("tools      Codex (--tool)", out)
+        self.assertEqual(self.sides(), self.CLAUDE_SIDE)
+        self.assertTrue((self.root / "workspace/bin/ptt").is_file())
+        self.assertTrue((self.root / "workspace/skills/ptt-take/SKILL.md").is_file())
+        self.assertIn("partitur rules begin",
+                      (self.root / "workspace/PROJECT-RULES.md").read_text())
+        self.assertRegex(out, r"updated\s+workspace/.partitur-version\s+\(tools claude\)")
+        self.assertEqual(stamp.read_text().splitlines()[-1], "tools claude")
+        self.assertIn('-m "uninstall Partitur for Codex"', out)
+        out = self.auto(clone, env=env).stdout
+        self.assertIn("tools      Claude Code (stamp)\n", out)
+        self.assertEqual(self.sides(), self.CLAUDE_SIDE)
+        self.auto(clone, "--uninstall", env=env, tool="claude")
+        self.assertEqual(self.sides(), set())
+        self.assertFalse(stamp.exists())
+        self.assertFalse((self.root / "workspace/bin/ptt").exists())
+
+    def test_first_install_detects(self):
+        clone = self.partitur_clone()
+        out = self.auto(clone, env=self.detect_only("claude")).stdout
+        self.assertIn("detected Claude Code", out)
+        self.assertIn("tools      Claude Code (detected)", out)
+        self.assertEqual(self.sides(), self.CLAUDE_SIDE)
+        stamp = (self.root / "workspace" / ".partitur-version").read_text().splitlines()
+        self.assertEqual(stamp, [f"partitur {git(clone, 'rev-parse', 'HEAD')}",
+                                 f"source {clone}", "tools claude"])
 
     def two_releases(self, old_stamp=False):
         """Install from release A, then make release B: a clone at the same commit."""
@@ -1058,6 +1207,65 @@ class InstallUser(unittest.TestCase):
                       "--uninstall", env=env).stdout
             self.assertRegex(out, r"removed\s+\.agents/skills/partitur")
             self.assertFalse((home / ".claude" / "skills" / "partitur").is_symlink())
+        finally:
+            shutil.rmtree(home)
+
+    def test_present_links_followed_where_one_tool_detected(self):
+        """The user scope's sides are its links to a Partitur clone: install
+        reports them, and --uninstall removes them, whatever is detected."""
+        home = Path(tempfile.mkdtemp())
+        try:
+            bin_dir = home / "bin"
+            bin_dir.mkdir()
+            for name in ("git", "python3"):
+                (bin_dir / name).symlink_to(shutil.which(name))
+            env = dict(os.environ, HOME=str(home), PATH=str(bin_dir))
+            py = str(bin_dir / "python3")
+
+            def user(*extra, tool=None):
+                return run(py, str(INSTALL), *(["--tool", tool] if tool else []),
+                           "--scope", "user", *extra, env=env).stdout
+
+            other = home / "release-x"            # another Partitur clone
+            shutil.copytree(HERE, other, symlinks=True,
+                            ignore=shutil.ignore_patterns(".git", "__pycache__"))
+            user(tool="claude")
+            (home / ".agents" / "skills").mkdir(parents=True)
+            codex = home / ".agents" / "skills" / "partitur"
+            codex.symlink_to(other)
+            out = user()                           # only ~/.claude: Claude Code detected
+            self.assertIn("tools      Claude Code (detected), Codex (present)", out)
+            self.assertRegex(out, rf"kept\s+\.agents/skills/partitur\s+\(installed already, "
+                                  rf"links {re.escape(str(other))}, not this Partitur; "
+                                  r"--uninstall --tool codex removes it\)")
+            codex.unlink()
+            codex.symlink_to(HERE)
+            out = user()
+            self.assertRegex(out, r"kept\s+\.agents/skills/partitur\s+\(installed already; "
+                                  r"--uninstall --tool codex removes it\)")
+            self.assertTrue(codex.is_symlink())
+            out = user("--uninstall")
+            self.assertIn("tools      Claude Code (present), Codex (present)", out)
+            self.assertRegex(out, r"removed\s+\.agents/skills/partitur")
+            self.assertRegex(out, r"removed\s+\.claude/skills/partitur")
+            self.assertFalse(codex.is_symlink())
+            # --tool removes only that side; a link to something else stays
+            user(tool="all")
+            notes = home / "notes"
+            notes.mkdir()
+            claude = home / ".claude" / "skills" / "partitur"
+            claude.unlink()
+            claude.symlink_to(notes)
+            out = user("--uninstall", tool="claude")
+            self.assertIn("tools      Claude Code (--tool)\n", out)
+            self.assertRegex(out, r"differs\s+\.claude/skills/partitur\s+\(not a link to a "
+                                  r"Partitur clone")
+            self.assertEqual(os.readlink(claude), str(notes))
+            self.assertTrue(codex.is_symlink())
+            out = user("--uninstall")
+            self.assertIn("tools      Codex (present)\n", out)
+            self.assertFalse(codex.is_symlink())
+            self.assertTrue(claude.is_symlink())
         finally:
             shutil.rmtree(home)
 

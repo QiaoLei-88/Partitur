@@ -149,13 +149,17 @@ Claude Code 继续使用 `CLAUDE_CODE_SESSION_ID`；
 
 要将项目升级到新版 Partitur，请拉取本仓库，并在第 1 步的命令中加上
 `--update` 后重新运行。项目会在 `workspace/.partitur-version` 中记录
-安装时的 Partitur 提交和所用的 clone，因此升级会替换过时内容、移除 Partitur
+安装时的 Partitur 提交、所用的 clone 以及为哪些工具安装，因此升级会替换过时内容、移除 Partitur
 不再提供的内容；从另一个 clone 运行时，还会把 `partitur` skill 链接改为指向该 clone；
 同时保留你的规则、记录和自行修改的文件。
 使用 `--force` 可以替换自行修改的文件，但会先将每个文件复制到备份目录。
 `--uninstall` 按同样的原则移除已安装内容。
-对于用户级链接，`--scope user --uninstall` 会处理检测到的工具；
-如果曾为两种工具都安装过，请加上 `--tool all`。
+之后的每次运行都会服务于记录的工具，即使所在机器缺少其中某个工具
+（多台机器共享同一工作区时）；`--tool` 可增加工具，与 `--uninstall`
+一起使用时只移除该工具这一侧。
+对于用户级链接，`--scope user --uninstall` 会移除 `~/.claude/skills` 和
+`~/.agents/skills` 中所有指向 Partitur clone 的 `partitur` 链接，
+或只移除 `--tool` 指定的那些。
 
 两种工具都将 `partitur` 链接到本仓库，以访问总入口技能及文档。
 `project/skills/` 中的命令模板名为 `SKILL.md.in`；
