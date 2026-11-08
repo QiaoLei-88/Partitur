@@ -176,9 +176,9 @@ The user turns nudges on or off for every session with `/ptt-nudges on|off`
 on by default; `ptt who` shows it on its first line. Off, nothing is lost,
 and turning nudges on sends nothing for earlier items.
 
-Proposed rule: a read-only step started by a nudge (a review, reading a
-note or report) is approved as the command it replaces would be, for that
-command's own records only.
+A read-only step started by a nudge (a review, reading a note or report)
+is approved as the command it replaces would be, for that command's own
+records only *(Adopted, A16)*.
 
 ## Stage close
 

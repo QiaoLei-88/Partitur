@@ -33,6 +33,7 @@ project's development notes.
 | A13 | A session asks for a decision with a numbered list, its recommendation first, always ending with `No decision, discuss further`; a decision is an option number with AtE, anything else is discussion | Exercised |
 | A14 | The decision list follows its question line directly, never another numbered list (Markdown renders adjacent lists as one and renumbers the second) | Adopted |
 | A15 | A number that is not an option means the user may have seen another rendering: the session says so and asks again as the user saw it | Adopted |
+| A16 | A read-only step started by a nudge (reporting an item, reading a note, checking a done report, a review by `ptt-pr-review` steps 1-6, a reply drafted but not recorded) is approved as the command it replaces would be, for that command's own records only; everything else waits for the user | Adopted |
 
 ## Roles
 
