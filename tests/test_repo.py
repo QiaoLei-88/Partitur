@@ -107,6 +107,23 @@ class Repo(unittest.TestCase):
         self.assertIn("worktrees/<task slug>", evidence)
         self.assertIn("Run all listed commands", disk)
 
+    def test_read_only_start_after_take_and_resume(self):
+        """T0010 amendment 0004: after a take or resume, a session goes on
+        read-only by itself; the rules block, the flow, and both skills agree."""
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        rules = text("templates", "rules.md")
+        self.assertIn("After taking or resuming a role or task, a session goes on read-only by itself", rules)
+        self.assertIn("goes on read-only by itself", text("flows", "authorization.md"))
+        take = text("project", "skills", "ptt-take", "SKILL.md.in")
+        for phrase in ("Then go on by yourself, read-only (rules file)",
+                       "wait for AtE", "end with a decision list asking for AtE",
+                       "`<records>/bin/pr gc`", "list what waits on it"):
+            self.assertIn(phrase, take)
+        resume = text("project", "skills", "ptt-resume", "SKILL.md.in")
+        self.assertIn("Then go on read-only as after a take", resume)
+        self.assertIn("what remains, from `status.md`", resume)
+
     def test_rules_name_commands_in_the_sessions_tool(self):
         rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
         self.assertIn("Name a command for the user in your own tool's notation.", rules)
@@ -127,6 +144,15 @@ class Repo(unittest.TestCase):
         review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
         self.assertIn("decision list right after its question line, never after another numbered list", review)
         self.assertIn("one that is not an option: ask again", review)
+        # T0010 amendment 0011: ALL1 takes every recommendation; not for one decision.
+        self.assertIn("\"`ALL1 AtE`: accept every recommendation\"", rules)
+        self.assertIn("(`ALL1 B2 AtE`: B takes 2, the rest 1)", rules)
+        self.assertIn("A single decision has no labels and no `ALL1` line", rules)
+        self.assertIn("A single decision has no labels and no `ALL1` line", flow)
+        self.assertIn("`ALL1 AtE`: accept every recommendation ```", flow)
+        for name in ("ptt-close", "ptt-pr-cleanup", "ptt-pr-reply", "ptt-pr-review"):
+            self.assertIn("ALL1 AtE", text("project", "skills", name, "SKILL.md.in"), name)
+        self.assertIn("`ALL1 AtE` line", text("SKILL.md"))
         # T0010 amendment 0002: several decisions in one message are labelled.
         self.assertIn("Two or more decisions in one message are labelled", rules)
         self.assertIn("(`A1 B2 AtE`)", rules)

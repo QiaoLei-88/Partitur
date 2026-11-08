@@ -81,7 +81,8 @@ Then, with the user:
      question line (`1. Partitur's rule`, `2. Keep the project's rule as a
      stated deviation`, `3. No decision, discuss further`), your
      recommendation first (usually the block's rule); with several
-     conflicts in one message, label them (`A1`, `B2`); see the decision
+     conflicts in one message, label them (`A1`, `B2`) and end with the
+     `ALL1 AtE` line; see the decision
      list in [authorization](flows/authorization.md). If the user keeps the
      project's way, it goes under "## Project Rules" as a stated deviation
      ("Partitur's rule on ... does not apply here: ..."), because install

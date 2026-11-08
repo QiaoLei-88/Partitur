@@ -78,11 +78,12 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    ```
 
    With `all`, or any other decision in the same message, label each
-   question instead (`A. Decide request NNNNNN:`, `- A1 ...`; rules file).
-7. On the user's decision (an option number or label with AtE, possibly
-   with changed comments; one that is not an option: ask again, rules
-   file), write
-   `MMMM-decision.md` and record it before anything else:
+   question instead (`A. Decide request NNNNNN:`, `- A1 ...`) and end with
+   the line "`ALL1 AtE`: accept every recommendation" (rules file).
+7. On the user's decision (an option number, a label, or `ALL1` with AtE,
+   possibly with changed comments; one that is not an option: ask again,
+   rules file), write `MMMM-decision.md` and record it before anything
+   else:
    `<records>/bin/ptt record -m "pr NNNNNN: decision <merge|changes
    requested|reject|withdraw>" <file>`. Then:
    - **Merge**: check the ancestry again (step 3; `<main>` may have moved);

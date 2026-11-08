@@ -14,6 +14,11 @@
 
 - Without authorization a session works read-only and creates no caches or
   artifacts *(Adopted, A9)*.
+- After taking or resuming a role or task (`/ptt-take`, `/ptt-resume`), a
+  session goes on read-only by itself: a task holder reads its charter's
+  sources and amendments, inspects the code, and presents a plan ending in
+  a decision list; the integrator lists requests and `pr gc`; a designer
+  reports what waits on it *(Proposed)*.
 - An authorized task includes its necessary edits and verification; work
   outside it, or a major change within it, needs its own authorization
   *(Adopted, A5)*.
@@ -65,6 +70,14 @@ later; a label without AtE is discussion, as a number is. A15 applies to
 labels: a label that is not an option, or a bare number when labels were
 shown, is said so and asked again as the user saw it.
 
+A labelled message ends with the line "`ALL1 AtE`: accept every
+recommendation" *(Proposed)*. `ALL1 AtE` takes option 1, the marked
+recommendation, of every question; exceptions may follow (`ALL1 B2 AtE`:
+B takes 2, the rest 1). Without AtE it is discussion, as any label. A
+single decision has no labels and no `ALL1` line; it is decided with
+`1 AtE` as before. A15 applies: if an option 1 the user saw is not the
+recommendation, the session says so and asks again as the user saw it.
+
 ```
 A. Decide request 000015:
 - A1 Request changes (recommended): C1, C2
@@ -74,6 +87,8 @@ A. Decide request 000015:
 B. Decide request 000016:
 - B1 Merge (recommended)
 - B2 No decision, discuss further
+
+`ALL1 AtE`: accept every recommendation
 ```
 
 ```
