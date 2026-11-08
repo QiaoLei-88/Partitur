@@ -135,7 +135,7 @@ those its inbox would show as new, counted since its inbox last looked (or
 its take), with the time of the oldest, or `unseen none`. Seen means shown
 to its session (a prompt hook counts), not handled.
 
-## Nudges *(Proposed)*
+## Nudges (D18)
 
 A nudge tells a session, by cross-session message, that its inbox has news,
 so that an idle session looks without waiting for the user's next message.
@@ -151,7 +151,7 @@ The inbox rules stay the one source of what is news:
    `status.md` update gets none. The line gives the holder's recorded
    session name and the text to send: "new in your inbox (records
    <commit>); run `ptt inbox <holder>`". A holder without a recorded name
-   gets no line.
+   gets no line *(Adopted)*.
 2. The writer's session, in Claude Code, sends a nudge only to a session
    that `ListAgents` lists by that name. It subscribes with `SendMessage`
    `notify_when_idle` and no message, whatever state the session shows, so

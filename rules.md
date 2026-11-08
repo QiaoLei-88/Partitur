@@ -94,6 +94,7 @@ project's development notes.
 | D9 | Findings meant for another session go into a file, not only into chat | Exercised |
 | D10 | Two label axes. Decisions: Agreed, Proposed, Open. Evidence: Documented, Source, Inferred, Tested, Unknown | Exercised for the decision axis and for Source, Inferred, Tested, Unknown; Adopted for Documented |
 | D17 | Agreed applies only to the wording the user agreed; an agreed intent with changed wording goes back to the user | Exercised |
+| D18 | After a record, the writing session nudges each holder it gave inbox news (except a subordinate's `status.md`) by a cross-session message to its recorded session name, if listed: it subscribes to the recipient's idle notice and on it sends only "new in your inbox"; fire-and-forget, the inbox stays the source of truth and `ptt who` shows unseen items; a master switch (`ptt nudges`) turns nudges off; Claude Code only | Exercised by hand; Adopted as printed by `ptt` |
 | D11 | A stage closes with a written close: results, carried-forward items, and the next stage's charter | Exercised |
 | D12 | Findings travel between sessions as files; the user carries notices between sessions | Exercised |
 | D12b | Sessions message each other directly | Proposed |
