@@ -34,6 +34,7 @@ project's development notes.
 | A14 | The decision list follows its question line directly, never another numbered list (Markdown renders adjacent lists as one and renumbers the second) | Adopted |
 | A15 | A number that is not an option means the user may have seen another rendering: the session says so and asks again as the user saw it | Adopted |
 | A16 | A read-only step started by a nudge (reporting an item, reading a note, checking a done report, a review by `ptt-pr-review` steps 1-6, a reply drafted but not recorded) is approved as the command it replaces would be, for that command's own records only; everything else waits for the user | Adopted |
+| A17 | Two or more decisions in one message are labelled: a letter per question, its options a bulleted list (`A1`, `A2`; bullets, which nothing renumbers), recommendation first, the last `No decision, discuss further`; the user answers with labels and AtE, any subset; a label without AtE is discussion; the message ends with the line `ALL1 AtE`: accept every recommendation, which takes option 1 of every question, exceptions following (`ALL1 B2 AtE`) | Adopted |
 
 ## Roles
 
