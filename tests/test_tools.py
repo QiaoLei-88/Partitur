@@ -262,6 +262,38 @@ class Workspace(unittest.TestCase):
         text = (rec / "run.md").read_text()
         self.assertIn(f"commit: {self.base}", text)
         self.assertIn("worktree_clean: yes", text)
+        self.assertIn("by: unknown", text)
+
+    def records_with_ptt(self):
+        """Make the records directory a ptt records repository."""
+        shutil.copy(PROJECT_BIN / "ptt", self.records / "bin" / "ptt")
+        root = self.records / "tasks" / "open" / "T0000-design"
+        root.mkdir(parents=True)
+        shutil.copy(HERE / "templates" / "root-charter.md", root / "charter.md")
+        git(self.records, "init", "-q", "-b", "master")
+        git(self.records, "config", "user.email", "t@example.org")
+        git(self.records, "config", "user.name", "t")
+        git(self.records, "add", "-A")
+        git(self.records, "commit", "-qm", "init")
+
+    def session_env(self, sid):
+        env = dict(os.environ)
+        for key in ("CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+            env.pop(key, None)
+        env["PTT_SESSION_ID"] = sid
+        return env
+
+    def test_run_record_by_bound_holder(self):
+        self.records_with_ptt()
+        env = self.session_env("11111111-2222-3333-4444-555555555555")
+        run("python3", str(self.records / "bin" / "ptt"), "take", "designer", env=env)
+        out = run("python3", str(self.records / "bin" / "test-run"), "new", str(self.code),
+                  env=env).stdout.strip()
+        self.assertIn("by: designer-g1\n", (Path(out) / "run.md").read_text())
+        other = self.session_env("99999999-2222-3333-4444-555555555555")
+        out = run("python3", str(self.records / "bin" / "test-run"), "new", str(self.code),
+                  env=other).stdout.strip()
+        self.assertIn("by: unknown\n", (Path(out) / "run.md").read_text())
 
 
 

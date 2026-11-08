@@ -14,8 +14,8 @@ A claim without a label is a claim the reader cannot weigh.
 ## Run records
 
 - One directory per run, `test-runs/<UTC timestamp>-<short sha>`, created by
-  a tool that records the checkout's identity; written once, never reused,
-  cited by id (E1).
+  a tool that records the checkout's identity and the holder that made it
+  (`by:`); written once, never reused, cited by id (E1).
 - Holds commands, environment, identifiers, exit status, counts, logs, and a
   report (E6). Small files in full; large outputs by hash, size, and a
   numerical summary, compared by tolerance (E2).

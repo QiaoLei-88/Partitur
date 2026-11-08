@@ -6,22 +6,54 @@ Usage:
 
 Creates <root>/<id>/ with id = <UTC timestamp>-<short commit SHA>, for example
 20261009T061500Z-7099ba2, writes run.md with the checkout's identity, and
-prints the directory path. The caller puts the command, logs, outputs, exit
-status and counts there; large outputs are recorded by SHA-256, size, and a
-compact numerical summary. A run directory is written by one run and never
-reused. The default root is test-runs/ in the workspace root (the parent of
-the records repository holding this tool's directory).
+prints the directory path. run.md names its creator in `by:`, the holder
+bound to this session by `ptt` (beside this tool), or `unknown` without
+one. The caller puts the command, logs, outputs, exit status and counts
+there; large outputs are recorded by SHA-256, size, and a compact
+numerical summary. A run directory is written by one run and never
+reused. The default root is test-runs/ in the workspace root (the parent
+of the records repository holding this tool's directory).
 """
 import argparse
+import importlib.machinery
+import importlib.util
 import subprocess
 import sys
 import time
 from pathlib import Path
 
+HERE = Path(__file__).resolve().parent
+
 
 def git(repo, *args):
     return subprocess.run(["git", "-C", str(repo), *args], check=True,
                           capture_output=True, text=True).stdout.strip()
+
+
+def sibling(name):
+    """The tool `name` beside this one, loaded as a module, or None."""
+    path = HERE / name
+    if not path.is_file():
+        return None
+    loader = importlib.machinery.SourceFileLoader(f"partitur_{name}", str(path))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    module = importlib.util.module_from_spec(spec)
+    try:
+        loader.exec_module(module)
+    except (Exception, SystemExit):
+        return None
+    return module
+
+
+def bound_holder():
+    """The holder bound to this session by ptt, or None."""
+    ptt = sibling("ptt")
+    if ptt is None:
+        return None
+    try:
+        return ptt.bound_here()
+    except (Exception, SystemExit):
+        return None
 
 
 def main():
@@ -58,6 +90,7 @@ def main():
         "---\n"
         f"id: {run.name}\n"
         f"created: {stamp}\n"
+        f"by: {bound_holder() or 'unknown'}\n"
         f"checkout: {top}\n"
         f"branch: {branch}\n"
         f"commit: {sha}\n"
