@@ -28,7 +28,9 @@ writes; other work needs AtE (rules file).
    (`/ptt-take`, step 3).
 4. Read what NAME starts from (`/ptt-take`, step 4) and its status record
    (`status.md`, or `<records>/handoff/integrator.md`), then report where it
-   stands and the next step.
+   stands and the next step. Then go on read-only as after a take
+   (`/ptt-take`, step 4); with work in progress, a task holder's plan covers
+   what remains, from `status.md`.
    After acting on an amendment, use `<records>/bin/ptt adopt TASK N[,N]
    --as NAME` on the user's AtE; if you disagree, write a note to the designer.
 

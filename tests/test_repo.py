@@ -107,6 +107,23 @@ class Repo(unittest.TestCase):
         self.assertIn("worktrees/<task slug>", evidence)
         self.assertIn("Run all listed commands", disk)
 
+    def test_read_only_start_after_take_and_resume(self):
+        """T0010 amendment 0004: after a take or resume, a session goes on
+        read-only by itself; the rules block, the flow, and both skills agree."""
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        rules = text("templates", "rules.md")
+        self.assertIn("After taking or resuming a role or task, a session goes on read-only by itself", rules)
+        self.assertIn("goes on read-only by itself", text("flows", "authorization.md"))
+        take = text("project", "skills", "ptt-take", "SKILL.md.in")
+        for phrase in ("Then go on by yourself, read-only (rules file)",
+                       "wait for AtE", "end with a decision list asking for AtE",
+                       "`<records>/bin/pr gc`", "list what waits on it"):
+            self.assertIn(phrase, take)
+        resume = text("project", "skills", "ptt-resume", "SKILL.md.in")
+        self.assertIn("Then go on read-only as after a take", resume)
+        self.assertIn("what remains, from `status.md`", resume)
+
     def test_rules_name_commands_in_the_sessions_tool(self):
         rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
         self.assertIn("Name a command for the user in your own tool's notation.", rules)

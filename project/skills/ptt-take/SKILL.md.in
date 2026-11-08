@@ -40,6 +40,18 @@ takes, approves recording it (an AtE does not); the work itself needs AtE
      holder makes the top-level tasks.
      After acting on an amendment, use `<records>/bin/ptt adopt TASK N[,N]
      --as NAME` on the user's AtE; if you disagree, write a note to the designer.
+
+   Then go on by yourself, read-only (rules file): writing files, making
+   worktrees, and runs that create run records wait for AtE.
+   - A task holder (worker, track): read every item of the charter's "Read
+     first" and its amendments, inspect the code and tests they name, and
+     present a plan: the commits, what each changes, the tests, risks and
+     Unknowns; end with a decision list asking for AtE.
+   - The integrator: `<records>/bin/pr list` and `<records>/bin/pr gc`
+     (read-only); list the requests waiting for review and ask which to
+     review first.
+   - A designer: its inbox; list what waits on it (done reports, leave
+     requests, notes).
 5. If the tool notes that `T0000` is not filled in (a project just set up,
    or a placeholder left since), find what exists: earlier handover files
    in `<records>/handoff/` (not `integrator.md`, `notes/`), "superseded"

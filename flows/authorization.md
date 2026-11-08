@@ -14,6 +14,11 @@
 
 - Without authorization a session works read-only and creates no caches or
   artifacts *(Adopted, A9)*.
+- After taking or resuming a role or task (`/ptt-take`, `/ptt-resume`), a
+  session goes on read-only by itself: a task holder reads its charter's
+  sources and amendments, inspects the code, and presents a plan ending in
+  a decision list; the integrator lists requests and `pr gc`; a designer
+  reports what waits on it *(Proposed)*.
 - An authorized task includes its necessary edits and verification; work
   outside it, or a major change within it, needs its own authorization
   *(Adopted, A5)*.
