@@ -1146,10 +1146,12 @@ class Ptt(unittest.TestCase):
         self.assertIn("worker-T0001  (worker, probe)  session prtr-wrkr-t1-123456  unseen", who)
         me = self.ptt("whoami", session=a).stdout
         self.assertIn("session: this one\nsession name: prtr-dsgn-g1-123456\n", me)
-        self.assertIn("to show it, type: /rename prtr-dsgn-g1-123456 in Claude Code", me)
+        self.assertIn("In Claude Code, so that automatic messages reach this session, rename it: "
+                      "/rename prtr-dsgn-g1-123456; in Codex, to show it, type: /rename, then "
+                      "enter prtr-dsgn-g1-123456\n", me)
         other = self.ptt("whoami", "designer-g1", session=b).stdout
         self.assertIn("session name: prtr-dsgn-g1-123456\n", other)
-        self.assertNotIn("to show it", other)
+        self.assertNotIn("/rename", other)
         # no session ID: no name
         self.ptt("leave", "integrator-1")
         r = self.ptt("take", "integrator")
@@ -1199,13 +1201,15 @@ class Ptt(unittest.TestCase):
 
     def test_rename_line_in_the_calling_tools_notation(self):
         (self.rec / "project-code").write_text("prtr\n")
-        for key, line in (("CLAUDE_CODE_SESSION_ID", "/rename prtr-intg-{n}-abcdef\n"),
-                          ("CODEX_THREAD_ID", "/rename, then enter prtr-intg-{n}-abcdef\n")):
+        for key, line in (("CLAUDE_CODE_SESSION_ID", "So that automatic messages reach this "
+                           "session, rename it: /rename prtr-intg-{n}-abcdef\n"),
+                          ("CODEX_THREAD_ID", "to show it, type: /rename, then enter "
+                           "prtr-intg-{n}-abcdef\n")):
             with self.subTest(key=key):
                 env = dict(self.env(), **{key: f"0-0-0-0-{key[:2].lower()}00abcdef"})
                 r = run("python3", str(self.rec / "bin" / "ptt"), "take", "integrator", env=env)
                 n = r.stdout.strip().rsplit("-", 1)[1]
-                self.assertIn("to show it, type: " + line.format(n=n), r.stderr)
+                self.assertIn("\n" + line.format(n=n), r.stderr)
                 run("python3", str(self.rec / "bin" / "ptt"), "leave", f"integrator-{n}",
                     env=env)
 

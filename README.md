@@ -29,8 +29,8 @@ Six ideas decide everything else; when in doubt, ask which one applies.
    integrator, or the holder of one task, and only because it took that
    role with a command. A role someone holds cannot be taken. Taking or
    resuming also names the session (`prtr-wrkr-t8-d6ddbc`: project, holder,
-   part of the session ID) and prints the line that shows the name in your
-   tool, `/rename <name>`.
+   part of the session ID) and prints the line that gives the session that
+   name, `/rename <name>`, so that automatic messages reach it.
 3. **Records, not memory.** What matters is in files in the records
    repository, so a session can be cleared or replaced at any time and the
    next one continues from them.

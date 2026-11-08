@@ -92,7 +92,8 @@ and both where neither is set (PTT_SESSION_ID alone names no tool).
 
 Session names: `take` and `resume` with a session ID also give the session a
 name, recorded in that event as `session_name` and never recomputed, and
-print the line that shows it in the tool (`/rename NAME`). The name is
+print the line that renames the session (`/rename NAME`; in Claude Code,
+nudges reach a session by that name). The name is
 `<project>-<holder>-<hash>`, lowercase: the project code is
 <records>/project-code (one line) if present, else the workspace root's
 directory name shortened (keep the first letter, drop later vowels and `y`,
@@ -728,19 +729,23 @@ def session_name_of(d):
 
 
 def rename_line(name):
-    """What the user types to show session name NAME in the calling tool."""
+    """The line asking the user to give this session the name NAME in the
+    calling tool, with the reason: in Claude Code, nudges reach a session
+    by that name; Codex gets no nudges, so there it only shows the name."""
+    claude = f"so that automatic messages reach this session, rename it: /rename {name}"
+    codex = f"to show it, type: /rename, then enter {name}"
     if os.environ.get("CLAUDE_CODE_SESSION_ID"):
-        return f"/rename {name}"
+        return claude[0].upper() + claude[1:]
     if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID"):
-        return f"/rename, then enter {name}"
-    return f"/rename {name} in Claude Code; /rename, then enter {name}, in Codex"
+        return codex
+    return f"In Claude Code, {claude}; in Codex, {codex}"
 
 
 def show_session_name(name):
-    """Print this session's name and the line that shows it in the tool, on
+    """Print this session's name and the line that renames the session, on
     standard error (standard output stays the holder name)."""
     if name:
-        print(f"session name: {name}\nto show it, type: {rename_line(name)}", file=sys.stderr)
+        print(f"session name: {name}\n{rename_line(name)}", file=sys.stderr)
 
 
 def skill(command):
@@ -1472,7 +1477,7 @@ def cmd_whoami(a):
     if name:
         print(f"session name: {name}")
         if sessions[-1] == sid:
-            print(f"to show it, type: {rename_line(name)}")
+            print(rename_line(name))
 
 
 def tree(rev):

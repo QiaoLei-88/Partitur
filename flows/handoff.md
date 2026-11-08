@@ -85,9 +85,13 @@ a design discussion only to save tokens: re-reading costs too.
 ## Session names *(Proposed)*
 
 `ptt take` and `ptt resume` give the session a name, record it in that
-event (`session_name:`), and print the line that shows it in the tool:
-`/rename <name>` in Claude Code; in Codex `/rename`, then the name (Codex
-documents `/rename` for the current chat, not an argument to it). The name
+event (`session_name:`), and print the line that renames the session. In
+Claude Code it gives the reason: "So that automatic messages reach this
+session, rename it: /rename <name>"; a session not renamed gets no nudges,
+since `ListAgents` does not list it by that name. In Codex, which gets no
+nudges, it only shows the name: `/rename`, then the name (Codex documents
+`/rename` for the current chat, not an argument to it). Renaming stays the
+user's act: `ptt` can neither see nor set a session's name. The name
 is chosen once and never recomputed; `ptt who` and `ptt whoami` show it. It
 is `<project>-<holder>-<hash>`, lowercase:
 
