@@ -18,7 +18,7 @@
   session goes on read-only by itself: a task holder reads its charter's
   sources and amendments, inspects the code, and presents a plan ending in
   a decision list; the integrator lists requests and `pr gc`; a designer
-  reports what waits on it *(Proposed)*.
+  reports what waits on it *(Adopted, A18)*.
 - An authorized task includes its necessary edits and verification; work
   outside it, or a major change within it, needs its own authorization
   *(Adopted, A5)*.
