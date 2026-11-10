@@ -39,8 +39,12 @@ No draft for request NNNNNN in this conversation. Decide:
 3. No decision, discuss further
 ```
 
-For several requests in one message, label each question (`A1`, `B2`)
-instead of numbering, and end with the `ALL1 AtE` line (rules file).
+If several requests need answers, give an overview line per request, then
+report one request per message (rules file). Use a numbered decision list
+for one decision. For several decisions on that request, label each
+question (`A1`, `B2`) and end with the `ALL1 AtE` line. The next request's
+report follows the user's answer; keep decisions about different requests
+in separate messages.
 
 ## Carrying it out
 

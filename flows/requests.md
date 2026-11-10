@@ -45,6 +45,16 @@ repository, and a table maps repositories to checkouts and main branches
    The integrator checks the task's merge order and amendments against
    request states, ancestry and file overlap, records the finding in the
    review, and sends order questions to the designer.
+   `/ptt-pr-review all` groups requests waiting for review by repository
+   and reviews only the first request per repository in merge order
+   (lowest request number when no order is stated). Requests of different
+   repositories are reviewed in the same run; the others in each repository
+   are listed as `waits: rebase after PR N merges`, not reviewed. An
+   unresolved order question leaves that repository waiting for resolution.
+   Finish recording the selected reviews before asking for decisions.
+   Give an overview line per request, reviewed or waiting, then report one
+   request per message with its own decision; the next report follows the
+   user's answer. `/ptt-pr-reply` likewise handles one request per message.
 6. **Requester moves freely.** Replies and updates may come at any time;
    decisions gate only merging and closing (C7).
 7. **Comments by ID**, continued across rounds, each marked required or

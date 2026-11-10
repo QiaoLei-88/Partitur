@@ -70,6 +70,14 @@ In Codex, commands start with `$` instead of `/`. For anything not in this
 table, ask a session: it reads Partitur's documents and explains, for
 example "how does leaving a task work?" or "what does the integrator do?".
 
+`/ptt-pr-review all` reviews the first waiting request per repository in
+merge order (lowest number when no order is stated), across repositories
+in one run. Other requests in that repository wait to rebase after the
+first merges. An overview lists every reviewed or waiting request; each
+review and its decision are then discussed in a separate message, waiting
+for your answer before the next. `/ptt-pr-reply` likewise handles one
+request per message.
+
 ## Getting started
 
 Requirements: Git 2.28 or later, Python 3.8 or later, and a system with

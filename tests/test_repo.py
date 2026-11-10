@@ -209,6 +209,7 @@ class Repo(unittest.TestCase):
         review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
         self.assertIn("decision list right after its question line, never after another numbered list", review)
         self.assertIn("one that is not an option: ask again", review)
+        self.assertIn("an option number, a label, or `ALL1` with AtE", review)
         # T0010 amendment 0011: ALL1 takes every recommendation; not for one decision.
         self.assertIn("\"`ALL1 AtE`: accept every recommendation\"", rules)
         self.assertIn("(`ALL1 B2 AtE`: B takes 2, the rest 1)", rules)
@@ -228,6 +229,50 @@ class Repo(unittest.TestCase):
             self.assertIn("rules file", text("project", "skills", name, "SKILL.md.in"))
             self.assertIn("A1", text("project", "skills", name, "SKILL.md.in"), name)
         self.assertIn("label them (`A1`, `B2`)", text("SKILL.md"))
+
+    def test_review_all_selects_one_request_per_repository_before_decisions(self):
+        """T0020: batch the reviews across repositories, not the decisions."""
+        review = " ".join((ROOT / "project/skills/ptt-pr-review/SKILL.md.in").read_text().split())
+        for phrase in ('group requests "waiting for review" by repository',
+                       "`Merge order` and amendments", "before selecting",
+                       "select only the first request in that order",
+                       "lowest request number when no order is stated",
+                       "leave that repository waiting until its order is resolved",
+                       "continue with independent repositories",
+                       "`waits: rebase after PR N merges`; do not review it",
+                       "for every selected request in the same run, before asking for any decision",
+                       "overview line per request, reviewed or waiting",
+                       "a later `all` selects again from the current states and merge order"):
+            self.assertIn(phrase, review)
+        self.assertNotIn('Review every request "waiting for review", lowest first', review)
+        flow = " ".join((ROOT / "flows/requests.md").read_text().split())
+        for phrase in ("first request per repository in merge order",
+                       "lowest request number when no order is stated",
+                       "`waits: rebase after PR N merges`",
+                       "Finish recording the selected reviews before asking for decisions"):
+            self.assertIn(phrase, flow)
+        for name, selection, reply in (
+                ("README.md", "first waiting request per repository",
+                 "`/ptt-pr-reply` likewise handles one request per message"),
+                ("README.zh-CN.md", "按合并顺序选取每个仓库的首个待审请求",
+                 "`/ptt-pr-reply` 同样每条消息只处理一个请求")):
+            wording = " ".join((ROOT / name).read_text().split())
+            self.assertIn("`/ptt-pr-review all`", wording, name)
+            self.assertIn(selection, wording, name)
+            self.assertIn(reply, wording, name)
+
+    def test_request_decisions_stay_in_separate_messages(self):
+        for name in ("ptt-pr-review", "ptt-pr-reply"):
+            wording = " ".join((ROOT / "project/skills" / name / "SKILL.md.in").read_text().split())
+            for phrase in ("one request per message",
+                           "Use a numbered decision list for one decision",
+                           "For several decisions on that request, label each question",
+                           "decisions about different requests in separate messages"):
+                self.assertIn(phrase, wording, name)
+        for skill in (ROOT / "project/skills").glob("*/SKILL.md.in"):
+            wording = " ".join(skill.read_text().split())
+            self.assertNotIn("For several requests in one message", wording, skill)
+            self.assertNotIn("With `all`, or any other decision in the same message", wording, skill)
 
     def test_close_reopens_an_incomplete_done_report(self):
         text = " ".join((ROOT / "project/skills/ptt-close/SKILL.md.in").read_text().split())

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `/ptt-pr-review all` reviews one request per repository in merge order;
+  others wait to rebase. Reviews across repositories complete in one run.
+- Reviews and replies discuss one request per message, each with its decision.
+  After updating the skills, clear and resume existing holders.
 - Reports give goals, status, actions or decisions with tradeoffs. Short IDs
   omit leading zeros and pair requests with tasks.
 - After updating the reporting rules and skills, clear and resume running

@@ -22,12 +22,34 @@ another session holds it, say so. Then stop.
 | none, `list [open\|merged\|closed\|all]` | `<records>/bin/pr list ...`: report the table, with each open request's status and any cleanup line. |
 | `show N` | `<records>/bin/pr show N`: report the conversation. |
 | `N` | Review request N (below), then wait for the user's decision. |
-| `all` | Review every request "waiting for review", lowest first; wait for a decision on each. |
+| `all` | Review the first request per repository in merge order; review those of different repositories in the same run, then ask for decisions one request per message (below). |
 
 A review is read-only for code: no merge, commit, checkout, or branch change
 in `<repo>/` or any worktree. It writes only its own message and run records
 (`<records>/bin/test-run new`). Never edit an existing message; never delete
 branches, worktrees, or tags (that is `ptt-pr-cleanup`, after a decision).
+
+## Review `all`
+
+Read `<records>/bin/pr list` and group requests "waiting for review" by
+repository. Read their tasks' `Merge order` and amendments and check the
+order as in step 3 below before selecting: in each repository, select only
+the first request in that order, lowest request number when no order is
+stated. Report unresolved order questions to the designer as in step 3;
+leave that repository waiting until its order is resolved, and continue
+with independent repositories.
+
+For each other waiting request in a repository with a selected PR N,
+list `waits: rebase after PR N merges`; do not review it. Merging N advances
+the main branch, so the remaining branches must incorporate it before
+their ancestry check can pass.
+
+Complete steps 1-6 through recording the review for every selected request
+in the same run, before asking for any decision. Then give an overview line
+per request, reviewed or waiting, and report one request per message as in
+step 6. The next request's report follows the user's answer. This batch
+reviews only the selected requests; a later `all` selects again from the
+current states and merge order.
 
 ## Review request N
 
@@ -97,9 +119,13 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    4. No decision, discuss further
    ```
 
-   With `all`, or any other decision in the same message, label each
-   question instead (`A. Decide request NNNNNN:`, `- A1 ...`) and end with
-   the line "`ALL1 AtE`: accept every recommendation" (rules file).
+   Report one request per message (rules file). Use a numbered decision
+   list for one decision. For several decisions on that request, label
+   each question (`A1`, `B2`) and end with the `ALL1 AtE` line.
+   With `all`, finish recording all selected reviews first,
+   then give the overview and report the first request; wait for the user's
+   answer before reporting the next request. Keep decisions about different
+   requests in separate messages.
 7. On the user's decision (an option number, a label, or `ALL1` with AtE,
    possibly with changed comments; one that is not an option: ask again,
    rules file), write `MMMM-decision.md` and record it before anything
