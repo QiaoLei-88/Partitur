@@ -14,6 +14,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent.parent
 
@@ -1036,6 +1037,85 @@ class Ptt(unittest.TestCase):
         self.ptt("leave", i, session="I")               # its own leave: nothing to tell
         self.assertEqual(self.ptt("inbox", "--quiet", session="I").stdout, "")
         self.assertIn("this session holds nothing", self.ptt("inbox", session="X").stdout)
+
+    def test_ended_names_reach_only_the_last_bound_session_once(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        sd = "00000000-0000-4000-8000-00000000dddd"
+        last = "00000000-0000-4000-8000-00000000eeee"
+        d = self.ptt("take", "designer", session=sd).stdout.strip()
+        for ending, suffix in (("close", "closed"), ("leave", "left"), ("free", "freed")):
+            with self.subTest(ending=ending):
+                n = self.task(ending, d)
+                w = self.ptt("take", n, session="old").stdout.strip()
+                self.ptt("resume", w, session=last)
+                if ending == "close":
+                    self.ptt("done", n, "--as", w, session=last)
+                    result = self.ptt("close", n, "--as", d, session=sd)
+                elif ending == "leave":
+                    self.ptt("leave", w, session=last)
+                    result = self.ptt("approve-leave", n, "--as", d, session=sd)
+                else:
+                    result = self.ptt("free", n, "--as", d, "--force", "--reason", "gone",
+                                      session=sd)
+                prefix = f"prtr-trck-t{int(n[1:])}"
+                self.assertNotIn(f"nudge: {prefix}-{suffix}", result.stderr)
+                self.assertIn(f"nudge: {prefix}-00eeee (Claude Code):", result.stderr)
+                for sid in ("old", sd, None):
+                    self.assertNotIn("/rename", self.ptt("inbox", w, session=sid).stdout)
+                out = self.ptt("inbox", "--quiet", session=last).stdout
+                self.assertIn(f"/rename {prefix}-{suffix}\n", out)
+                self.assertEqual(self.ptt("inbox", "--quiet", session=last).stdout, "")
+                self.assertNotIn("/rename", self.ptt("inbox", w, session="old").stdout)
+
+    def test_cancel_renames_the_last_holder_but_not_an_unclaimed_task(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        n = self.task("cancelled", d)
+        w = self.ptt("take", n, session="W").stdout.strip()
+        self.ptt("free", n, "--as", d, "--force", "--reason", "gone", session="D")
+        self.assertIn("/rename prtr-trck-t1-freed", self.ptt("inbox", session="W").stdout)
+        result = self.ptt("cancel", n, "--as", d, "--reason", "unneeded", session="D")
+        self.assertNotIn("nudge:", result.stderr)
+        self.assertNotIn("/rename", self.ptt("inbox", w, session="D").stdout)
+        out = self.ptt("inbox", "--quiet", session="W").stdout
+        self.assertIn("/rename prtr-trck-t1-cancelled", out)
+        self.assertEqual(self.ptt("inbox", "--quiet", session="W").stdout, "")
+        n = self.task("unclaimed", d)
+        result = self.ptt("cancel", n, "--as", d, "--reason", "unneeded", session="D")
+        self.assertNotIn("/rename", result.stdout)
+        self.assertNotIn("ended_session", self.ptt("show", n).stdout)
+
+    @patch.dict(os.environ, GIT_AUTHOR_DATE="2000-01-01T00:00:00+0000",
+                GIT_COMMITTER_DATE="2000-01-01T00:00:00+0000")
+    def test_own_leave_and_freed_roles_have_ended_names(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        for role, code in (("designer", "dsgn-g"), ("integrator", "intg-")):
+            with self.subTest(role=role):
+                holder = self.ptt("take", role, session="own").stdout.strip()
+                out = self.ptt("leave", holder, session="own").stdout
+                self.assertIn(f"/rename prtr-{code}1-left", out)
+                self.assertEqual(self.ptt("inbox", "--quiet", session="own").stdout, "")
+                holder = self.ptt("take", role, session="freed").stdout.strip()
+                self.ptt("free", role, "--as", "user", "--reason", "gone", "--force")
+                out = self.ptt("inbox", "--quiet", session="freed").stdout
+                self.assertIn(f"/rename prtr-{code}2-freed", out)
+                self.assertEqual(self.ptt("inbox", "--quiet", session="freed").stdout, "")
+
+    def test_ended_name_collision_is_recorded_and_does_not_change(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        d = self.designer()
+        n = self.task("collision", d)
+        w = self.ptt("take", n, session="W").stdout.strip()
+        other = self.rec / "roles" / "integrator" / "0001-leave.md"
+        other.parent.mkdir(parents=True)
+        other.write_text("---\nby: integrator-1\nevent: leave\nended_session_id: other\n"
+                         "ended_session_name: prtr-trck-t1-closed\n---\n")
+        self.ptt("record", "-m", "historical name", str(other))
+        self.ptt("done", n, "--as", w, session="W")
+        self.ptt("close", n, "--as", d)
+        self.assertIn("ended_session_name: prtr-trck-t1-closed-2", self.ptt("show", n).stdout)
+        (self.rec / "project-code").write_text("changed\n")
+        self.assertIn("/rename prtr-trck-t1-closed-2", self.ptt("inbox", session="W").stdout)
 
     def test_resume_without_a_name_lists_a_single_handover_and_binds_nothing(self):
         i = self.ptt("take", "integrator", session="A").stdout.strip()

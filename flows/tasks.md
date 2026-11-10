@@ -161,7 +161,11 @@ In Codex the commands start with `$` instead of `/`.
   older note without a `to:` goes to the designer, marked), a new review or
   decision on its request, and for the integrator a new request or reply;
   and, once, to the session last bound to a holder whose hold someone else
-  ended (a close, an approved leave, a freeing). In Claude Code and Codex
+  ended (a close, an approved leave, a freeing), or whose former task was
+  later cancelled, with its recorded ended-name `/rename` line. A root
+  designer or integrator leaving gets that line in its command output.
+  Looking from another session does not consume an ended notice or show
+  its rename line. In Claude Code and Codex
   (once trusted), install's prompt hook runs it before each user message,
   so a bound holder sees it with the user's next message; without the hook
   the holder runs `/ptt-inbox`, and the user carries the notice as before

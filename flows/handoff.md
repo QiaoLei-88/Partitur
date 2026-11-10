@@ -112,6 +112,16 @@ is `<project>-<holder>-<hash>`, lowercase:
   same name, the window moves one digit towards the start, at most seven
   windows; only then is it lengthened.
 
+When a hold ends, the ending event records `ended_session_id` and
+`ended_session_name`: the live name with its hash replaced by `closed`,
+`cancelled`, `left`, or `freed`. A collision with another session's recorded
+name adds `-2`, `-3`, and so on. Only the last bound session gets the
+printed `/rename` line, once through its inbox; a root designer or
+integrator leaving gets it in the leave output. Renaming remains the
+user's act. A later cancellation addresses the last holder; a task never
+taken has no session to rename. An ending nudge uses the old live name,
+never the ended name; a later cancellation sends none.
+
 When a task becomes ready (`ptt ready`, `ptt approve-leave`, `ptt free`) or
 a role becomes free (the designer or integrator leaving or freed), `ptt`
 prints lines to paste in the workspace root that start a session taking

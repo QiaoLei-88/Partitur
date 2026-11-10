@@ -118,6 +118,12 @@ or integrator, `approve-leave`, `free`), print ready-to-paste lines that
 start a session taking it: `claude -n <project>-<holder> "/ptt-take N"`
 (the session name without its hash, until take gives the full one) and
 `codex '$ptt-take N'`.
+An ending event records `ended_session_id` and `ended_session_name`: the
+live name with its hash replaced by closed, cancelled, left, or freed;
+collisions with another session add -2, -3, ... . Only the last bound
+session gets its rename line, once through inbox (or its own root/role
+leave output). Cancellation addresses the last holder if there was one.
+An ending nudge uses the old live name, never an ended name.
 
 Nudges: after each commit, every command that records prints a notice
 for each holder other than the writer to whom the commit gave news:
@@ -438,7 +444,8 @@ def nudge_targets(commit):
         lines = news(name, held, f"{commit}^")
         if [x for x in lines if not re.match(r"read T\S+ status\.md:", x)]:
             out.append((name, session_name_of(d), sessions[-1]))
-    changed = set(git("diff-tree", "--root", "--no-commit-id", "--name-only", "-r",
+    changed = set(git("diff-tree", "--root", "--no-commit-id", "--name-only", "-r", "-M",
+                      "--diff-filter=A",
                       commit).stdout.split())
     for e in ended_holds():
         if str(e["path"].relative_to(REC)) in changed and e["name"] != ACTOR:
@@ -796,8 +803,33 @@ def recorded_session_names(sid):
     """Session names recorded by sessions other than `sid`."""
     dirs = [d for d in ROLES.iterdir() if d.is_dir()] if ROLES.is_dir() else []
     dirs += [d for _, _, d in all_tasks()]
-    return {e["session_name"] for d in dirs for e in events(d)
-            if e.get("session_name") and e.get("session_id") != sid}
+    return {e[field] for d in dirs for e in events(d)
+            for field, identity in (("session_name", "session_id"),
+                                    ("ended_session_name", "ended_session_id"))
+            if e.get(field) and e.get(identity) != sid}
+
+
+def end_session(d, suffix):
+    """Fields recording the last bound session's ended name, under the write lock."""
+    bindings = [e for e in events(d) if e["kind"] in ("take", "resume")]
+    if not bindings or not bindings[-1].get("session_name"):
+        return {}
+    bound = bindings[-1]
+    sid = bound.get("session_id")
+    prefix = bound["session_name"].rsplit("-", 1)[0] + "-" + suffix
+    taken = recorded_session_names(sid)
+    name, n = prefix, 1
+    while name in taken:
+        n += 1
+        name = f"{prefix}-{n}"
+    return dict(ended_session_id=sid, ended_session_name=name)
+
+
+def ended_rename(fields):
+    name = fields.get("ended_session_name")
+    if name and fields.get("ended_session_id") == session_id():
+        return f"To show that this session has ended, type: /rename {name}"
+    return None
 
 
 def new_session_name(holder, sid):
@@ -1165,11 +1197,14 @@ def cmd_leave(a):
     must_be_clear(a.name)
     if held[0] == "task" and held[1]["number"] == ROOT:
         i = held[1]
-        add_event(i["dir"], "leave", dict(by=a.name), a.status or "",
+        fields = dict(by=a.name, **end_session(i["dir"], "left"))
+        add_event(i["dir"], "leave", fields, a.status or "",
                   f"task {tid(ROOT)}: {a.name} leaves the root design")
         print(f"{a.name} left the root design; the next `ptt take designer` is "
               f"designer-g{i['takes'] + 1}")
         offer_task(ROOT)
+        if ended_rename(fields):
+            print(ended_rename(fields))
         return
     if held[0] == "role":
         role = held[1]
@@ -1183,10 +1218,13 @@ def cmd_leave(a):
                         pending.append(d.name[:6])
             need(not pending, "integrator cannot leave: decisions not carried out for "
                  "request(s) " + ", ".join(pending))
-        add_event(ROLES / role, "leave", dict(by=a.name), a.status or "",
+        fields = dict(by=a.name, **end_session(ROLES / role, "left"))
+        add_event(ROLES / role, "leave", fields, a.status or "",
                   f"role {role}: {a.name} leaves")
         print(f"{a.name} left the {role} role")
         offer_role(role)
+        if ended_rename(fields):
+            print(ended_rename(fields))
         return
     i = held[1]
     need(not i["leave_request"], f"{a.name} already asked to leave task {tid(i['number'])}")
@@ -1205,7 +1243,8 @@ def cmd_approve_leave(a):
     need(i["holder"] and i["leave_request"], f"nobody asked to leave task {tid(i['number'])}")
     if i["kind"] == "design":
         must_be_clear(i["holder"])
-    add_event(i["dir"], "leave", dict(by=i["holder"], approved_by=a.as_), "",
+    add_event(i["dir"], "leave", dict(by=i["holder"], approved_by=a.as_,
+              **end_session(i["dir"], "left")), "",
               f"task {tid(i['number'])}: {i['holder']} leaves, approved by {a.as_}")
     print(f"task {tid(i['number'])} is ready again")
     offer_task(i["number"])
@@ -1216,7 +1255,8 @@ def cmd_free(a):
         need(a.as_ == "user", "only the user frees a role (--as user)")
         holder, _ = role_state(a.what)
         need(holder, f"{a.what} is not held")
-        add_event(ROLES / a.what, "leave", dict(by=holder, freed_by="user"), a.reason,
+        add_event(ROLES / a.what, "leave", dict(by=holder, freed_by="user",
+                  **end_session(ROLES / a.what, "freed")), a.reason,
                   f"role {a.what}: {holder} freed by the user")
         print(f"{a.what} is free")
         offer_role(a.what)
@@ -1230,7 +1270,8 @@ def cmd_free(a):
     need(silent or a.force, f"{i['holder']} has a record from the last {STALE_DAYS:g} days; "
          "it may still be working. Ask it to leave (approval), or use --force if you know "
          "it is gone")
-    add_event(i["dir"], "leave", dict(by=i["holder"], freed_by=a.as_, forced=bool(a.force)),
+    add_event(i["dir"], "leave", dict(by=i["holder"], freed_by=a.as_, forced=bool(a.force),
+              **end_session(i["dir"], "freed")),
               a.reason,
               f"task {tid(i['number'])}: {i['holder']} freed by {a.as_}")
     print(f"task {tid(i['number'])} is ready again; its status.md shows where it stood")
@@ -1338,7 +1379,8 @@ def finish(i, kind, place, fields, body, message):
          "(ptt record):\n" + dirty)
     evs = events(i["dir"])
     event = i["dir"] / f"{(evs[-1]['n'] if evs else 0) + 1:04d}-{kind}.md"
-    fields = dict(fields, event=kind, date=date.today().isoformat())
+    fields = dict(fields, event=kind, date=date.today().isoformat(),
+                  **end_session(i["dir"], "closed" if kind == "close" else "cancelled"))
     text = "---\n" + "".join(f"{k}: {clean(v)}\n" for k, v in fields.items()) + "---\n"
     if body:
         text += "\n" + body.strip() + "\n"
@@ -1722,7 +1764,7 @@ def news(name, held, base, commits=None):
 
 
 def ended_holds():
-    """Holds that someone else ended (a close, an approved leave, a freeing):
+    """Holds that someone else ended, including a later cancellation:
     dicts with the holder's name, its sessions and last session name, the
     ending event, and a line saying so. A holder's own leave is not listed;
     it ran the command."""
@@ -1739,10 +1781,12 @@ def ended_holds():
             elif k == "resume":
                 sessions.append(e.get("session_id"))
                 session_name = e.get("session_name")
-            elif k in ("leave", "close") and name:
+            elif k in ("leave", "close", "cancel") and name:
                 who = lambda f: "the user" if e.get(f) == "user" else e.get(f)
                 if k == "close":
                     line = f"{what} was closed by {who('by')}"
+                elif k == "cancel":
+                    line = f"{what} was cancelled by {who('by')}"
                 elif e.get("freed_by"):
                     line = f"{name} was freed from {what} by {who('freed_by')}"
                 elif e.get("approved_by"):
@@ -1751,8 +1795,10 @@ def ended_holds():
                     line = None
                 if line:
                     out.append(dict(name=name, sessions=sessions, path=e["path"], line=line,
-                                    session_name=session_name))
-                name, sessions = None, []
+                                    session_name=session_name,
+                                    ended_session_id=e.get("ended_session_id"),
+                                    ended_session_name=e.get("ended_session_name")))
+                session_name = None   # a later cancellation must not nudge the old live name
     return out
 
 
@@ -1775,22 +1821,29 @@ def inbox_ended(name, quiet):
     if not ends:
         return False
     for e in ends:
-        e["commit"], _, when = git("log", "-1", "--format=%H %ct", "--",
-                                   str(e["path"].relative_to(REC)),
-                                   check=False).stdout.strip().partition(" ")
-        e["when"] = int(when or 0)
-    end = max(ends, key=lambda e: e["when"])
+        e["commit"] = git("log", "-1", "--format=%H", "--",
+                          str(e["path"].relative_to(REC)), check=False).stdout.strip()
+    end = ends[0]
+    for e in ends[1:]:
+        # Commit ancestry orders ends even when timestamps tie or clocks go backwards.
+        if not end["commit"] or (e["commit"] and git(
+                "merge-base", "--is-ancestor", end["commit"], e["commit"],
+                check=False).returncode == 0):
+            end = e
     mark_file = git_dir() / "ptt-inbox" / end["name"]
     mark = mark_file.read_text().strip() if mark_file.exists() else None
     line = ended_note(end, mark)
     if line:
         print(f"ptt inbox for {end['name']}: {line}" if quiet else line)
+        if ended_rename(end):
+            print(ended_rename(end))
     elif quiet:
         return True
     else:
         print(f"{end['line']}; {end['name']} holds nothing now")
-    mark_file.parent.mkdir(exist_ok=True)
-    mark_file.write_text(git("rev-parse", "HEAD").stdout.strip() + "\n")
+    if sid == end["sessions"][-1]:
+        mark_file.parent.mkdir(exist_ok=True)
+        mark_file.write_text(git("rev-parse", "HEAD").stdout.strip() + "\n")
     return True
 
 
