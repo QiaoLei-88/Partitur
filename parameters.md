@@ -31,7 +31,7 @@ Changing one of these means changing the tools or skills that use it.
 | Session IDs | `PTT_SESSION_ID`, else `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, `CODEX_SESSION_ID`; Codex's hook reads the event's `session_id` | G16 |
 | Handover markers | `<records>/.git/ptt-handover/<holder name>`: left at a quiet point (`ptt handover`), used by `ptt resume` without a name; lapse by events; not committed | G19 |
 | Records lock | `<records>/.git/ptt.lock.d/`: names its owner (machine, process, start); removed only when the owner is known gone (`ptt unlock`) | F11 |
-| Inbox markers | `<records>/.git/ptt-inbox/<holder name>`: the records commit a holder last looked at; not committed | G17 |
+| Inbox markers | `<records>/.git/ptt-inbox/<holder name>`: the records commit a holder last looked at, moved only by its bound session (or a session without an ID); not committed | G17 |
 | Holder names | `designer-g<N>` (holders of `T0000`), `integrator-<N>`, `<kind>-<task ID>` (`track-T0007.1`), then `-2`, `-3` for later holders | G2 |
 | Stale holder | no record for 7 days, listed for the supervisor | G6 |
 | Request directories | `<records>/pr/{open,merged,closed}/NNNNNN-short-name/`, six-digit numbers | C1, C3a |

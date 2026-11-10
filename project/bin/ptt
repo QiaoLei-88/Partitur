@@ -88,9 +88,13 @@ shell and hook IDs must identify the same session to find its bound holder.
 holder (--as NAME, the NAME of `leave`) from another session is refused, and
 so is any write from a session whose holder has since been resumed
 elsewhere. Without a session ID (for example a plain terminal), nothing is
-bound or checked. Hints name a skill command in the calling tool's notation,
-known from those variables: `/ptt-...` in Claude Code, `$ptt-...` in Codex,
-and both where neither is set (PTT_SESSION_ID alone names no tool).
+bound or checked. `inbox NAME` moves NAME's inbox mark only in the session
+bound to NAME, or in a session without an ID; another session (one cleared
+before its `resume`, or a supervisor looking) sees the same items, and they
+stay new for NAME's own session. Hints name a skill command in the calling
+tool's notation, known from those variables: `/ptt-...` in Claude Code,
+`$ptt-...` in Codex, and both where neither is set (PTT_SESSION_ID alone
+names no tool).
 
 Session names: `take` and `resume` with a session ID also give the session a
 name, recorded in that event as `session_name` and never recomputed, and
