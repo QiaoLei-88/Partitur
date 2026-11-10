@@ -64,6 +64,9 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
    left (G6, G7).
 8. **A charter is frozen once released**; changes are amendments, recorded
    as events. The holder writes only `status.md` (G11, G12).
+   The designer (including a sub-designer) states merge order with reasons
+   and clearing conditions in the charter and keeps it current by amending
+   the waiting task; this gates merging, while `depends:` gates taking.
 9. **Clearing does not change the holder.** The role or task stays
    recorded; after `/clear`, the user names the holder the fresh session
    continues as (`/ptt-resume <name>`; a handover only puts its holder first

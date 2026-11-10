@@ -45,6 +45,22 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    stale: say so in the review instead of reviewing a moving branch.
 3. If `git -C <repo> merge-base --is-ancestor <main> <head>` fails,
    recommend bringing the branch up to date.
+   Read the request's task with `<records>/bin/ptt show <task>`: its
+   charter's `Merge order` and all amendments. For each `after:` entry,
+   find the named request (or the relevant requests of the named task),
+   read its state with `pr list all` and `pr show`, and check the stated
+   reason and clearing condition against the actual file overlap. For a
+   prerequisite merged in this repository, check
+   `git -C <repo> merge-base --is-ancestor <prerequisite merge commit> <head>`;
+   for another repository, check incorporation on its own main branch.
+   A task being closed alone does not prove its prerequisite changes are
+   present. A reason that no longer holds, conflicting charter orders, or
+   unforeseen overlap goes in a note to the designer (`to: designer`);
+   the integrator does not change the order. Distinguish a recorded
+   clearing condition being met from a reason being invalidated: the
+   latter needs the designer's resolution before recommending merge.
+   A charter without the section is "not stated"; check overlap as before.
+   A request with no task is also "not stated".
 4. Review `<base>..<head>` (later rounds: the commits since the last
    reviewed head, and the answers to earlier comments): each diff, `git diff
    --check`, consistency with the project instructions and design documents,
@@ -62,10 +78,14 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    in it; build and run outside the reviewed checkout (e.g. in the run
    record); cite its id.
 6. Write `MMMM-review.md` (one more than the highest `MMMM`; comment IDs
-   continue across rounds). List `MMMM-*` again: if another file has your
-   number and is already recorded, rename yours to the next free one. Record
-   only this file: `<records>/bin/ptt record -m "pr NNNNNN: review MMMM"
-   <file>`. Report the analysis, comments, and recommendation, end with the
+   continue across rounds). Include one merge-order line: "mergeable as to
+   order", "waits on <task or request>: <reason still holding>", or "not
+   stated: <overlap finding>"; include all outstanding prerequisites and
+   any unresolved designer question. List `MMMM-*` again: if another file
+   has your number and is already recorded, rename yours to the next free
+   one. Record only this file:
+   `<records>/bin/ptt record -m "pr NNNNNN: review MMMM" <file>`.
+   Report the analysis, comments, and recommendation, end with the
    decision list right after its question line, never after another
    numbered list (rules file), and stop:
 
@@ -130,6 +150,7 @@ test_runs: <run ids, or none>
 
 ## Analysis
 What changed, risks, what was checked and what was not.
+Merge order: <mergeable as to order | waits on N: reason | not stated: overlap finding>.
 
 ## Checks
 Commands run and results; run ids.
