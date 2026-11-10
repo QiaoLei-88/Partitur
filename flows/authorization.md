@@ -59,7 +59,7 @@ A number that is not an option means the user may have seen another
 rendering: the session says so and asks again as the user saw it
 *(Adopted, A15)*.
 
-Two or more decisions in one message are labelled *(Adopted, A17)*: each
+Two or more decisions of one topic in one message are labelled *(Adopted, A17)*: each
 question gets a letter heading (A, B, ...), and its options follow it as a
 bulleted list, `- A1 ...`, `- A2 ...`, recommendation first and marked, the
 last `No decision, discuss further`. Bullets, not an ordered list, so
@@ -79,14 +79,15 @@ single decision has no labels and no `ALL1` line; it is decided with
 recommendation, the session says so and asks again as the user saw it.
 
 ```
-A. Decide request 000015:
-- A1 Request changes (recommended): C1, C2
-- A2 Merge anyway
+A. PR 15: require the C1 fix?
+- A1 Request changes (recommended): C1
+- A2 Accept C1 as it stands
 - A3 No decision, discuss further
 
-B. Decide request 000016:
-- B1 Merge (recommended)
-- B2 No decision, discuss further
+B. PR 15: require the C2 fix?
+- B1 Request changes (recommended): C2
+- B2 Accept C2 as it stands
+- B3 No decision, discuss further
 
 `ALL1 AtE`: accept every recommendation
 ```
