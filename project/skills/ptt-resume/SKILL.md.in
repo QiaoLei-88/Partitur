@@ -1,6 +1,6 @@
 ---
 name: ptt-resume
-description: "Continue as a holder in a fresh session or after /clear: binds the holder name to this session and catches up from the records. Argument: the holder name (integrator-1, designer-g1, worker-T0007), or none to continue the holder that left a handover."
+description: "Continue as a holder in a fresh session or after /clear: binds the holder name to this session and catches up from the records. Argument: the holder name (integrator-1, designer-g1, worker-T0007), or none to list the holders, binding none."
 disable-model-invocation: true
 ---
 
@@ -10,9 +10,10 @@ The command, or an AtE naming these records, approves the records this skill
 writes; other work needs AtE (rules file).
 
 1. `<records>/bin/ptt resume NAME`, or without a name `<records>/bin/ptt
-   resume`: it continues the one holder that left a handover at a quiet
-   point; otherwise it lists the holders, those with a handover first, then
-   by their last write. Show the list and ask which one; stop. A holder
+   resume`: it only lists the holders, those with a handover first, then by
+   their last write, each with its named resume, and binds none, also when
+   one holder alone left a handover. Show the list and ask which one; stop:
+   only the user's named resume continues a holder. A holder
    marked "may still be working" wrote minutes ago from its own session:
    continuing it takes the role from that session, so say so.
 2. If refused (NAME holds nothing, or this session already is another
@@ -34,8 +35,8 @@ writes; other work needs AtE (rules file).
    After acting on an amendment, use `<records>/bin/ptt adopt TASK N[,N]
    --as NAME` on the user's AtE; if you disagree, write a note to the designer.
 
-In Claude Code, `/clear` starts a fresh session ID: use `/ptt-resume` to
-continue the holder and reload its handover.
+In Claude Code, `/clear` starts a fresh session ID: use `/ptt-resume NAME`
+to continue the holder and reload its handover.
 
 In Codex invoke this skill as `$ptt-resume`. A fresh chat or fork must
 resume to take over; continuing or compacting the same thread keeps its

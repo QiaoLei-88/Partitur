@@ -66,8 +66,8 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
    as events. The holder writes only `status.md` (G11, G12).
 9. **Clearing does not change the holder.** The role or task stays
    recorded; after `/clear`, the user names the holder the fresh session
-   continues as (`/ptt-resume <name>`, or `/ptt-resume` alone for the
-   holder that left a handover at its quiet point, G19), and it picks up from
+   continues as (`/ptt-resume <name>`; a handover only puts its holder first
+   in the list that `/ptt-resume` alone shows, G19), and it picks up from
    the records.
    Leaving is for handing the work to another session (D16, G13).
 10. **A holder is bound to one session.** Where the agent tool gives a
@@ -129,7 +129,7 @@ with `ptt show`.
 | `/ptt-take [designer\|integrator\|task]` | any session | `ptt take`; a task by ID (`T0007`, `0007`, `7`, `T0007.1`), full name (`T0007-wall-distance`), or slug; without argument `ptt tasks` |
 | `/ptt-whoami [name\|all]` | any session | `ptt whoami`: who this session is (reads only); `all`: `ptt who`, `ptt tasks` |
 | `/ptt-inbox [name]` | any holder | `ptt inbox`: what is new since the holder last looked, and what waits on it |
-| `/ptt-resume [NAME]` | a cleared or fresh session | `ptt resume`: continue as NAME, or without NAME the holder that left a handover (`ptt handover`), bound to this session |
+| `/ptt-resume [NAME]` | a cleared or fresh session | `ptt resume`: continue as NAME, bound to this session; without NAME, only list the holders (a handover from `ptt handover` first), binding none |
 | `/ptt-mktask`, `release N`, `amend N` | designer | `ptt mktask`, `ptt ready`, `ptt amend` |
 | `ptt adopt TASK N[,N] --as NAME [--text TEXT]` | holder | record adoption of the named amendment events |
 | `/ptt-done` | holder | `ptt done` |
