@@ -1837,6 +1837,11 @@ def cmd_inbox(a):
             print(f"- {line}")
         for line in waits:
             print(f"waits on you: {line}")
+    if session_id() and bound_here() != name:
+        if new and not a.quiet:
+            print(f"this session is not bound to {name}: these items stay new "
+                  f"for {name}'s own session")
+        return
     mark = git_dir() / "ptt-inbox" / name
     mark.parent.mkdir(exist_ok=True)
     mark.write_text(head + "\n")

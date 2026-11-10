@@ -1178,6 +1178,32 @@ class Ptt(unittest.TestCase):
         self.ptt("inbox", w, "--quiet", session="W")
         self.assertRegex(self.ptt("who").stdout, rf"{w} .*  unseen none\n")
 
+    def test_only_the_bound_session_moves_the_inbox_mark(self):
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        n = self.task("probe", d)
+        w = self.ptt("take", n, session="W").stdout.strip()
+        self.ptt("amend", n, "--as", d, "--text", "more", session="D")
+        self.ptt("inbox", session="D")
+        # another session (a cleared one, or a supervisor) sees the items; they stay new
+        for args in ((), ("--quiet",)):
+            out = self.ptt("inbox", w, *args, session="X").stdout
+            self.assertIn("amend event", out)
+            self.assertEqual("--quiet" not in args,
+                             f"these items stay new for {w}'s own session" in out)
+            self.assertRegex(self.ptt("who").stdout, rf"{w} .*  unseen 1, oldest ")
+        self.assertNotIn("stay new", self.ptt("inbox", d, session="X").stdout)  # nothing new
+        # the bound session moves the mark
+        out = self.ptt("inbox", w, session="W").stdout
+        self.assertIn("amend event", out)
+        self.assertNotIn("stay new", out)
+        self.assertRegex(self.ptt("who").stdout, rf"{w} .*  unseen none\n")
+        self.assertIn(f"{w}: nothing new", self.ptt("inbox", session="W").stdout)
+        # a session without an ID moves it
+        self.ptt("amend", n, "--as", d, "--text", "and more", session="D")
+        self.assertIn("amend event", self.ptt("inbox", w).stdout)
+        self.assertRegex(self.ptt("who").stdout, rf"{w} .*  unseen none\n")
+        self.assertIn(f"{w}: nothing new", self.ptt("inbox", w, session="W").stdout)
+
     def test_resume_names_a_session_bound_before_names(self):
         (self.rec / "project-code").write_text("prtr\n")
         sid = "00000000-0000-4000-8000-aaaaaa123456"
