@@ -135,6 +135,23 @@ class Repo(unittest.TestCase):
         self.assertIn("Then go on read-only as after a take", resume)
         self.assertIn("what remains, from `status.md`", resume)
 
+    def test_take_and_resume_repeat_rename_in_the_final_report(self):
+        """T0017 amendment 0004: the reminder survives the read-only work."""
+        def text(name):
+            return " ".join((ROOT / "project/skills" / name / "SKILL.md.in").read_text().split())
+        take = text("ptt-take")
+        resume = text("ptt-resume")
+        for wording in (take, resume):
+            for phrase in ("final report (plan or decision list)", "`1. /rename <name>`",
+                           "recorded session name", "the business items"):
+                self.assertIn(phrase, wording)
+        for phrase in ('`ListAgents` ("This session is ...")',
+                       "omit the reminder when they match",
+                       "In Codex the current name cannot be read, so always list the reminder first",
+                       "Introduce any decision options with their own question line"):
+            self.assertIn(phrase, take)
+        self.assertIn("apply the rename check in `/ptt-take`, step 4", resume)
+
     def test_rules_name_commands_in_the_sessions_tool(self):
         rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
         self.assertIn("Name a command for the user in your own tool's notation.", rules)

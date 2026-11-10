@@ -37,6 +37,9 @@ writes; other work needs AtE (rules file).
    what remains, from `status.md`.
    After acting on an amendment, use `<records>/bin/ptt adopt TASK N[,N]
    --as NAME` on the user's AtE; if you disagree, write a note to the designer.
+   For the final report (plan or decision list), apply the rename check in
+   `/ptt-take`, step 4: when required, start with `1. /rename <name>` using
+   the recorded session name, then the business items.
 
 In Claude Code, `/clear` starts a fresh session ID: use `/ptt-resume NAME`
 to continue the holder and reload its handover.
