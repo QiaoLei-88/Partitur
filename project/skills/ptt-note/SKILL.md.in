@@ -1,0 +1,38 @@
+---
+name: ptt-note
+description: "Write and record a note from your topic and gist, then show where to carry it. Argument: designer, integrator, or an open task's ID."
+disable-model-invocation: true
+---
+
+# Note from the user
+
+The command, or an AtE naming these records, approves the note this skill
+writes; the work it proposes still needs AtE (rules file). This is a
+user-invoked command, not a step for sessions to invoke themselves.
+
+1. From the user's topic, gist, and conversation, write the note in your
+   own words. Ask only if the recipient or intended message is missing.
+   Preserve the distinction between a proposal and an agreed decision.
+   Write `<records>/handoff/notes/<topic>.md`, choosing an unused filename
+   (add a suffix if needed), with front matter:
+
+   ```markdown
+   ---
+   to: <designer|integrator|T0007>
+   ---
+   ```
+
+   Use the requested recipient; `ptt record` validates it. A correction
+   goes in a new note identifying the earlier one. Leave the earlier note
+   in place for its recipient.
+2. Record at once with `<records>/bin/ptt record -m "note: <topic>"
+   <records>/handoff/notes/<topic>.md`, as this session's holder if it has
+   one. Show no draft or approval question first. If recording is refused,
+   report the tool's error and that the note is not recorded; stop.
+3. Follow the tool's `nudges:` instructions for any `nudge:` targets. Pass
+   each `carry:` line to the user; for a Claude Code target absent from
+   `ListAgents`, give the manual line as instructed. Before naming a current
+   holder, run `<records>/bin/ptt who` (rules file). End with only the
+   transfer lines needed, no summary of the note. When every target is
+   nudged, no transfer line is needed. If the recipient has no holder,
+   say so; the note waits in its inbox when someone takes it.

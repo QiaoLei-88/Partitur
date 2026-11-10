@@ -549,6 +549,10 @@ class InstallProject(unittest.TestCase):
                 if path.parent.name.startswith("ptt-"):
                     self.assertNotIn("<records>", path.read_text())
                     self.assertIn("partitur-records/bin/", path.read_text())
+                    policy = HERE / "project/skills" / path.parent.name / "agents/openai.yaml"
+                    if policy.exists():
+                        self.assertEqual((path.parent / "agents/openai.yaml").read_text(),
+                                         policy.read_text())
         entry = skills / "partitur"
         for directory, _, files in os.walk(entry, followlinks=True):
             for name in files:

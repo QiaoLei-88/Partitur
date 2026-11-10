@@ -15,9 +15,11 @@ writes (it writes none); other work needs AtE (rules file).
    one without a session ID); from another session the items stay new for
    the holder's own session.
 2. Report each line with a suggested next step: read a changed `status.md`
-   or note and say what it means for your work; read an amendment (`ptt
-   show <N>`); read a note to you, record any outcome where it belongs, and
-   then offer to delete it (`rm`, then `ptt record`); answer a review (`/ptt-pr-draft-reply`); record a
+   and say what it means for your work; read an amendment (`ptt
+   show <N>`); read a note to you, first state in one or two sentences your
+   understanding of what it asks, proposes, or tells you, then what that
+   means for your work, record any outcome where it belongs, and
+   offer to delete it (`rm`, then `ptt record`); answer a review (`/ptt-pr-draft-reply`); record a
    decided request's outcome in your status; settle what waits on you
    (`/ptt-close`, `/ptt-leave approve`). Act only with the user's command or
    AtE.

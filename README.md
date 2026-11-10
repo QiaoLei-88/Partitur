@@ -54,6 +54,7 @@ Six ideas decide everything else; when in doubt, ask which one applies.
 | have a session work on a task | any free session | `/ptt-take N` (or the task's name), or in a new one the line `ptt ready` printed: `claude -n <name> "/ptt-take N"` |
 | know who a session is | any | `/ptt-whoami`; `/ptt-whoami all` for everyone |
 | know what is new for a session and what waits on it | any holder | `/ptt-inbox` (with an active prompt hook, it also arrives with your next message) |
+| send a note from your topic and gist | any | `/ptt-note <recipient>` (designer, integrator, or an open task's ID) |
 | continue a role after `/clear` or in a fresh session | the continuing session | `/ptt-resume <name>` (without a name, it lists the holders, the one that left a handover at its quiet point first) |
 | submit finished work for review | the task holder | `/ptt-pr-submit` |
 | answer a review | the task holder | `/ptt-pr-draft-reply` to see the plan and reply text, then `/ptt-pr-reply` to release it (`/ptt-pr-submit draft` likewise before submitting) |

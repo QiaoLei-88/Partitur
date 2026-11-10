@@ -1247,7 +1247,8 @@ class Ptt(unittest.TestCase):
         names = {d: "prtr-dsgn-g1-00d0d0", w: "prtr-trck-t1-00eeee", i: "prtr-intg-1-00abcd"}
 
         def nudged(r):
-            found = re.findall(r"^nudge: (\S+): new in your inbox \(records [0-9a-f]+\); run "
+            found = re.findall(r"^nudge: (\S+) \(Claude Code\): new in your inbox "
+                               r"\(records [0-9a-f]+\); run "
                                r"`workspace/bin/ptt inbox (\S+)`$", r.stderr, re.M)
             if found:
                 self.assertIn("\nnudges: in Claude Code, for each session above that ListAgents "
@@ -1274,11 +1275,12 @@ class Ptt(unittest.TestCase):
         (pr / "0002-review.md").write_text(f"---\nkind: review\nsession: {i}\n---\n")
         self.assertEqual(nudged(self.ptt("record", "-m", "rv", str(pr / "0002-review.md"),
                                          session=si)), [w])
-        # switched off: no targets, nothing lost; `who` shows the switch
+        # switched off: manual carry only, nothing lost; `who` shows the switch
         self.assertEqual(self.ptt("nudges").stdout, "nudges on\n")
         self.assertEqual(self.ptt("nudges", "off").stdout, "nudges off\n")
         r = self.ptt("amend", n, "--as", d, "--text", "y", session=sd)
         self.assertNotIn("nudge", r.stderr)
+        self.assertIn(f"carry: in session {names[w]} (Claude Code) type /ptt-inbox", r.stderr)
         who = self.ptt("who").stdout
         self.assertEqual(who.splitlines()[0], "nudges      off")
         self.assertRegex(who, rf"{w} .*  unseen 3, ")
@@ -1289,12 +1291,59 @@ class Ptt(unittest.TestCase):
         self.assertEqual(nudged(self.ptt("pr-move", "1", "merged", "-m", "m", session=si)), [w])
         # a close, to the former holder
         self.assertEqual(nudged(self.ptt("close", n, "--as", d, session=sd)), [w])
-        # a holder without a recorded session name gets no line
+        # a holder without a recorded session name gets a manual fallback
         self.ptt("leave", i, session=si)
         self.ptt("take", "integrator")
         (notes / "g.md").write_text("---\nto: integrator\n---\n\nLate.\n")
         r = self.ptt("record", "-m", "n", str(notes / "g.md"), session=sd)
         self.assertNotIn("nudge", r.stderr)
+        self.assertIn("carry: in holder integrator-2 (no session name) (unknown tool) "
+                      "type /ptt-inbox (Claude Code) or $ptt-inbox (Codex)", r.stderr)
+
+    def test_note_carry_lines_follow_the_targets_current_tool(self):
+        """All recipients use the same routing; a resume changes the tool,
+        and a close keeps the ended hold's last address."""
+        (self.rec / "project-code").write_text("prtr\n")
+        sd = "00000000-0000-4000-8000-00000000dddd"
+        sw = "00000000-0000-7000-8000-00000000eeee"
+        si = "00000000-0000-4000-8000-00000000aaaa"
+        d = self.ptt("take", "designer", session=sd).stdout.strip()
+        n = self.task("probe", d)
+        w = self.ptt("take", n, session=sw).stdout.strip()
+        i = self.ptt("take", "integrator", session=si).stdout.strip()
+        notes = self.rec / "handoff" / "notes"
+        notes.mkdir(parents=True)
+
+        def notice(to, sender):
+            path = notes / f"note-{len(list(notes.iterdir()))}.md"
+            path.write_text(f"---\nto: {to}\n---\n\nA finding.\n")
+            return self.ptt("record", "-m", "note", str(path), session=sender).stderr
+
+        out = notice("designer", sw)  # Codex cannot send to Claude Code
+        self.assertIn("carry: in session prtr-dsgn-g1-00dddd (Claude Code) type /ptt-inbox", out)
+        self.assertNotIn("nudge:", out)
+        out = notice(n, sd)
+        self.assertIn("carry: in session prtr-trck-t1-00eeee (Codex) type $ptt-inbox", out)
+        self.assertNotIn("nudge:", out)
+        out = notice("integrator", sd)
+        self.assertIn("nudge: prtr-intg-1-00aaaa (Claude Code):", out)
+        self.assertIn("For each session absent from ListAgents", out)
+        self.assertNotIn("carry:", out)  # ListAgents decides the manual fallback
+
+        resumed = "00000000-0000-7000-8000-00000000bbbb"
+        self.ptt("resume", i, session=resumed)
+        out = notice("integrator", sd)
+        self.assertIn("carry: in session prtr-intg-1-00bbbb (Codex) type $ptt-inbox", out)
+        self.assertNotIn("00aaaa", out)
+        self.assertNotIn("nudge:", out)
+        self.ptt("done", n, "--as", w, session=sw)
+        out = self.ptt("close", n, "--as", d, session=sd).stderr
+        self.assertIn("carry: in session prtr-trck-t1-00eeee (Codex) type $ptt-inbox", out)
+
+        self.ptt("resume", i, session="custom-id")
+        out = notice("integrator", sd)
+        self.assertIn("(unknown tool) type /ptt-inbox (Claude Code) or $ptt-inbox (Codex)", out)
+        self.assertNotIn("nudge:", out)
 
     def test_freed_roles_and_tasks_print_take_lines(self):
         (self.rec / "project-code").write_text("prtr\n")

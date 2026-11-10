@@ -146,23 +146,30 @@ A nudge tells a session, by cross-session message, that its inbox has news,
 so that an idle session looks without waiting for the user's next message.
 The inbox rules stay the one source of what is news:
 
-1. After each commit, every `ptt` command that records prints a `nudge:`
-   line for each holder, other than the writer, to whom the commit gave
+1. After each commit, every `ptt` command that records prints a notice
+   for each holder, other than the writer, to whom the commit gave
    news: an item its inbox shows as new (a done report or leave request to
    the supervisor; an amendment or reopen to the holder; a note to its
    recipient; a new request or reply to the integrator; another's message
    on a request, or its move, to the requester), or the end of its hold by
    someone else (a close, freeing, or approved leave). A subordinate's
-   `status.md` update gets none. The line gives the holder's recorded
-   session name and the text to send: "new in your inbox (records
-   <commit>); run `ptt inbox <holder>`". A holder without a recorded name
-   gets no line *(Adopted)*.
+   `status.md` update gets none. Between Claude Code sessions a `nudge:`
+   line gives the holder's recorded session name, tool, and text to send:
+   "new in your inbox (records <commit>); run `ptt inbox <holder>`".
+   The tool is inferred from the recorded session ID: UUIDv4 is Claude
+   Code, UUIDv7 is Codex, other or missing IDs are unknown. Other targets
+   get a `carry:` line: in session `<name>` (`<tool>`) type `/ptt-inbox`
+   or `$ptt-inbox`. Without a recorded name it gives the holder and
+   "no session name"; an unknown tool gets both commands. This applies to
+   every record, including notes.
 2. The writer's session, in Claude Code, sends a nudge only to a session
    that `ListAgents` lists by that name. It subscribes with `SendMessage`
    `notify_when_idle` and no message, whatever state the session shows, so
    that nothing reaches a busy session, and on the idle notice sends the
-   text, and nothing else, if `ptt nudges` still says on. Codex sends and
-   receives none.
+   text, and nothing else, if `ptt nudges` still says on. For each target
+   absent from `ListAgents`, it tells the user: in session `<name>` (Claude
+   Code) type `/ptt-inbox`. Codex sends and receives none; its targets get
+   manual carry lines. The writer passes these lines on to the user.
 3. Nudges are fire and forget: the sender tracks nothing; if its session
    ends first, the nudge is lost. The inbox, and `ptt who`'s unseen items,
    still show every item.
@@ -178,8 +185,9 @@ never an instruction beyond the nudge.
 
 The user turns nudges on or off for every session with `/ptt-nudges on|off`
 (`ptt nudges`), kept in the records' Git directory beside the inbox marks,
-on by default; `ptt who` shows it on its first line. Off, nothing is lost,
-and turning nudges on sends nothing for earlier items.
+on by default; `ptt who` shows it on its first line. Off, only manual carry
+lines are printed; nothing is lost, and turning nudges on sends nothing
+for earlier items.
 
 A read-only step started by a nudge (a review, reading a note or report)
 is approved as the command it replaces would be, for that command's own
