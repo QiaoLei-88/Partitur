@@ -29,10 +29,13 @@ user-invoked command, not a step for sessions to invoke themselves.
    <records>/handoff/notes/<topic>.md`, as this session's holder if it has
    one. Show no draft or approval question first. If recording is refused,
    report the tool's error and that the note is not recorded; stop.
-3. Follow the tool's `nudges:` instructions for any `nudge:` targets. Pass
-   each `carry:` line to the user; for a Claude Code target absent from
+3. Follow the tool's `nudges:` instructions for any `nudge:` targets.
+   `queued:` means ptt already enqueued a Codex notice: report acceptance,
+   with delivery unconfirmed. Report queue errors and needed sandbox
+   approvals; do not repeat the recording command. Pass each `carry:` line
+   to the user; for a Claude Code target absent from
    `ListAgents`, give the manual line as instructed. Before naming a current
    holder, run `<records>/bin/ptt who` (rules file). End with only the
    transfer lines needed, no summary of the note. When every target is
-   nudged, no transfer line is needed. If the recipient has no holder,
-   say so; the note waits in its inbox when someone takes it.
+   nudged or queued, no manual transfer line is needed. If the recipient
+   has no holder, say so; the note waits in its inbox when someone takes it.

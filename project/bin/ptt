@@ -138,7 +138,13 @@ the end of its hold by someone else. The line gives the holder's recorded
 session name and tool, inferred from the recorded ID (UUIDv4: Claude Code,
 UUIDv7: Codex; otherwise unknown). Between Claude Code sessions a `nudge:`
 line gives the text to send on an idle notice; the writer checks ListAgents
-and carries the notice manually if the session is absent. Other targets
+and carries the notice manually if the session is absent. Between Codex
+sessions ptt runs `codex queue --thread UUID --message TEXT` with the
+recorded UUID, without --resume. PTT_CODEX_COMMAND chooses one executable
+path/name (default codex), not a shell command. Queue failures keep the
+record and print a notice and carry line; success means accepted, not
+delivered. Closed sessions may receive it on resume; the recipient first
+checks the switch and its current binding (ptt-inbox step 3). Other targets
 get a `carry:` line naming the session and its inbox skill; without a
 session name it names the holder. `ptt nudges on|off` (default on) is kept
 in the records' Git directory, beside the inbox marks; off, only manual
@@ -473,12 +479,30 @@ def session_tool(sid):
     return "unknown tool"
 
 
+def queue_codex(sid, text):
+    """Queue one local Codex notice; return acceptance, never delivery."""
+    command = os.environ.get("PTT_CODEX_COMMAND", "codex")
+    try:
+        # Recording holds the records lock; bound how long a queue command can delay it.
+        result = subprocess.run([command, "queue", "--thread", sid, "--message", text],
+                                stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                                errors="replace", timeout=10)
+    except (OSError, subprocess.SubprocessError) as err:
+        note(f"Codex queue to {sid} not confirmed: {err}; record kept")
+        return False
+    if result.returncode:
+        detail = (result.stderr or result.stdout).strip()
+        note(f"Codex queue to {sid} not confirmed (exit {result.returncode}): {detail}; record kept")
+        return False
+    return True
+
+
 def announce_nudges(commit):
-    """Print automatic or manual inbox notices for `commit`'s targets.
+    """Queue Codex notices or print automatic/manual inbox notices.
     A failure here never undoes the commit."""
     try:
         targets = nudge_targets(commit)
-        automatic = nudges_on() and session_tool(session_id()) == "Claude Code"
+        sender = session_tool(session_id()) if nudges_on() else None
     except Exception as err:
         note(f"nudge targets not computed: {err}")
         return
@@ -488,15 +512,19 @@ def announce_nudges(commit):
     nudged = False
     for name, session, sid in targets:
         tool = session_tool(sid)
-        if automatic and session and tool == "Claude Code":
-            print(f"nudge: {session} ({tool}): new in your inbox (records {commit}); run "
-                  f"`{inbox} inbox {name}`", file=sys.stderr)
+        text = f"new in your inbox (records {commit}); run `{inbox} inbox {name}`"
+        if sender == "Claude Code" and session and tool == "Claude Code":
+            print(f"nudge: {session} ({tool}): {text}", file=sys.stderr)
             nudged = True
-        else:
-            address = f"session {session}" if session else f"holder {name} (no session name)"
-            command = {"Claude Code": "/ptt-inbox", "Codex": "$ptt-inbox"}.get(
-                tool, "/ptt-inbox (Claude Code) or $ptt-inbox (Codex)")
-            print(f"carry: in {address} ({tool}) type {command}", file=sys.stderr)
+            continue
+        if sender == "Codex" and tool == "Codex" and queue_codex(sid, text):
+            print(f"queued: {session or name} (Codex): accepted into queue; delivery unconfirmed",
+                  file=sys.stderr)
+            continue
+        address = f"session {session}" if session else f"holder {name} (no session name)"
+        command = {"Claude Code": "/ptt-inbox", "Codex": "$ptt-inbox"}.get(
+            tool, "/ptt-inbox (Claude Code) or $ptt-inbox (Codex)")
+        print(f"carry: in {address} ({tool}) type {command}", file=sys.stderr)
     if nudged:
         print("nudges: in Claude Code, for each session above that ListAgents lists, subscribe "
               "with SendMessage notify_when_idle (no message); on its idle notice, if `ptt nudges` "
@@ -880,7 +908,7 @@ def session_name_of(d):
 def rename_line(name):
     """The line asking the user to give this session the name NAME in the
     calling tool, with the reason: in Claude Code, nudges reach a session
-    by that name; Codex gets no nudges, so there it only shows the name."""
+    by that name; Codex uses the recorded UUID, so there it only shows the name."""
     claude = f"so that automatic messages reach this session, rename it: /rename {name}"
     codex = f"to show it, type: /rename {name}"
     if calling_tool() == "claude":

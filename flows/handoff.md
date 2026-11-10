@@ -92,9 +92,9 @@ a design discussion only to save tokens: re-reading costs too.
 event (`session_name:`), and print the line that renames the session. In
 Claude Code it gives the reason: "So that automatic messages reach this
 session, rename it: /rename <name>"; a session not renamed gets no nudges,
-since `ListAgents` does not list it by that name. In Codex, which gets no
-nudges, it only shows the name: `/rename <name>` (Codex's `/rename` takes
-the name inline, as its source shows). Renaming stays the
+since `ListAgents` does not list it by that name. In Codex, which receives
+nudges by its recorded UUID, it only shows the name: `/rename <name>`
+(Codex's `/rename` takes the name inline, as its source shows). Renaming stays the
 user's act: `ptt` can neither see nor set a session's name. The name
 is chosen once and never recomputed; `ptt who` and `ptt whoami` show it. It
 is `<project>-<holder>-<hash>`, lowercase:
@@ -175,8 +175,8 @@ The inbox rules stay the one source of what is news:
    line gives the holder's recorded session name, tool, and text to send:
    "new in your inbox (records <commit>); run `ptt inbox <holder>`".
    The tool is inferred from the recorded session ID: UUIDv4 is Claude
-   Code, UUIDv7 is Codex, other or missing IDs are unknown. Other targets
-   get a `carry:` line: in session `<name>` (`<tool>`) type `/ptt-inbox`
+   Code, UUIDv7 is Codex, other or missing IDs are unknown. Targets outside
+   the routes below get a `carry:` line: in session `<name>` (`<tool>`) type `/ptt-inbox`
    or `$ptt-inbox`. Without a recorded name it gives the holder and
    "no session name"; an unknown tool gets both commands. This applies to
    every record, including notes.
@@ -186,11 +186,33 @@ The inbox rules stay the one source of what is news:
    that nothing reaches a busy session, and on the idle notice sends the
    text, and nothing else, if `ptt nudges` still says on. For each target
    absent from `ListAgents`, it tells the user: in session `<name>` (Claude
-   Code) type `/ptt-inbox`. Codex sends and receives none; its targets get
-   manual carry lines. The writer passes these lines on to the user.
-3. Nudges are fire and forget: the sender tracks nothing; if its session
-   ends first, the nudge is lost. The inbox, and `ptt who`'s unseen items,
-   still show every item.
+   Code) type `/ptt-inbox`.
+3. Between Codex sessions, `ptt` runs `codex queue --thread <recorded UUID>
+   --message <text>` after recording, with neither `--resume` nor an idle
+   subscription. The queue waits for a busy session. Closed sessions may
+   receive the notice when resumed: this deferred delivery is accepted.
+   `queued:` means accepted into the queue; delivery is unconfirmed.
+   A nonzero exit, missing executable, or ten-second timeout prints a
+   notice and a manual `carry:` line; the record stands. A timeout leaves
+   acceptance unknown, so ptt does not retry. The local Codex installation
+   must know the UUID; another machine or tool needs manual transfer.
+   The writer passes `carry:` lines and queue errors on to the user.
+
+For Codex, set `PTT_CODEX_COMMAND` in the sending session's environment to
+one executable path or name (default `codex`). It is passed as one argument,
+without a shell or added options, so paths containing spaces work. Use a
+queue-compatible entry point if the usual wrapper adds unsupported flags.
+Export it in the shell before starting Codex so the session inherits the setting.
+This environment setting stays local to the sender, including when records
+are shared across machines. Sandbox access to Codex user state may need
+approval: report the failure and use the tool's normal approval flow for
+any retry; preserve the record and never bypass that flow. Do not rerun
+the recording command to retry a nudge.
+
+Nudges have no acknowledgement or retry tracking. A Claude Code sender
+that ends before sending loses its nudge; an accepted Codex message can
+outlive its sender. The inbox, and `ptt who`'s unseen items, still show
+every item.
 
 A nudged session first checks `ptt nudges`; if off, it reports and stops.
 It then checks `ptt whoami` without a name: only the session still bound
@@ -208,7 +230,8 @@ The user turns nudges on or off for every session with `/ptt-nudges on|off`
 (`ptt nudges`), kept in the records' Git directory beside the inbox marks,
 on by default; `ptt who` shows it on its first line. Off, only manual carry
 lines are printed; nothing is lost, and turning nudges on sends nothing
-for earlier items.
+for earlier items. Turning nudges off does not retract queued Codex
+messages; the recipient checks the switch again before acting.
 
 A read-only step started by a nudge (a review, reading a note or report)
 is approved as the command it replaces would be, for that command's own

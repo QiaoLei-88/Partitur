@@ -14,6 +14,15 @@
 Fields of the repository table are separated by whitespace and may not
 contain any.
 
+## Sending Codex nudges
+
+`PTT_CODEX_COMMAND` in the sender's environment selects one queue-compatible
+executable path or name, default `codex`. It accepts no shell syntax or
+extra arguments. Export it in the shell that starts Codex so the session
+inherits it, for example `export PTT_CODEX_COMMAND='/path/to/queue-compatible-codex'`.
+See [nudges](flows/handoff.md#nudges-d18) for delivery,
+failures, and sandbox approvals.
+
 ## Fixed by Partitur's tools and skills
 
 Changing one of these means changing the tools or skills that use it.

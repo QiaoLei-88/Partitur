@@ -14,7 +14,8 @@ other work needs AtE (rules file).
 - `on` or `off`: `<records>/bin/ptt nudges on|off`, then report the state.
   The switch is shared by every session of the project.
 
-Off, `ptt` prints no nudge targets, and a session that subscribed before
-sends nothing on the idle notice. Nothing is lost: the inbox and the unseen
-items in `<records>/bin/ptt who` show every item. Turning nudges on sends
-nothing for earlier items.
+Off, `ptt` prints only manual carry lines, and a session that subscribed
+before sends nothing on the idle notice. Already queued Codex notices
+remain queued; their recipients check the switch before acting. Nothing
+is lost: the inbox and the unseen items in `<records>/bin/ptt who` show
+every item. Turning nudges on sends nothing for earlier items.
