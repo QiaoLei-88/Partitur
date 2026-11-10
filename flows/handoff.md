@@ -192,7 +192,10 @@ The inbox rules stay the one source of what is news:
    ends first, the nudge is lost. The inbox, and `ptt who`'s unseen items,
    still show every item.
 
-A nudged session runs its inbox and does only the read-only part of each
+A nudged session first checks `ptt nudges`; if off, it reports and stops.
+It then checks `ptt whoami` without a name: only the session still bound
+to the addressed holder proceeds. An ended or moved hold means report
+and stop. It runs its inbox and does only the read-only part of each
 item: it reports it; a supervisor checks a done report against the task's
 acceptance and waits for the user; the integrator reviews a request
 (`ptt-pr-review` steps 1-6: its review message and run records); a
