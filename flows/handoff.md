@@ -78,7 +78,7 @@ then by their last write, each with its named resume; it binds none, also
 when one holder alone left a handover. The handover lapses by events,
 never by age: when the holder writes again, its binding moves, or its
 hold ends; a pause of days keeps it. The session that was the holder is told once,
-through its inbox, that it continues elsewhere (G19). Continuing or
+through its inbox, that it continues elsewhere *(Proposed, G19)*. Continuing or
 compacting the same thread keeps its binding. Resuming with a different session ID moves
 the binding and prevents the earlier session from writing *(Proposed,
 G13, G16)*. A session never clears in the middle of a multi-round review or

@@ -67,7 +67,7 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
 9. **Clearing does not change the holder.** The role or task stays
    recorded; after `/clear`, the user names the holder the fresh session
    continues as (`/ptt-resume <name>`; a handover only puts its holder first
-   in the list that `/ptt-resume` alone shows, G19), and it picks up from
+   in the list that `/ptt-resume` alone shows *(Proposed, G19)*), and it picks up from
    the records.
    Leaving is for handing the work to another session (D16, G13).
 10. **A holder is bound to one session.** Where the agent tool gives a
