@@ -20,7 +20,9 @@ writes (it writes none); other work needs AtE (rules file).
    understanding of what it asks, proposes, or tells you, then what that
    means for your work, record any outcome where it belongs, and
    offer to delete it (`rm`, then `ptt record`); answer a review (`/ptt-pr-draft-reply`); record a
-   decided request's outcome in your status; settle what waits on you
+   decided request's outcome in your status; report a subordinate's merge
+   notice (if its commit is unknown, inspect the request and local main
+   branch); settle what waits on you
    (`/ptt-close`, `/ptt-leave approve`). Act only with the user's command or
    AtE.
    After acting on an amendment, use `<records>/bin/ptt adopt TASK N[,N]

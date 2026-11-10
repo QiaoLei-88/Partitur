@@ -37,7 +37,8 @@ class Ptt(unittest.TestCase):
         self.root = Path(tempfile.mkdtemp())
         self.rec = self.root / "workspace"
         (self.rec / "bin").mkdir(parents=True)
-        shutil.copy(HERE / "project" / "bin" / "ptt", self.rec / "bin" / "ptt")
+        for name in ("ptt", "pr"):
+            shutil.copy(HERE / "project" / "bin" / name, self.rec / "bin" / name)
         (self.rec / "tasks").mkdir()
         shutil.copy(HERE / "templates" / "charter.md", self.rec / "tasks" / "charter-template.md")
         root = self.rec / "tasks" / "open" / "T0000-design"
@@ -353,7 +354,7 @@ class Ptt(unittest.TestCase):
         run("git", "-C", str(self.rec), "update-ref", "-d", "refs/heads/master")
         r = self.ptt("record", "-m", "first record", str(self.rec))
         head = run("git", "-C", str(self.rec), "rev-parse", "--short", "HEAD").stdout.strip()
-        self.assertEqual(r.stderr, f"recorded {head}: A bin/ptt, A tasks/charter-template.md, "
+        self.assertEqual(r.stderr, f"recorded {head}: A bin/pr, A bin/ptt, A tasks/charter-template.md, "
                          "A tasks/open/T0000-design/charter.md\n")
 
     def test_record_report_failure_keeps_committed_files(self):
@@ -1015,6 +1016,82 @@ class Ptt(unittest.TestCase):
         self.assertEqual(self.ptt("inbox", "--quiet", session="W").stdout, "")
         self.ptt("pr-move", "1", "merged", "-m", "pr 000001: merged", session="I")
         self.assertIn("request 000001: now merged", self.ptt("inbox", w).stdout)
+
+    def test_merge_notices_go_only_to_the_direct_supervisor_once(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        sd = "00000000-0000-4000-8000-00000000dddd"
+        ss = "00000000-0000-4000-8000-00000000eeee"
+        si = "00000000-0000-4000-8000-00000000aaaa"
+        d = self.ptt("take", "designer", session=sd).stdout.strip()
+        parent = self.task("parent", d, kind="design")
+        sub = self.ptt("take", parent, session=ss).stdout.strip()
+        child = self.task("child", sub)
+        worker = self.ptt("take", child, session="W").stdout.strip()
+        top = self.task("top", d)
+        tw = self.ptt("take", top, session="T").stdout.strip()
+        integ = self.ptt("take", "integrator", session=si).stdout.strip()
+        for holder, sid in ((d, sd), (sub, ss)):
+            self.ptt("inbox", holder, session=sid)
+        for number, task, requester, place, target in (
+                (1, child, worker, "merged", sub),
+                (2, top, tw, "merged", d),
+                (3, child, sub, "merged", None),
+                (4, None, worker, "merged", None),
+                (5, child, worker, "closed", None)):
+            with self.subTest(number=number):
+                request = self.rec / "pr" / "open" / f"{number:06d}-change"
+                request.mkdir(parents=True)
+                task_line = f"task: {task}\n" if task else ""
+                (request / "0001-request.md").write_text(
+                    f"---\nkind: request\nsession: {requester}\n{task_line}---\n")
+                self.ptt("record", "-m", "request", str(request))
+                (request / "0002-decision.md").write_text(
+                    f"---\nkind: decision\nsession: {integ}\nmerge_commit: {'a' * 40}\n---\n")
+                self.ptt("record", "-m", "decision", str(request))
+                # Clear review/request notices; this check is specifically about the move.
+                self.ptt("inbox", d, session=sd)
+                self.ptt("inbox", sub, session=ss)
+                moved = self.ptt("pr-move", str(number), place, "-m", "move", session=si)
+                notice = f"{task}: request {number:06d} merged as {'a' * 40}"
+                for holder, sid in ((d, sd), (sub, ss)):
+                    out = self.ptt("inbox", holder, session=sid).stdout
+                    if holder == target:
+                        self.assertIn(notice, out)
+                        self.assertIn(f"inbox {holder}`", moved.stderr)
+                    else:
+                        self.assertNotIn(" merged as ", out)
+                    self.assertNotIn(" merged as ", self.ptt("inbox", holder, session=sid).stdout)
+                if not target:
+                    # A self-authored request still has the requester's ordinary move notice.
+                    self.assertNotIn(f"inbox {d}`", moved.stderr)
+                    if requester != sub:
+                        self.assertNotIn(f"inbox {sub}`", moved.stderr)
+
+    def test_merge_notice_finds_the_local_merge_and_reports_a_missing_sha(self):
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        n = self.task("merged", d)
+        w = self.ptt("take", n, session="W").stdout.strip()
+        code = self.root / "code"
+        run("git", "init", "-q", "-b", "main", str(code))
+        run("git", "-C", str(code), "config", "user.name", "Test")
+        run("git", "-C", str(code), "config", "user.email", "test@example.org")
+        run("git", "-C", str(code), "commit", "--allow-empty", "-qm", "base")
+        run("git", "-C", str(code), "checkout", "-qb", "feature")
+        run("git", "-C", str(code), "commit", "--allow-empty", "-qm", "feature")
+        run("git", "-C", str(code), "checkout", "-q", "main")
+        run("git", "-C", str(code), "merge", "--no-ff", "feature", "-m", "Merge feature (pr 000001)")
+        merge = run("git", "-C", str(code), "rev-parse", "HEAD").stdout.strip()
+        for number, expected in ((1, merge), (2, "unknown")):
+            request = self.rec / "pr" / "open" / f"{number:06d}-change"
+            request.mkdir(parents=True)
+            (self.rec / "pr" / "repos").write_text("code code main\n")
+            (request / "0001-request.md").write_text(
+                f"---\nkind: request\nsession: {w}\ntask: {n}\nrepo: code\n---\n")
+            self.ptt("record", "-m", "request", str(self.rec / "pr"))
+            self.ptt("inbox", d, session="D")
+            self.ptt("pr-move", str(number), "merged", "-m", "move")
+            self.assertIn(f"{n}: request {number:06d} merged as {expected}",
+                          self.ptt("inbox", d, session="D").stdout)
 
     def test_inbox_tells_the_last_session_its_hold_ended(self):
         d = self.ptt("take", "designer", session="D").stdout.strip()

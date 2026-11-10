@@ -136,13 +136,18 @@ and carries the notice manually if the session is absent. Other targets
 get a `carry:` line naming the session and its inbox skill; without a
 session name it names the holder. `ptt nudges on|off` (default on) is kept
 in the records' Git directory, beside the inbox marks; off, only manual
-carry lines are printed. The inbox and `ptt who` show every item either way.
+carry lines are printed. The inbox and `ptt who` show every item either way. A request moved to merged/
+notifies its task's direct supervisor unless that supervisor is the
+requester. No supervisor notice is added for closed requests or requests
+without a task. The merge SHA uses pr's lookup (decision field, then local
+main-branch merge); an unavailable SHA is shown as unknown.
 """
 import argparse
 import fcntl
 import json
 import os
 import re
+import runpy
 import shutil
 import socket
 import subprocess
@@ -1703,6 +1708,23 @@ def inbox_base(name, d):
     return git("log", "-1", "--format=%H", "--", rel, check=False).stdout.strip() or None
 
 
+def request_merge(d):
+    """Use pr's merge lookup: an explicit decision SHA, else the local main branch."""
+    pr = runpy.run_path(str(REC / "bin" / "pr"))
+    decision = pr["decision"](d) or {}
+    if decision.get("merge_commit"):
+        return decision["merge_commit"]
+    repo = front_matter(d / "0001-request.md")[0].get("repo")
+    try:
+        pr["load_repos"](REC / "pr")
+    except (OSError, SystemExit):
+        return "unknown"
+    checkout = pr["CHECKOUT"].get(repo)
+    if not checkout:
+        return "unknown"
+    return pr["merge_commit"](REC.parent / checkout, pr["MAIN"][repo], d.name[:6], decision) or "unknown"
+
+
 def news(name, held, base, commits=None):
     """Lines for what changed since `base` that concerns NAME; the commit of
     each line is appended to `commits`, if given."""
@@ -1756,10 +1778,18 @@ def news(name, held, base, commits=None):
                 out.append(f"request {d[:6]}: new {kind} {f[:4]}, waiting for review "
                            f"({sha(area, d, f)})")
     for (area, d, f), (place, _) in sorted(moved.items()):
-        if area == "pr" and f == "0001-request.md" and \
-                front_matter(REC / "pr" / place / d / f)[0].get("session") == name:
+        if area != "pr" or f != "0001-request.md":
+            continue
+        request = REC / "pr" / place / d
+        first = front_matter(request / f)[0]
+        if first.get("session") == name:
             sha(area, d, f)
             out.append(f"request {d[:6]}: now {place}; record the outcome in your status")
+        elif place == "merged":
+            task = next((i for i in infos() if tid(i["number"]) == first.get("task")), None)
+            if task and supervisor(task["number"]) == name:
+                sha(area, d, f)
+                out.append(f"{tid(task['number'])}: request {d[:6]} merged as {request_merge(request)}")
     return out
 
 

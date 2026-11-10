@@ -162,7 +162,14 @@ The inbox rules stay the one source of what is news:
    the supervisor; an amendment or reopen to the holder; a note to its
    recipient; a new request or reply to the integrator; another's message
    on a request, or its move, to the requester), or the end of its hold by
-   someone else (a close, freeing, or approved leave). A subordinate's
+   someone else (a close, freeing, or approved leave). A task's direct
+   supervisor also gets one inbox line and an automatic or manual notice
+   when its request moves to `merged/`, unless the supervisor authored it.
+   Requests without
+   `task:` and requests closed without merging add no supervisor notice;
+   no notice goes further up the tree. The line names the merge commit,
+   from the decision's `merge_commit` or pr's local main-branch lookup;
+   if neither locates it, the line says `unknown`. A subordinate's
    `status.md` update gets none. Between Claude Code sessions a `nudge:`
    line gives the holder's recorded session name, tool, and text to send:
    "new in your inbox (records <commit>); run `ptt inbox <holder>`".

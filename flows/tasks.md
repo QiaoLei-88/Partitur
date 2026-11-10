@@ -165,7 +165,9 @@ In Codex the commands start with `$` instead of `/`.
   note to it (and, until deleted, every note to it waits on it; `ptt record`
   refuses a note whose front matter names no role or open task, and an
   older note without a `to:` goes to the designer, marked), a new review or
-  decision on its request, and for the integrator a new request or reply;
+  decision on its request, a task's merged request to its direct supervisor
+  (unless that supervisor authored it), and for the integrator a new
+  request or reply;
   and, once, to the session last bound to a holder whose hold someone else
   ended (a close, an approved leave, a freeing), or whose former task was
   later cancelled, with its recorded ended-name `/rename` line. A root
