@@ -128,6 +128,40 @@ class Repo(unittest.TestCase):
         rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
         self.assertIn("Name a command for the user in your own tool's notation.", rules)
 
+    def test_merge_order_is_stated_amended_and_reviewed(self):
+        """T0013: charter order reaches review without becoming a take dependency."""
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        charter = text("templates", "charter.md")
+        for phrase in ("## Merge order", "after: <task or request>", "reason:",
+                       "cleared when:", "Independent of other open tasks.",
+                       "`depends:` instead gates taking"):
+            self.assertIn(phrase, charter)
+        draft = text("project", "skills", "ptt-mktask", "SKILL.md.in")
+        for phrase in ("Independent of other open tasks.", "Sub-designers",
+                       "amends the waiting task", "its `after:` decides",
+                       "`before:` in the other charter is only a pointer",
+                       "no extra note to the holder", "already has a request submitted",
+                       "`to: integrator`", "A merged request cannot be reordered"):
+            self.assertIn(phrase, draft)
+        review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
+        for phrase in ("`Merge order` and all amendments", "pr list all", "pr show",
+                       "actual file overlap", "<prerequisite merge commit> <head>",
+                       "conflicting charter orders", "unforeseen overlap", "`to: designer`",
+                       "the integrator does not change the order",
+                       "A charter without the section is \"not stated\"",
+                       "mergeable as to order", "reason still holding",
+                       "Merge order: <mergeable as to order"):
+            self.assertIn(phrase, review)
+        for path in (("templates", "rules.md"), ("flows", "tasks.md")):
+            wording = text(*path)
+            self.assertIn("waiting task", wording)
+            self.assertIn("`depends:` gates taking", wording)
+        for path in (("templates", "rules.md"), ("flows", "requests.md")):
+            self.assertIn("records the finding in the review", text(*path))
+        self.assertIn("merge order with reasons and clearing conditions",
+                      text("flows", "handoff.md"))
+
     def test_decision_list_wording_agrees(self):
         """Rule A13: the options follow their question line, never another
         numbered list; a number that is not an option is asked again."""

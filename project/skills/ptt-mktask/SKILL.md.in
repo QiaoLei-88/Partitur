@@ -21,9 +21,13 @@ subtasks of its scope. `<name>` is your holder name.
    prints the charter's path.
 3. Fill in the charter from the discussion (or a brief the user names, cited
    as its source): goal, read-first list by repository, path, and commit or
-   request number, scope, where results go, out of scope, acceptance
-   criteria checkable from records. Mark what the user agreed and what you
-   propose.
+   request number, scope, where results go, merge order, out of scope,
+   acceptance criteria checkable from records. In `Merge order`, give each
+   `after: <task or request>`, its reason and when it clears, or write
+   "Independent of other open tasks." `depends:` gates taking until the
+   dependencies are closed; merge order gates merging while work may start.
+   Sub-designers do the same for their subtasks. Mark what the user agreed
+   and what you propose.
 4. Show it to the user. A draft stays editable until released; record edits
    with `<records>/bin/ptt record -m "task <N>: charter draft" <charter>`.
 
@@ -41,3 +45,11 @@ A released charter is never edited; an agreed change is an amendment:
 N,N` to replace its dependencies (checked for cycles). A holder sees it in
 its inbox (with an active prompt hook, at the user's next message;
 otherwise at its next `/ptt-inbox`).
+
+A change of merge order amends the waiting task: its `after:` decides;
+`before:` in the other charter is only a pointer. To put a new task ahead
+of an earlier one, amend that earlier, waiting task. The amendment reaches
+its holder through the inbox; no extra note to the holder is needed. If
+the waiting task already has a request submitted, also record a note to
+the integrator (`to: integrator`) naming that request and the amendment.
+A merged request cannot be reordered.

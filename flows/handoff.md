@@ -18,7 +18,9 @@ How work and knowledge pass between sessions and scopes.
 
 The task number and title, and the sentence "this charter authorizes
 nothing"; goal; read first (by lasting references); scope; where results
-go; out of scope; acceptance ([template](../templates/charter.md)).
+go; merge order with reasons and clearing conditions (the designer's,
+maintained by amendments); out of scope; acceptance
+([template](../templates/charter.md)).
 
 ## Handover
 

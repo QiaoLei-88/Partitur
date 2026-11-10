@@ -26,6 +26,15 @@ commits, and requests need the user's AtE as usual.
   task); run records under `test-runs/`.
 - Findings that affect the design: `status.md`, or a note to the designer.
 
+## Merge order
+
+{{For each prerequisite: after: <task or request>; reason: <why merging
+waits>; cleared when: <condition that satisfies the prerequisite>. Or:
+Independent of other open tasks.}}
+
+This order gates merging; work may start. `depends:` instead gates taking
+the task until its dependencies are closed.
+
 ## Out of scope
 
 - Design decisions without the user.

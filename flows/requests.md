@@ -42,6 +42,9 @@ repository, and a table maps repositories to checkouts and main branches
 5. **Review recommends.** The integrator's review ends in a recommendation;
    the user decides; the decision is a message of its own, quoting the user
    (C5, C16).
+   The integrator checks the task's merge order and amendments against
+   request states, ancestry and file overlap, records the finding in the
+   review, and sends order questions to the designer.
 6. **Requester moves freely.** Replies and updates may come at any time;
    decisions gate only merging and closing (C7).
 7. **Comments by ID**, continued across rounds, each marked required or
