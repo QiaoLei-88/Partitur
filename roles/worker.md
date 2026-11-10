@@ -31,6 +31,6 @@ worktree, delivered through requests (B5a, B5b).
 
 As a track: takes its task, reports done, leaves only with the
 supervisor's approval, learns of reviews, amendments, and the close through
-`/ptt-inbox`, and continues after `/clear` with `/ptt-resume`. A successor
+`/ptt-inbox`, and continues after `/clear` with `/ptt-resume <name>`. A successor
 takes the task again and continues the same branch from `status.md` and the
 request records (D15). See [roles and tasks](../flows/tasks.md).

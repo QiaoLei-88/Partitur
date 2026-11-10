@@ -9,7 +9,8 @@ task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
                                    inbox last looked)
   ptt nudges [on|off]              turn nudges on or off for every session, or show them
   ptt handover NAME                leave a handover marker: a fresh session continues
-                                   NAME with `ptt resume` and no name
+                                   NAME with `ptt resume NAME`; the marker puts NAME
+                                   first in the list of `ptt resume`
   ptt unlock [--force]             remove the records lock if its owner is gone
                                    (--force: held on a machine that no longer exists)
   ptt whoami [NAME]                what NAME (default: the holder bound to this
@@ -25,8 +26,8 @@ task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
                                    the integrator role, or a ready task; prints the
                                    holder name
   ptt resume [NAME]                continue as NAME in this new conversation; without
-                                   NAME, the holder with a handover marker, or a list of
-                                   holders by their last write
+                                   NAME, only list the holders (those with a handover
+                                   marker first, then by their last write), binding none
   ptt leave NAME [--status TEXT]   give up the integrator role or T0000 (designer), or
                                    ask to give up any other task
   ptt approve-leave TASK --as NAME   supervisor: accept a holder's request to leave
@@ -1025,17 +1026,13 @@ def bind_note(name):
              "session, and its writes are not checked")
 
 
-def resume_choice():
-    """The holder a session continues as when the user names none: the one
-    with a valid handover marker, or None after listing the holders."""
+def resume_list():
+    """List the holders a session may continue as, each with its named
+    resume; never choose one: continuing is the user's explicit instruction."""
     held = holdings()
     sid = session_id()
     marked = [(n, handover(n, s[-1] if s else None)) for n, _, s in held]
     marked = [(n, m) for n, m in marked if m]
-    if len(marked) == 1:
-        name, m = marked[0]
-        print(f"{name} left a handover {ago(float(m['time']))}; continuing it")
-        return name
     rows = []
     for n, _, s in held:
         if sid and s and s[-1] == sid:
@@ -1048,16 +1045,17 @@ def resume_choice():
                      f"last write {ago(t)}" + ("; may still be working" if busy else "")))
     if not rows:
         print("no holder to continue; `ptt who` lists the holders")
-        return None
-    print("Which holder does this session continue as? (ptt resume NAME)")
+        return
+    print("Which holder does this session continue as? Nothing is bound until the "
+          "resume names it:")
     for k, (_, _, n, text) in enumerate(sorted(rows), 1):
-        print(f"{k}. {n:16} {text}")
-    return None
+        print(f"{k}. {n:16} {text}; continue: {skill(f'ptt-resume {n}')}")
 
 
 def cmd_handover(a):
-    """Leave a handover marker for NAME, so that a fresh session continues
-    it with `ptt resume` and no name. Only the session bound to NAME does."""
+    """Leave a handover marker for NAME, which puts it first in the list of
+    `ptt resume` without a name; a fresh session continues it with `ptt
+    resume NAME`. Only the session bound to NAME does."""
     hits = [h for h in holdings() if h[0] == a.name]
     need(hits, f"{a.name} holds nothing")
     sessions = hits[0][2]
@@ -1068,15 +1066,14 @@ def cmd_handover(a):
     (handover_dir() / a.name).write_text(
         f"session={(sessions[-1] if sessions else '') or ''}\n"
         f"commit={git('rev-parse', 'HEAD').stdout.strip()}\ntime={time.time()}\n")
-    print(f"handover left: a fresh session continues {a.name} with `ptt resume` "
-          f"({skill('ptt-resume')}) and no name")
+    print(f"handover left: a fresh session continues {a.name} with `ptt resume {a.name}` "
+          f"({skill(f'ptt-resume {a.name}')})")
 
 
 def cmd_resume(a):
     if not a.name:
-        a.name = resume_choice()
-        if not a.name:
-            return
+        resume_list()
+        return
     hits = [h for h in holdings() if h[0] == a.name]
     need(hits, f"{a.name} holds nothing; nothing to continue (`ptt who` lists the holders)")
     _, d, sessions = hits[0]

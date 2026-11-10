@@ -830,7 +830,8 @@ class Ptt(unittest.TestCase):
                                   f"({form.format(f'ptt-resume {holder}')})", refusal)
                     self.assertNotIn("/clear", refusal)
                 handover = native("handover", holder).stdout
-                self.assertIn(f"({form.format('ptt-resume')}) and no name", handover)
+                self.assertIn(f"`ptt resume {holder}` ({form.format(f'ptt-resume {holder}')})",
+                              handover)
                 native("leave", holder)
 
     def test_session_environment_precedence(self):
@@ -1036,12 +1037,21 @@ class Ptt(unittest.TestCase):
         self.assertEqual(self.ptt("inbox", "--quiet", session="I").stdout, "")
         self.assertIn("this session holds nothing", self.ptt("inbox", session="X").stdout)
 
-    def test_handover_lets_a_fresh_session_resume_without_a_name(self):
+    def test_resume_without_a_name_lists_a_single_handover_and_binds_nothing(self):
         i = self.ptt("take", "integrator", session="A").stdout.strip()
+        d = self.ptt("take", "designer", session="D").stdout.strip()
         self.assertIn("only that session", self.refused("handover", i, session="X"))
         self.ptt("handover", i, session="A")
-        r = self.ptt("resume", session="B")
-        self.assertIn(f"{i} left a handover", r.stdout)
+        menu = self.ptt("resume", session="B").stdout
+        self.assertRegex(menu, rf"1\. {i} +handover left just now; continue: "
+                               rf"/ptt-resume {i} in Claude Code, \$ptt-resume {i} in Codex\n")
+        self.assertRegex(menu, rf"2\. {d} +last write .*; continue: /ptt-resume {d} ")
+        self.assertNotIn("this session is", menu)
+        self.assertTrue((self.rec / ".git" / "ptt-handover" / i).exists())
+        self.assertIn("is bound to another session", self.refused("leave", i, session="B"))
+        self.assertEqual(self.ptt("inbox", "--quiet", session="A").stdout, "")
+        # only the named resume binds
+        r = self.ptt("resume", i, session="B")
         self.assertIn(f"this session is {i}", r.stdout)
         self.assertFalse((self.rec / ".git" / "ptt-handover" / i).exists())
         # the old session is told once, and its writes are refused
@@ -1077,7 +1087,9 @@ class Ptt(unittest.TestCase):
         self.assertRegex(menu, rf"1\. ({i}|{d}) +handover left")
         self.assertRegex(menu, rf"2\. ({i}|{d}) +handover left")
         self.assertIn(f"this session is {d}", self.ptt("resume", d, session="B").stdout)
-        self.assertIn(f"{i} left a handover", self.ptt("resume", session="C").stdout)
+        menu = self.ptt("resume", session="C").stdout
+        self.assertRegex(menu, rf"1\. {i} +handover left")
+        self.assertNotIn("this session is", menu)
 
     def test_inbox_quiet_never_fails(self):
         self.assertEqual(self.ptt("inbox", "--quiet").stdout, "")

@@ -71,11 +71,13 @@ local marker, not a record. The user's `/clear`, or a new session, is
 approval of the offer; ignoring it means continue. Clearing does not
 release the holder. In Claude Code, `/clear` starts a fresh session ID; in
 Codex, so does a fresh chat or fork. The fresh session continues with
-`/ptt-resume` (`$ptt-resume` in Codex) and no name: the holder that left the
-handover. Without one, or with several, it lists the holders by their last
-write and the user names one. The handover lapses by events, never by age:
-when the holder writes again, its binding moves, or its hold ends; a
-pause of days keeps it. The session that was the holder is told once,
+`/ptt-resume <name>` (`$ptt-resume <name>` in Codex): only a named resume
+binds, so continuing is always the user's explicit instruction. Without a
+name, `ptt resume` only lists the holders, those with a handover first,
+then by their last write, each with its named resume; it binds none, also
+when one holder alone left a handover. The handover lapses by events,
+never by age: when the holder writes again, its binding moves, or its
+hold ends; a pause of days keeps it. The session that was the holder is told once,
 through its inbox, that it continues elsewhere (G19). Continuing or
 compacting the same thread keeps its binding. Resuming with a different session ID moves
 the binding and prevents the earlier session from writing *(Proposed,
