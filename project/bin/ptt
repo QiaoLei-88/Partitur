@@ -459,7 +459,8 @@ def nudge_targets(commit):
                       "--diff-filter=A",
                       commit).stdout.split())
     for e in ended_holds():
-        if str(e["path"].relative_to(REC)) in changed and e["name"] != ACTOR:
+        if (str(e["path"].relative_to(REC)) in changed and e["name"] != ACTOR
+                and not e["path"].name.endswith("-cancel.md")):
             out.append((e["name"], e["session_name"], e["sessions"][-1]))
     return list(dict.fromkeys(out))
 

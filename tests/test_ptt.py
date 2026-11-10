@@ -1147,6 +1147,31 @@ class Ptt(unittest.TestCase):
                 self.assertEqual(self.ptt("inbox", "--quiet", session=last).stdout, "")
                 self.assertNotIn("/rename", self.ptt("inbox", w, session="old").stdout)
 
+    def test_claude_cancel_after_ended_hold_has_no_second_notice(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        sd = "00000000-0000-4000-8000-00000000dddd"
+        sw = "00000000-0000-4000-8000-00000000eeee"
+        d = self.ptt("take", "designer", session=sd).stdout.strip()
+        for ending in ("free", "leave"):
+            with self.subTest(ending=ending):
+                n = self.task(ending, d)
+                w = self.ptt("take", n, session=sw).stdout.strip()
+                if ending == "free":
+                    result = self.ptt("free", n, "--as", d, "--force", "--reason", "gone",
+                                      session=sd)
+                else:
+                    self.ptt("leave", w, session=sw)
+                    result = self.ptt("approve-leave", n, "--as", d, session=sd)
+                prefix = f"prtr-trck-t{int(n[1:])}"
+                self.assertEqual(result.stderr.count(f"nudge: {prefix}-00eeee (Claude Code):"), 1)
+                self.ptt("inbox", "--quiet", session=sw)
+                result = self.ptt("cancel", n, "--as", d, "--reason", "unneeded", session=sd)
+                self.assertNotIn("nudge:", result.stderr)
+                self.assertNotIn("carry:", result.stderr)
+                out = self.ptt("inbox", "--quiet", session=sw).stdout
+                self.assertIn(f"/rename {prefix}-cancelled\n", out)
+                self.assertEqual(self.ptt("inbox", "--quiet", session=sw).stdout, "")
+
     def test_cancel_renames_the_last_holder_but_not_an_unclaimed_task(self):
         (self.rec / "project-code").write_text("prtr\n")
         d = self.ptt("take", "designer", session="D").stdout.strip()
