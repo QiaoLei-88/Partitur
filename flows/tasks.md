@@ -112,6 +112,12 @@ finds a run's task this way once the worktree is gone *(Adopted, E9)*.
 A task's state is derived from its events, as a request's is from its
 messages; there is no state file to go stale (C2).
 
+When a done report misses an acceptance criterion, the supervisor offers
+Reopen or discussion. On the user's AtE, `ptt reopen --reason` records the
+missing criteria and clears the pending done report; the holder can then
+complete the work and report done again. Wait applies only before a done
+report exists.
+
 ## Adopting amendments
 
 After acting on an amendment, the task's holder records an `adopt`
