@@ -198,11 +198,11 @@ class Repo(unittest.TestCase):
         for name in ("ptt-close", "ptt-pr-cleanup", "ptt-pr-reply", "ptt-pr-review"):
             self.assertIn("ALL1 AtE", text("project", "skills", name, "SKILL.md.in"), name)
         self.assertIn("`ALL1 AtE` line", text("SKILL.md"))
-        # T0010 amendment 0002: several decisions in one message are labelled.
-        self.assertIn("Two or more decisions in one message are labelled", rules)
+        # T0017: labelled decisions stay within one topic.
+        self.assertIn("Two or more decisions of one topic in one message are labelled", rules)
         self.assertIn("(`A1 B2 AtE`)", rules)
         self.assertIn("a bare number when labels were shown", rules)
-        self.assertIn("Two or more decisions in one message are labelled", flow)
+        self.assertIn("Two or more decisions of one topic in one message are labelled", flow)
         self.assertIn("- A1 Request changes", flow)
         for name in ("ptt-close", "ptt-pr-cleanup", "ptt-pr-reply", "ptt-pr-review"):
             self.assertIn("rules file", text("project", "skills", name, "SKILL.md.in"))
@@ -215,6 +215,43 @@ class Repo(unittest.TestCase):
         self.assertNotIn("`2. Wait`", text)
         self.assertIn('ptt reopen <N> --as <name> --reason "<missing criteria>"', text)
         self.assertIn("Wait only when no done report exists", text)
+
+    def test_reports_take_one_topic_at_a_time(self):
+        """T0017: preserve the agreed rule and point reporting skills to it."""
+        rules = " ".join((ROOT / "templates/rules.md").read_text().split())
+        expected = " ".join("""
+            - Report to the user one topic at a time. Read a change before reporting
+              it. Start with an overview: one line per topic, about 20 to 30 Chinese
+              characters or 15 English words, saying what happened and who acts next
+              (`PR 24 merged into master; T13 to send its done report`), never only
+              that something changed; mark the topic now taken up. Then take up that
+              topic alone, ending with its own decision; the next topic follows the
+              user's answer. Use short IDs (`PR 24`, `T13`) and name every subject;
+              no pronoun without a clear antecedent.
+        """.split())
+        self.assertIn(expected + " - When the user must decide,", rules)
+        for name in ("ptt-take", "ptt-resume", "ptt-inbox"):
+            text = " ".join((ROOT / "project/skills" / name / "SKILL.md.in").read_text().split())
+            self.assertIn("Report as the rules file says: an overview line per item, "
+                          "then one topic at a time.", text, name)
+
+    def test_brief_reads_the_holders_scope_before_reporting(self):
+        """T0017 amendment 0002: a user-only briefing, without new records."""
+        text = " ".join((ROOT / "project/skills/ptt-brief/SKILL.md.in").read_text().split())
+        for phrase in ("`<records>/bin/ptt whoami`", "If no holder is bound here",
+                       "`<records>/bin/ptt who`", "`<records>/bin/pr list`",
+                       "`<records>/bin/ptt inbox`", "Designer:", "Integrator:",
+                       "Task holder:", "Read the status records and notes",
+                       "`<records>/bin/pr show N`", "pr list all",
+                       "Mark missing or unread evidence Unknown",
+                       "never report a change you have not read",
+                       "overview line per item, then one topic at a time",
+                       "Mark the items waiting on the user",
+                       "first item waiting on the user alone",
+                       "If no item needs the user's decision",
+                       "write no status, note, review, decision, or other record",
+                       "do not carry out the reported next steps"):
+            self.assertIn(phrase, text)
 
     def test_reply_is_drafted_and_released_by_its_own_commands(self):
         """Replies to a review: /ptt-pr-draft-reply writes nothing, /ptt-pr-reply

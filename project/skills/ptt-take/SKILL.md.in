@@ -31,7 +31,9 @@ takes, approves recording it (an AtE does not); the work itself needs AtE
    Claude Code, automatic messages reach this session only by that name);
    the name is recorded, so never invent or change it.
 4. Read what you start from, then report what you hold, your supervisor,
-   the next step, and every `note:` the tool printed:
+   the next step, and every `note:` the tool printed.
+   Report as the rules file says: an overview line per item, then one topic
+   at a time.
    - integrator: `<records>/handoff/integrator.md`, `<records>/bin/pr list`;
    - a task (also `designer`): `<records>/bin/ptt show <N>` (charter,
      amendments, previous holder's `status.md`), then `<records>/bin/ptt

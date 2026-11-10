@@ -25,6 +25,8 @@ writes (it writes none); other work needs AtE (rules file).
    branch); settle what waits on you
    (`/ptt-close`, `/ptt-leave approve`). Act only with the user's command or
    AtE.
+   Report as the rules file says: an overview line per item, then one topic
+   at a time.
    After acting on an amendment, use `<records>/bin/ptt adopt TASK N[,N]
    --as NAME` on the user's AtE; if you disagree, write a note to the designer.
 3. Started by a nudge (a cross-session message "new in your inbox (...);
