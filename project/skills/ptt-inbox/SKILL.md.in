@@ -7,6 +7,7 @@ description: "Show what is new in the records for this session's holder since it
 
 The command, or an AtE naming these records, approves the records this skill
 writes (it writes none); other work needs AtE (rules file).
+For a nudge, start at step 3 before running step 1.
 
 1. `<records>/bin/ptt inbox` (the holder bound to this session), or `ptt
    inbox <name>` with the holder name this session got from `/ptt-take` or
@@ -30,8 +31,12 @@ writes (it writes none); other work needs AtE (rules file).
    After acting on an amendment, use `<records>/bin/ptt adopt TASK N[,N]
    --as NAME` on the user's AtE; if you disagree, write a note to the designer.
 3. Started by a nudge (a cross-session message "new in your inbox (...);
-   run `ptt inbox NAME`"): run the inbox as in step 1 and do only the
-   read-only part of each item. Report it. As a supervisor, check a done
+   run `ptt inbox NAME`"): first run `<records>/bin/ptt nudges`. If off,
+   report that nudges are off and stop. Otherwise run `ptt whoami` without
+   a name: proceed only if this session is still bound to NAME. If the
+   hold ended or moved, report that and stop. Then run the inbox as in
+   step 1; if it reports an ended hold, follow step 4 and stop. Do only
+   the read-only part of each item. Report it. As a supervisor, check a done
    report against the task's acceptance and wait for the user. As the
    integrator, review a request waiting for review by `/ptt-pr-review`
    steps 1-6 (its review message and run records only). As a requester,
@@ -49,5 +54,5 @@ and, once trusted, Codex. It adds what is new to the conversation; treat
 such lines like this report. In Codex, review/trust `.codex/hooks.json`
 (`/hooks` in the CLI); use `$ptt-inbox` manually if the hook is unavailable.
 A holder that is not bound to the session (`/ptt-resume`, `$ptt-resume` in
-Codex) gets nothing from the hook. An idle session gets no notification
-until its next user message.
+Codex) gets nothing from the hook. The hook alone does not wake an idle
+session; a nudge can.

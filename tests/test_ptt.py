@@ -35,6 +35,23 @@ def run(*args, cwd=None, check=True, env=None, input=None):
 class Ptt(unittest.TestCase):
     def setUp(self):
         self.root = Path(tempfile.mkdtemp())
+        self.codex = self.root / "queue tools" / "codex"
+        self.codex.parent.mkdir()
+        self.codex.write_text("""#!/usr/bin/env python3
+import json, sys, time
+from pathlib import Path
+root = Path(__file__).parent
+with (root / 'calls.jsonl').open('a') as f:
+    f.write(json.dumps(sys.argv[1:]) + '\\n')
+mode = (root / 'mode').read_text() if (root / 'mode').exists() else '0'
+if mode == 'timeout':
+    time.sleep(30)
+else:
+    if mode != '0':
+        print('queue rejected by test executable', file=sys.stderr)
+    sys.exit(int(mode))
+""")
+        self.codex.chmod(0o755)
         self.rec = self.root / "workspace"
         (self.rec / "bin").mkdir(parents=True)
         for name in ("ptt", "pr"):
@@ -59,6 +76,8 @@ class Ptt(unittest.TestCase):
         for key in ("PTT_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID",
                     "CODEX_SESSION_ID"):
             env.pop(key, None)
+        # Synthetic UUIDs must never reach the user's real Codex installation.
+        env["PTT_CODEX_COMMAND"] = (base or {}).get("PTT_CODEX_COMMAND", str(self.codex))
         if session:
             env["PTT_SESSION_ID"] = session
         return env
@@ -1147,6 +1166,31 @@ class Ptt(unittest.TestCase):
                 self.assertEqual(self.ptt("inbox", "--quiet", session=last).stdout, "")
                 self.assertNotIn("/rename", self.ptt("inbox", w, session="old").stdout)
 
+    def test_claude_cancel_after_ended_hold_has_no_second_notice(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        sd = "00000000-0000-4000-8000-00000000dddd"
+        sw = "00000000-0000-4000-8000-00000000eeee"
+        d = self.ptt("take", "designer", session=sd).stdout.strip()
+        for ending in ("free", "leave"):
+            with self.subTest(ending=ending):
+                n = self.task(ending, d)
+                w = self.ptt("take", n, session=sw).stdout.strip()
+                if ending == "free":
+                    result = self.ptt("free", n, "--as", d, "--force", "--reason", "gone",
+                                      session=sd)
+                else:
+                    self.ptt("leave", w, session=sw)
+                    result = self.ptt("approve-leave", n, "--as", d, session=sd)
+                prefix = f"prtr-trck-t{int(n[1:])}"
+                self.assertEqual(result.stderr.count(f"nudge: {prefix}-00eeee (Claude Code):"), 1)
+                self.ptt("inbox", "--quiet", session=sw)
+                result = self.ptt("cancel", n, "--as", d, "--reason", "unneeded", session=sd)
+                self.assertNotIn("nudge:", result.stderr)
+                self.assertNotIn("carry:", result.stderr)
+                out = self.ptt("inbox", "--quiet", session=sw).stdout
+                self.assertIn(f"/rename {prefix}-cancelled\n", out)
+                self.assertEqual(self.ptt("inbox", "--quiet", session=sw).stdout, "")
+
     def test_cancel_renames_the_last_holder_but_not_an_unclaimed_task(self):
         (self.rec / "project-code").write_text("prtr\n")
         d = self.ptt("take", "designer", session="D").stdout.strip()
@@ -1565,6 +1609,114 @@ class Ptt(unittest.TestCase):
         # Invalid metadata is also refused at take, including an older released charter.
         path.write_text(path.read_text().replace("tool: any", "tool: other"))
         self.assertIn("tool must be", self.refused("take", n))
+
+    def queue_calls(self):
+        log = self.codex.parent / "calls.jsonl"
+        return [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+
+    def test_codex_queue_uses_uuid_configured_executable_and_default(self):
+        sd = "00000000-0000-7000-8000-000000dddddd"
+        sw = "00000000-0000-7000-8000-000000eeeeee"
+        d = self.ptt("take", "designer", session=sd).stdout.strip()
+        n = self.task("queue", d)
+        w = self.ptt("take", n, session=sw).stdout.strip()
+        result = self.ptt("amend", n, "--as", d, "--text", "first", session=sd)
+        commit = run("git", "-C", str(self.rec), "rev-parse", "--short", "HEAD").stdout.strip()
+        self.assertEqual(self.queue_calls(), [["queue", "--thread", sw, "--message",
+                         f"new in your inbox (records {commit}); run `workspace/bin/ptt inbox {w}`"]])
+        self.assertIn("accepted into queue; delivery unconfirmed", result.stderr)
+        self.assertNotIn("carry:", result.stderr)
+        # Unset override: PATH supplies the default executable, still isolated.
+        env = self.env(session=sd)
+        env.pop("PTT_CODEX_COMMAND")
+        env["PATH"] = str(self.codex.parent) + os.pathsep + env["PATH"]
+        run("python3", str(self.rec / "bin/ptt"), "amend", n, "--as", d,
+            "--text", "default executable", env=env)
+        self.assertEqual(len(self.queue_calls()), 2)
+        self.assertEqual(self.queue_calls()[-1][0:3], ["queue", "--thread", sw])
+        # Older records may have a UUID without a display name.
+        take = self.rec / "tasks/open/T0001-queue/0002-take.md"
+        take.write_text(re.sub(r"^session_name:.*\n", "", take.read_text(), flags=re.M))
+        run("git", "-C", str(self.rec), "commit", "-qam", "legacy name")
+        result = self.ptt("amend", n, "--as", d, "--text", "UUID alone", session=sd)
+        self.assertIn(f"queued: {w} (Codex)", result.stderr)
+        self.assertEqual(len(self.queue_calls()), 3)
+        si = "00000000-0000-7000-8000-000000ffffff"
+        self.ptt("take", "integrator", session=si)
+        notes = self.rec / "handoff/notes"
+        notes.mkdir(parents=True)
+        for name, target in (("worker", n), ("integrator", "integrator")):
+            (notes / (name + ".md")).write_text(f"---\nto: {target}\n---\nA finding.\n")
+        self.ptt("record", "-m", "two recipients", str(notes), session=sd)
+        self.assertEqual(len(self.queue_calls()), 5)
+        self.assertEqual({call[2] for call in self.queue_calls()[-2:]}, {sw, si})
+
+    def test_codex_queue_skips_disabled_unknown_and_cross_tool_targets(self):
+        sd = "00000000-0000-7000-8000-000000dddddd"
+        d = self.ptt("take", "designer", session=sd).stdout.strip()
+        for sid in (None, "custom-id", "00000000-0000-4000-8000-000000cccccc",
+                    "00000000-0000-7000-8000-000000eeeeee"):
+            with self.subTest(sid=sid):
+                n = self.task("target-" + str(len(list((self.rec / "tasks/open").iterdir()))), d)
+                self.ptt("take", n, session=sid)
+                if sid and "-7000-" in sid:
+                    self.ptt("nudges", "off")
+                result = self.ptt("amend", n, "--as", d, "--text", "manual", session=sd)
+                self.assertIn("carry:", result.stderr)
+                self.assertEqual(self.queue_calls(), [])
+        self.ptt("nudges", "on")
+        claude = "00000000-0000-4000-8000-000000aaaaaa"
+        self.ptt("resume", d, session=claude)
+        result = self.ptt("amend", n, "--as", d, "--text", "cross tool", session=claude)
+        self.assertIn("(Codex) type $ptt-inbox", result.stderr)
+        self.assertEqual(self.queue_calls(), [])
+
+    def test_codex_queue_failures_keep_the_record_and_offer_manual_transfer(self):
+        sd = "00000000-0000-7000-8000-000000dddddd"
+        sw = "00000000-0000-7000-8000-000000eeeeee"
+        d = self.ptt("take", "designer", session=sd).stdout.strip()
+        n = self.task("failure", d)
+        self.ptt("take", n, session=sw)
+        for mode in ("missing", "permission", "2", "timeout"):
+            with self.subTest(mode=mode):
+                self.codex.chmod(0o644 if mode == "permission" else 0o755)
+                (self.codex.parent / "mode").write_text(mode if mode in ("2", "timeout") else "0")
+                env = {"PTT_CODEX_COMMAND": str(self.codex) + ("-absent" if mode == "missing" else "")}
+                env = dict(os.environ, **env)
+                before = run("git", "-C", str(self.rec), "rev-parse", "HEAD").stdout
+                result = self.ptt("amend", n, "--as", d, "--text", mode, session=sd, env=env)
+                self.assertNotEqual(before, run("git", "-C", str(self.rec), "rev-parse", "HEAD").stdout)
+                self.assertIn("recorded ", result.stderr)
+                self.assertIn("not confirmed", result.stderr)
+                self.assertIn("record kept", result.stderr)
+                self.assertIn("(Codex) type $ptt-inbox", result.stderr)
+                self.assertNotIn("queued:", result.stderr)
+                self.assertIn(mode, self.ptt("show", n).stdout)
+        self.assertEqual(len(self.queue_calls()), 2)  # failed exit and timeout, no retries
+
+    def test_codex_queue_follows_resume_and_does_not_repeat_ended_holds(self):
+        sd = "00000000-0000-7000-8000-000000dddddd"
+        old = "00000000-0000-7000-8000-000000aaaaaa"
+        new = "00000000-0000-7000-8000-000000bbbbbb"
+        d = self.ptt("take", "designer", session=sd).stdout.strip()
+        for ending in ("close", "free"):
+            with self.subTest(ending=ending):
+                n = self.task(ending, d)
+                w = self.ptt("take", n, session=old).stdout.strip()
+                self.ptt("resume", w, session=new)
+                if ending == "close":
+                    self.ptt("done", n, "--as", w, session=new)
+                    count = len(self.queue_calls())
+                    self.ptt("close", n, "--as", d, session=sd)
+                else:
+                    count = len(self.queue_calls())
+                    self.ptt("free", n, "--as", d, "--force", "--reason", "gone", session=sd)
+                self.assertEqual(len(self.queue_calls()), count + 1)
+                self.assertEqual(self.queue_calls()[-1][0:3], ["queue", "--thread", new])
+                if ending == "free":
+                    self.ptt("cancel", n, "--as", d, "--reason", "unneeded", session=sd)
+                    self.assertEqual(len(self.queue_calls()), count + 1)
+                self.assertTrue(all(call[2] != old for call in self.queue_calls()))
 
     def test_freed_roles_and_tasks_print_take_lines(self):
         (self.rec / "project-code").write_text("prtr\n")
