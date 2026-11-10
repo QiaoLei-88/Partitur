@@ -30,7 +30,8 @@ same skills as `$ptt-*` (for example `$ptt-take designer`).
    [requests](flows/requests.md) and the `ptt-*` skills.
 6. When a `ptt` command prints `nudge:` lines, nudge those sessions as its
    `nudges:` line says; when nudged, do only the read-only part
-   ([nudges](flows/handoff.md#nudges-proposed)).
+   ([nudges](flows/handoff.md#nudges-proposed)). Pass `carry:` lines to the
+   user: they say where to open the inbox when no automatic nudge can reach it.
 7. At a quiet point, offer once to be cleared; clearing keeps what you hold:
    [handoff](flows/handoff.md#clearing-context-proposed-d16).
 

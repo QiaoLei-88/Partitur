@@ -85,6 +85,17 @@ class Repo(unittest.TestCase):
                 self.assertIn("The command, or an AtE naming these records, approves", text,
                               skill.parent.name)
 
+    def test_note_is_user_invoked_and_recipient_explains_its_understanding(self):
+        skills = ROOT / "project/skills"
+        note = " ".join((skills / "ptt-note/SKILL.md.in").read_text().split())
+        self.assertIn("the work it proposes still needs AtE", note)
+        self.assertIn("Show no draft or approval question first", note)
+        self.assertIn("no summary of the note", note)
+        self.assertIn("A correction goes in a new note", note)
+        inbox = " ".join((skills / "ptt-inbox/SKILL.md.in").read_text().split())
+        self.assertIn("first state in one or two sentences your understanding", inbox)
+        self.assertIn("then what that means for your work", inbox)
+
     def test_user_direction_overrides_cleanup_limits(self):
         """T0010: ownership and head rules limit only what a session proposes
         by itself; what the user names, any session cleans up."""

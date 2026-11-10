@@ -119,16 +119,18 @@ start a session taking it: `claude -n <project>-<holder> "/ptt-take N"`
 (the session name without its hash, until take gives the full one) and
 `codex '$ptt-take N'`.
 
-Nudges: after each commit, every command that records prints a `nudge:`
-line for each holder other than the writer to whom the commit gave news:
+Nudges: after each commit, every command that records prints a notice
+for each holder other than the writer to whom the commit gave news:
 an item its inbox shows as new (a subordinate's status.md update aside), or
 the end of its hold by someone else. The line gives the holder's recorded
-session name and the text to send; in Claude Code the writer subscribes to
-that session with notify_when_idle and sends the text on the notice, if
-nudges are still on. `ptt nudges on|off` (default on) is kept in the
-records' Git directory, beside the inbox marks; off, no targets are printed.
-Holders without a recorded session name get no line; the inbox and `ptt
-who`'s unseen items show every item either way.
+session name and tool, inferred from the recorded ID (UUIDv4: Claude Code,
+UUIDv7: Codex; otherwise unknown). Between Claude Code sessions a `nudge:`
+line gives the text to send on an idle notice; the writer checks ListAgents
+and carries the notice manually if the session is absent. Other targets
+get a `carry:` line naming the session and its inbox skill; without a
+session name it names the holder. `ptt nudges on|off` (default on) is kept
+in the records' Git directory, beside the inbox marks; off, only manual
+carry lines are printed. The inbox and `ptt who` show every item either way.
 """
 import argparse
 import fcntl
@@ -422,49 +424,66 @@ def nudges_on():
 
 
 def nudge_targets(commit):
-    """(holder, session name) of each holder other than the writer to whom
-    records `commit` gave news: an item its inbox shows as new, a
+    """(holder, session name, session ID) of each holder other than the writer
+    to whom records `commit` gave news: an item its inbox shows as new, a
     subordinate's status.md update aside, or the end of its hold by someone
     else. The session name is None if none was recorded."""
     if not git("rev-parse", "-q", "--verify", f"{commit}^", check=False).stdout.strip():
         return []
     out = []
-    for name, d, _ in holdings():
+    for name, d, sessions in holdings():
         held = held_by(name)
         if name == ACTOR or not held:
             continue
         lines = news(name, held, f"{commit}^")
         if [x for x in lines if not re.match(r"read T\S+ status\.md:", x)]:
-            out.append((name, session_name_of(d)))
+            out.append((name, session_name_of(d), sessions[-1]))
     changed = set(git("diff-tree", "--root", "--no-commit-id", "--name-only", "-r",
                       commit).stdout.split())
     for e in ended_holds():
         if str(e["path"].relative_to(REC)) in changed and e["name"] != ACTOR:
-            out.append((e["name"], e["session_name"]))
+            out.append((e["name"], e["session_name"], e["sessions"][-1]))
     return list(dict.fromkeys(out))
 
 
+def session_tool(sid):
+    """Infer a recorded session's tool; unfamiliar IDs stay unknown."""
+    # shortcut: UUID versions identify today's tools; revise if their ID formats change.
+    if sid and UUID.fullmatch(sid.lower()):
+        return {"4": "Claude Code", "7": "Codex"}.get(sid[14], "unknown tool")
+    return "unknown tool"
+
+
 def announce_nudges(commit):
-    """Print the nudges records `commit` calls for, if nudges are on: one
-    `nudge:` line per holder with a recorded session name, then how to send
-    them. A failure here never undoes the commit."""
+    """Print automatic or manual inbox notices for `commit`'s targets.
+    A failure here never undoes the commit."""
     try:
-        if not nudges_on():
-            return
-        targets = [(n, s) for n, s in nudge_targets(commit) if s]
+        targets = nudge_targets(commit)
+        automatic = nudges_on() and session_tool(session_id()) == "Claude Code"
     except Exception as err:
         note(f"nudge targets not computed: {err}")
         return
     if not targets:
         return
     inbox = REC.relative_to(REC.parent) / "bin" / "ptt"
-    for name, session in targets:
-        print(f"nudge: {session}: new in your inbox (records {commit}); run "
-              f"`{inbox} inbox {name}`", file=sys.stderr)
-    print("nudges: in Claude Code, for each session above that ListAgents lists, subscribe "
-          "with SendMessage notify_when_idle (no message); on its idle notice, if `ptt nudges` "
-          "still says on, send it the text after its name, and nothing else. Codex sends none.",
-          file=sys.stderr)
+    nudged = False
+    for name, session, sid in targets:
+        tool = session_tool(sid)
+        if automatic and session and tool == "Claude Code":
+            print(f"nudge: {session} ({tool}): new in your inbox (records {commit}); run "
+                  f"`{inbox} inbox {name}`", file=sys.stderr)
+            nudged = True
+        else:
+            address = f"session {session}" if session else f"holder {name} (no session name)"
+            command = {"Claude Code": "/ptt-inbox", "Codex": "$ptt-inbox"}.get(
+                tool, "/ptt-inbox (Claude Code) or $ptt-inbox (Codex)")
+            print(f"carry: in {address} ({tool}) type {command}", file=sys.stderr)
+    if nudged:
+        print("nudges: in Claude Code, for each session above that ListAgents lists, subscribe "
+              "with SendMessage notify_when_idle (no message); on its idle notice, if `ptt nudges` "
+              "still says on, send only the text after `): `. For each session absent from "
+              "ListAgents, tell the user: in session <name> (Claude Code) type /ptt-inbox.",
+              file=sys.stderr)
 
 
 def events(d):
