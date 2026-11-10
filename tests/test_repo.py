@@ -209,6 +209,13 @@ class Repo(unittest.TestCase):
             self.assertIn("A1", text("project", "skills", name, "SKILL.md.in"), name)
         self.assertIn("label them (`A1`, `B2`)", text("SKILL.md"))
 
+    def test_close_reopens_an_incomplete_done_report(self):
+        text = " ".join((ROOT / "project/skills/ptt-close/SKILL.md.in").read_text().split())
+        self.assertIn("`1. Reopen` (the missing criteria) / `2. No decision, discuss further`", text)
+        self.assertNotIn("`2. Wait`", text)
+        self.assertIn('ptt reopen <N> --as <name> --reason "<missing criteria>"', text)
+        self.assertIn("Wait only when no done report exists", text)
+
     def test_reply_is_drafted_and_released_by_its_own_commands(self):
         """Replies to a review: /ptt-pr-draft-reply writes nothing, /ptt-pr-reply
         releases; /ptt-pr-submit no longer replies."""

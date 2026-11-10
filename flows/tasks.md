@@ -35,7 +35,13 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
    `track-T0007-2` for a task's second holder), which is its `--as` name and
    its `session:` in every message (G1, G2).
 2. **Conflicts are refused.** A held role or task cannot be taken; a second
-   simultaneous take loses. Nothing is overridden silently (G1).
+   simultaneous take loses. A charter's optional `tool:` restricts taking
+   to `claude` or `codex`; absent or `any` accepts either, including an
+   unknown tool. A restricted task refuses a mismatch or unknown tool.
+   Identity comes from `CLAUDE_CODE_SESSION_ID`, then `CODEX_THREAD_ID` or
+   `CODEX_SESSION_ID`; `PTT_SESSION_ID` alone names no tool. `mktask --tool`
+   sets the field, and `amend --tool` replaces it for future takes without
+   changing an existing hold. Nothing is overridden silently (G1).
 3. **Taking is not approval to work.** The user's command records the role;
    writes still need the user's AtE (A2).
 4. **Supervision is a tree.** A top-level task's (`T0007`) supervisor is
@@ -112,6 +118,12 @@ finds a run's task this way once the worktree is gone *(Adopted, E9)*.
 A task's state is derived from its events, as a request's is from its
 messages; there is no state file to go stale (C2).
 
+When a done report misses an acceptance criterion, the supervisor offers
+Reopen or discussion. On the user's AtE, `ptt reopen --reason` records the
+missing criteria and clears the pending done report; the holder can then
+complete the work and report done again. Wait applies only before a done
+report exists.
+
 ## Adopting amendments
 
 After acting on an amendment, the task's holder records an `adopt`
@@ -159,9 +171,15 @@ In Codex the commands start with `$` instead of `/`.
   note to it (and, until deleted, every note to it waits on it; `ptt record`
   refuses a note whose front matter names no role or open task, and an
   older note without a `to:` goes to the designer, marked), a new review or
-  decision on its request, and for the integrator a new request or reply;
+  decision on its request, a task's merged request to its direct supervisor
+  (unless that supervisor authored it), and for the integrator a new
+  request or reply;
   and, once, to the session last bound to a holder whose hold someone else
-  ended (a close, an approved leave, a freeing). In Claude Code and Codex
+  ended (a close, an approved leave, a freeing), or whose former task was
+  later cancelled, with its recorded ended-name `/rename` line. A root
+  designer or integrator leaving gets that line in its command output.
+  Looking from another session does not consume an ended notice or show
+  its rename line. In Claude Code and Codex
   (once trusted), install's prompt hook runs it before each user message,
   so a bound holder sees it with the user's next message; without the hook
   the holder runs `/ptt-inbox`, and the user carries the notice as before

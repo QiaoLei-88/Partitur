@@ -112,6 +112,16 @@ is `<project>-<holder>-<hash>`, lowercase:
   same name, the window moves one digit towards the start, at most seven
   windows; only then is it lengthened.
 
+When a hold ends, the ending event records `ended_session_id` and
+`ended_session_name`: the live name with its hash replaced by `closed`,
+`cancelled`, `left`, or `freed`. A collision with another session's recorded
+name adds `-2`, `-3`, and so on. Only the last bound session gets the
+printed `/rename` line, once through its inbox; a root designer or
+integrator leaving gets it in the leave output. Renaming remains the
+user's act. A later cancellation addresses the last holder; a task never
+taken has no session to rename. An ending nudge uses the old live name,
+never the ended name; a later cancellation sends none.
+
 When a task becomes ready (`ptt ready`, `ptt approve-leave`, `ptt free`) or
 a role becomes free (the designer or integrator leaving or freed), `ptt`
 prints lines to paste in the workspace root that start a session taking
@@ -128,7 +138,8 @@ hash, the part known before the take; the take then prints the full name
 and its `/rename` line. Codex cannot name a session at start (no such
 option), so its line only takes; its prompt names the skill as `$ptt-take`
 in single quotes, so that the shell leaves the `$` alone. A blocked task
-gets no lines until it can be taken.
+gets no lines until it can be taken. A task restricted by `tool:` prints
+only that tool's line; `any` or an absent field prints both.
 
 Any session can derive a holder's current session name from the records:
 the address a later cross-session message would use. Without a session ID
@@ -152,7 +163,14 @@ The inbox rules stay the one source of what is news:
    the supervisor; an amendment or reopen to the holder; a note to its
    recipient; a new request or reply to the integrator; another's message
    on a request, or its move, to the requester), or the end of its hold by
-   someone else (a close, freeing, or approved leave). A subordinate's
+   someone else (a close, freeing, or approved leave). A task's direct
+   supervisor also gets one inbox line and an automatic or manual notice
+   when its request moves to `merged/`, unless the supervisor authored it.
+   Requests without
+   `task:` and requests closed without merging add no supervisor notice;
+   no notice goes further up the tree. The line names the merge commit,
+   from the decision's `merge_commit` or pr's local main-branch lookup;
+   if neither locates it, the line says `unknown`. A subordinate's
    `status.md` update gets none. Between Claude Code sessions a `nudge:`
    line gives the holder's recorded session name, tool, and text to send:
    "new in your inbox (records <commit>); run `ptt inbox <holder>`".

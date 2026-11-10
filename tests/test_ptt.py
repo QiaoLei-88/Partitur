@@ -14,6 +14,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 HERE = Path(__file__).resolve().parent.parent
 
@@ -36,7 +37,8 @@ class Ptt(unittest.TestCase):
         self.root = Path(tempfile.mkdtemp())
         self.rec = self.root / "workspace"
         (self.rec / "bin").mkdir(parents=True)
-        shutil.copy(HERE / "project" / "bin" / "ptt", self.rec / "bin" / "ptt")
+        for name in ("ptt", "pr"):
+            shutil.copy(HERE / "project" / "bin" / name, self.rec / "bin" / name)
         (self.rec / "tasks").mkdir()
         shutil.copy(HERE / "templates" / "charter.md", self.rec / "tasks" / "charter-template.md")
         root = self.rec / "tasks" / "open" / "T0000-design"
@@ -352,7 +354,7 @@ class Ptt(unittest.TestCase):
         run("git", "-C", str(self.rec), "update-ref", "-d", "refs/heads/master")
         r = self.ptt("record", "-m", "first record", str(self.rec))
         head = run("git", "-C", str(self.rec), "rev-parse", "--short", "HEAD").stdout.strip()
-        self.assertEqual(r.stderr, f"recorded {head}: A bin/ptt, A tasks/charter-template.md, "
+        self.assertEqual(r.stderr, f"recorded {head}: A bin/pr, A bin/ptt, A tasks/charter-template.md, "
                          "A tasks/open/T0000-design/charter.md\n")
 
     def test_record_report_failure_keeps_committed_files(self):
@@ -444,6 +446,9 @@ class Ptt(unittest.TestCase):
         self.ptt("done", n, "--as", h)
         self.ptt("reopen", n, "--as", d, "--reason", "acceptance 2 not met")
         self.assertNotIn("reports done", self.ptt("inbox", d).stdout)
+        self.ptt("done", n, "--as", h, "--text", "criteria now met")
+        self.assertIn("reports done", self.ptt("inbox", d).stdout)
+        self.ptt("reopen", n, "--as", d, "--reason", "another missing criterion")
         self.ptt("free", n, "--as", d, "--reason", "rethink", "--force")
         self.ptt("cancel", n, "--as", d, "--reason", "superseded")
         self.assertTrue(any((self.rec / "tasks" / "cancelled").iterdir()))
@@ -1012,6 +1017,82 @@ class Ptt(unittest.TestCase):
         self.ptt("pr-move", "1", "merged", "-m", "pr 000001: merged", session="I")
         self.assertIn("request 000001: now merged", self.ptt("inbox", w).stdout)
 
+    def test_merge_notices_go_only_to_the_direct_supervisor_once(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        sd = "00000000-0000-4000-8000-00000000dddd"
+        ss = "00000000-0000-4000-8000-00000000eeee"
+        si = "00000000-0000-4000-8000-00000000aaaa"
+        d = self.ptt("take", "designer", session=sd).stdout.strip()
+        parent = self.task("parent", d, kind="design")
+        sub = self.ptt("take", parent, session=ss).stdout.strip()
+        child = self.task("child", sub)
+        worker = self.ptt("take", child, session="W").stdout.strip()
+        top = self.task("top", d)
+        tw = self.ptt("take", top, session="T").stdout.strip()
+        integ = self.ptt("take", "integrator", session=si).stdout.strip()
+        for holder, sid in ((d, sd), (sub, ss)):
+            self.ptt("inbox", holder, session=sid)
+        for number, task, requester, place, target in (
+                (1, child, worker, "merged", sub),
+                (2, top, tw, "merged", d),
+                (3, child, sub, "merged", None),
+                (4, None, worker, "merged", None),
+                (5, child, worker, "closed", None)):
+            with self.subTest(number=number):
+                request = self.rec / "pr" / "open" / f"{number:06d}-change"
+                request.mkdir(parents=True)
+                task_line = f"task: {task}\n" if task else ""
+                (request / "0001-request.md").write_text(
+                    f"---\nkind: request\nsession: {requester}\n{task_line}---\n")
+                self.ptt("record", "-m", "request", str(request))
+                (request / "0002-decision.md").write_text(
+                    f"---\nkind: decision\nsession: {integ}\nmerge_commit: {'a' * 40}\n---\n")
+                self.ptt("record", "-m", "decision", str(request))
+                # Clear review/request notices; this check is specifically about the move.
+                self.ptt("inbox", d, session=sd)
+                self.ptt("inbox", sub, session=ss)
+                moved = self.ptt("pr-move", str(number), place, "-m", "move", session=si)
+                notice = f"{task}: request {number:06d} merged as {'a' * 40}"
+                for holder, sid in ((d, sd), (sub, ss)):
+                    out = self.ptt("inbox", holder, session=sid).stdout
+                    if holder == target:
+                        self.assertIn(notice, out)
+                        self.assertIn(f"inbox {holder}`", moved.stderr)
+                    else:
+                        self.assertNotIn(" merged as ", out)
+                    self.assertNotIn(" merged as ", self.ptt("inbox", holder, session=sid).stdout)
+                if not target:
+                    # A self-authored request still has the requester's ordinary move notice.
+                    self.assertNotIn(f"inbox {d}`", moved.stderr)
+                    if requester != sub:
+                        self.assertNotIn(f"inbox {sub}`", moved.stderr)
+
+    def test_merge_notice_finds_the_local_merge_and_reports_a_missing_sha(self):
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        n = self.task("merged", d)
+        w = self.ptt("take", n, session="W").stdout.strip()
+        code = self.root / "code"
+        run("git", "init", "-q", "-b", "main", str(code))
+        run("git", "-C", str(code), "config", "user.name", "Test")
+        run("git", "-C", str(code), "config", "user.email", "test@example.org")
+        run("git", "-C", str(code), "commit", "--allow-empty", "-qm", "base")
+        run("git", "-C", str(code), "checkout", "-qb", "feature")
+        run("git", "-C", str(code), "commit", "--allow-empty", "-qm", "feature")
+        run("git", "-C", str(code), "checkout", "-q", "main")
+        run("git", "-C", str(code), "merge", "--no-ff", "feature", "-m", "Merge feature (pr 000001)")
+        merge = run("git", "-C", str(code), "rev-parse", "HEAD").stdout.strip()
+        for number, expected in ((1, merge), (2, "unknown")):
+            request = self.rec / "pr" / "open" / f"{number:06d}-change"
+            request.mkdir(parents=True)
+            (self.rec / "pr" / "repos").write_text("code code main\n")
+            (request / "0001-request.md").write_text(
+                f"---\nkind: request\nsession: {w}\ntask: {n}\nrepo: code\n---\n")
+            self.ptt("record", "-m", "request", str(self.rec / "pr"))
+            self.ptt("inbox", d, session="D")
+            self.ptt("pr-move", str(number), "merged", "-m", "move")
+            self.assertIn(f"{n}: request {number:06d} merged as {expected}",
+                          self.ptt("inbox", d, session="D").stdout)
+
     def test_inbox_tells_the_last_session_its_hold_ended(self):
         d = self.ptt("take", "designer", session="D").stdout.strip()
         a, b, c = (self.task(x, d) for x in ("a", "b", "c"))
@@ -1036,6 +1117,85 @@ class Ptt(unittest.TestCase):
         self.ptt("leave", i, session="I")               # its own leave: nothing to tell
         self.assertEqual(self.ptt("inbox", "--quiet", session="I").stdout, "")
         self.assertIn("this session holds nothing", self.ptt("inbox", session="X").stdout)
+
+    def test_ended_names_reach_only_the_last_bound_session_once(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        sd = "00000000-0000-4000-8000-00000000dddd"
+        last = "00000000-0000-4000-8000-00000000eeee"
+        d = self.ptt("take", "designer", session=sd).stdout.strip()
+        for ending, suffix in (("close", "closed"), ("leave", "left"), ("free", "freed")):
+            with self.subTest(ending=ending):
+                n = self.task(ending, d)
+                w = self.ptt("take", n, session="old").stdout.strip()
+                self.ptt("resume", w, session=last)
+                if ending == "close":
+                    self.ptt("done", n, "--as", w, session=last)
+                    result = self.ptt("close", n, "--as", d, session=sd)
+                elif ending == "leave":
+                    self.ptt("leave", w, session=last)
+                    result = self.ptt("approve-leave", n, "--as", d, session=sd)
+                else:
+                    result = self.ptt("free", n, "--as", d, "--force", "--reason", "gone",
+                                      session=sd)
+                prefix = f"prtr-trck-t{int(n[1:])}"
+                self.assertNotIn(f"nudge: {prefix}-{suffix}", result.stderr)
+                self.assertIn(f"nudge: {prefix}-00eeee (Claude Code):", result.stderr)
+                for sid in ("old", sd, None):
+                    self.assertNotIn("/rename", self.ptt("inbox", w, session=sid).stdout)
+                out = self.ptt("inbox", "--quiet", session=last).stdout
+                self.assertIn(f"/rename {prefix}-{suffix}\n", out)
+                self.assertEqual(self.ptt("inbox", "--quiet", session=last).stdout, "")
+                self.assertNotIn("/rename", self.ptt("inbox", w, session="old").stdout)
+
+    def test_cancel_renames_the_last_holder_but_not_an_unclaimed_task(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        d = self.ptt("take", "designer", session="D").stdout.strip()
+        n = self.task("cancelled", d)
+        w = self.ptt("take", n, session="W").stdout.strip()
+        self.ptt("free", n, "--as", d, "--force", "--reason", "gone", session="D")
+        self.assertIn("/rename prtr-trck-t1-freed", self.ptt("inbox", session="W").stdout)
+        result = self.ptt("cancel", n, "--as", d, "--reason", "unneeded", session="D")
+        self.assertNotIn("nudge:", result.stderr)
+        self.assertNotIn("/rename", self.ptt("inbox", w, session="D").stdout)
+        out = self.ptt("inbox", "--quiet", session="W").stdout
+        self.assertIn("/rename prtr-trck-t1-cancelled", out)
+        self.assertEqual(self.ptt("inbox", "--quiet", session="W").stdout, "")
+        n = self.task("unclaimed", d)
+        result = self.ptt("cancel", n, "--as", d, "--reason", "unneeded", session="D")
+        self.assertNotIn("/rename", result.stdout)
+        self.assertNotIn("ended_session", self.ptt("show", n).stdout)
+
+    @patch.dict(os.environ, GIT_AUTHOR_DATE="2000-01-01T00:00:00+0000",
+                GIT_COMMITTER_DATE="2000-01-01T00:00:00+0000")
+    def test_own_leave_and_freed_roles_have_ended_names(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        for role, code in (("designer", "dsgn-g"), ("integrator", "intg-")):
+            with self.subTest(role=role):
+                holder = self.ptt("take", role, session="own").stdout.strip()
+                out = self.ptt("leave", holder, session="own").stdout
+                self.assertIn(f"/rename prtr-{code}1-left", out)
+                self.assertEqual(self.ptt("inbox", "--quiet", session="own").stdout, "")
+                holder = self.ptt("take", role, session="freed").stdout.strip()
+                self.ptt("free", role, "--as", "user", "--reason", "gone", "--force")
+                out = self.ptt("inbox", "--quiet", session="freed").stdout
+                self.assertIn(f"/rename prtr-{code}2-freed", out)
+                self.assertEqual(self.ptt("inbox", "--quiet", session="freed").stdout, "")
+
+    def test_ended_name_collision_is_recorded_and_does_not_change(self):
+        (self.rec / "project-code").write_text("prtr\n")
+        d = self.designer()
+        n = self.task("collision", d)
+        w = self.ptt("take", n, session="W").stdout.strip()
+        other = self.rec / "roles" / "integrator" / "0001-leave.md"
+        other.parent.mkdir(parents=True)
+        other.write_text("---\nby: integrator-1\nevent: leave\nended_session_id: other\n"
+                         "ended_session_name: prtr-trck-t1-closed\n---\n")
+        self.ptt("record", "-m", "historical name", str(other))
+        self.ptt("done", n, "--as", w, session="W")
+        self.ptt("close", n, "--as", d)
+        self.assertIn("ended_session_name: prtr-trck-t1-closed-2", self.ptt("show", n).stdout)
+        (self.rec / "project-code").write_text("changed\n")
+        self.assertIn("/rename prtr-trck-t1-closed-2", self.ptt("inbox", session="W").stdout)
 
     def test_resume_without_a_name_lists_a_single_handover_and_binds_nothing(self):
         i = self.ptt("take", "integrator", session="A").stdout.strip()
@@ -1344,6 +1504,67 @@ class Ptt(unittest.TestCase):
         out = notice("integrator", sd)
         self.assertIn("(unknown tool) type /ptt-inbox (Claude Code) or $ptt-inbox (Codex)", out)
         self.assertNotIn("nudge:", out)
+
+    def test_tool_bound_tasks_check_environment_and_amendments(self):
+        d = self.designer()
+        for tool, key, other in (("claude", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID"),
+                                  ("codex", "CODEX_SESSION_ID", "CLAUDE_CODE_SESSION_ID")):
+            with self.subTest(tool=tool):
+                path = Path(self.ptt("mktask", tool, "--as", d, "--tool", tool).stdout.strip())
+                self.fill(path)
+                n = path.parent.name.split("-")[0]
+                ready = self.ptt("ready", n, "--as", d).stdout
+                self.assertEqual("  Claude Code:" in ready, tool == "claude")
+                self.assertEqual("  Codex:" in ready, tool == "codex")
+                for wrong in (None, "PTT_SESSION_ID", other):
+                    env = dict(self.env(), **({wrong: "wrong"} if wrong else {}))
+                    r = run("python3", str(self.rec / "bin/ptt"), "take", n, env=env, check=False)
+                    self.assertNotEqual(r.returncode, 0)
+                    self.assertIn(f"requires tool {tool}", r.stderr)
+                    self.assertFalse((path.parent / "status.md").exists())
+                env = dict(self.env(), **{key: tool})
+                r = run("python3", str(self.rec / "bin/ptt"), "take", n, env=env)
+                holder = r.stdout.strip()
+                run("python3", str(self.rec / "bin/ptt"), "leave", holder, env=env)
+                out = self.ptt("approve-leave", n, "--as", d).stdout
+                self.assertEqual("  Claude Code:" in out, tool == "claude")
+                self.assertEqual("  Codex:" in out, tool == "codex")
+                replacement = "codex" if tool == "claude" else "claude"
+                self.ptt("amend", n, "--as", d, "--text", "switch tool", "--tool", replacement)
+                refused = run("python3", str(self.rec / "bin/ptt"), "take", n, env=env, check=False)
+                self.assertNotEqual(refused.returncode, 0)
+                self.assertIn(f"requires tool {replacement}", refused.stderr)
+                env = dict(self.env(), **{other: "replacement"})
+                holder = run("python3", str(self.rec / "bin/ptt"), "take", n, env=env).stdout.strip()
+                self.ptt("free", n, "--as", d, "--reason", "test", "--force")
+                self.ptt("amend", n, "--as", d, "--text", "remove tool restriction", "--tool", "any")
+                self.ptt("take", n)  # unknown tool now accepted
+                self.ptt("free", n, "--as", d, "--reason", "test", "--force")
+
+    def test_any_tool_and_invalid_tool_values(self):
+        d = self.designer()
+        path = Path(self.ptt("mktask", "any-tool", "--as", d, "--tool", "any").stdout.strip())
+        self.fill(path)
+        n = path.parent.name.split("-")[0]
+        ready = self.ptt("ready", n, "--as", d).stdout
+        self.assertIn("  Claude Code:", ready)
+        self.assertIn("  Codex:", ready)
+        for key in (None, "PTT_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+            env = dict(self.env(), **({key: "test-id"} if key else {}))
+            run("python3", str(self.rec / "bin/ptt"), "take", n, env=env)
+            self.ptt("free", n, "--as", d, "--reason", "test", "--force")
+        before = run("git", "-C", str(self.rec), "rev-parse", "HEAD").stdout
+        self.assertIn("invalid choice", self.refused("mktask", "bad", "--as", d, "--tool", "other"))
+        self.assertIn("invalid choice", self.refused("amend", n, "--as", d, "--text", "bad", "--tool", "other"))
+        self.assertEqual(before, run("git", "-C", str(self.rec), "rev-parse", "HEAD").stdout)
+        invalid = Path(self.ptt("mktask", "invalid", "--as", d, "--tool", "any").stdout.strip())
+        self.fill(invalid)
+        invalid.write_text(invalid.read_text().replace("tool: any", "tool: other"))
+        self.assertIn("tool must be", self.refused("ready", "invalid", "--as", d))
+        self.assertFalse(list(invalid.parent.glob("*-release.md")))
+        # Invalid metadata is also refused at take, including an older released charter.
+        path.write_text(path.read_text().replace("tool: any", "tool: other"))
+        self.assertIn("tool must be", self.refused("take", n))
 
     def test_freed_roles_and_tasks_print_take_lines(self):
         (self.rec / "project-code").write_text("prtr\n")

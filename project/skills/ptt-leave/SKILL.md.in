@@ -30,7 +30,8 @@ writes; other work needs AtE (rules file). `<name>` is your holder name.
      the approval reaches this session through its inbox (`/ptt-inbox`, or
      with an active prompt hook at the user's next message).
    - The designer and the integrator leave at once: the user supervises
-     them, and the command is the approval. Pass on the printed lines that
+     them, and the command is the approval. Pass on the printed `/rename`
+     line so this session's name shows that it ended, and the lines that
      start a new session taking the role.
 3. After leaving, offer the user to clear this session.
 
