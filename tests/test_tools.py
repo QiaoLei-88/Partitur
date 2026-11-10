@@ -545,6 +545,10 @@ class InstallProject(unittest.TestCase):
         for directory in (".agents", ".claude"):
             found = skill_files(self.root / directory / "skills")
             self.assertEqual(sorted(p.parent.name for p in found), sorted(expected))
+            brief = self.root / directory / "skills/ptt-brief"
+            self.assertIn("disable-model-invocation: true", (brief / "SKILL.md").read_text())
+            self.assertEqual((brief / "agents/openai.yaml").read_text(),
+                             "policy:\n  allow_implicit_invocation: false\n")
             for path in found:
                 if path.parent.name.startswith("ptt-"):
                     self.assertNotIn("<records>", path.read_text())

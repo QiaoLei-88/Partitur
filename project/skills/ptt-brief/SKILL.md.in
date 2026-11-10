@@ -1,0 +1,40 @@
+---
+name: ptt-brief
+description: "Brief the user on this session's work: what happened, who acts next, and what needs the user's decision. Reads records only. No arguments."
+disable-model-invocation: true
+---
+
+# Brief the user
+
+The command, or an AtE naming these records, approves the records this skill
+writes (it writes none); other work needs AtE (rules file).
+
+1. Run `<records>/bin/ptt whoami` to identify the holder bound to this
+   session. If no holder is bound here, report that and stop; taking or
+   resuming is the user's choice.
+2. Run `<records>/bin/ptt who`, `<records>/bin/pr list`, and
+   `<records>/bin/ptt inbox` for this session's holder. The inbox advances
+   its usual read marker; this skill creates no records.
+3. Read the records behind the items, within the holder's scope:
+   - Designer: its design task (`<records>/bin/ptt show N`), its tasks'
+     `status.md` files, and their open requests. Use `<records>/bin/ptt
+     tasks` and the charters to identify the tasks it supervises.
+   - Integrator: `<records>/handoff/integrator.md` and the open requests.
+   - Task holder: its own task (`<records>/bin/ptt show N`) and requests.
+   Read the status records and notes these items name, and use
+   `<records>/bin/pr show N` for each relevant request, including a merged
+   or closed request named by a status or inbox item. Use `pr list all`
+   when needed to find those requests. Take request state from `pr list`,
+   not a status record. Mark missing or unread evidence Unknown; never
+   report a change you have not read.
+4. Report as the rules file says: an overview line per item, then one topic
+   at a time. Each line says what happened and who acts next, with short
+   IDs and named subjects. Mark the items waiting on the user and the
+   topic now taken up. Take up the first item waiting on the user alone,
+   ending with its own decision list; the next topic follows the user's
+   answer. If no item needs the user's decision, state who acts next and
+   stop. Refresh `ptt who` before naming holders or who acts next.
+
+This is a briefing only: write no status, note, review, decision, or other
+record, and do not carry out the reported next steps. In Codex invoke it
+as `$ptt-brief`; in Claude Code, `/ptt-brief`.

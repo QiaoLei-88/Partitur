@@ -235,6 +235,24 @@ class Repo(unittest.TestCase):
             self.assertIn("Report as the rules file says: an overview line per item, "
                           "then one topic at a time.", text, name)
 
+    def test_brief_reads_the_holders_scope_before_reporting(self):
+        """T0017 amendment 0002: a user-only briefing, without new records."""
+        text = " ".join((ROOT / "project/skills/ptt-brief/SKILL.md.in").read_text().split())
+        for phrase in ("`<records>/bin/ptt whoami`", "If no holder is bound here",
+                       "`<records>/bin/ptt who`", "`<records>/bin/pr list`",
+                       "`<records>/bin/ptt inbox`", "Designer:", "Integrator:",
+                       "Task holder:", "Read the status records and notes",
+                       "`<records>/bin/pr show N`", "pr list all",
+                       "Mark missing or unread evidence Unknown",
+                       "never report a change you have not read",
+                       "overview line per item, then one topic at a time",
+                       "Mark the items waiting on the user",
+                       "first item waiting on the user alone",
+                       "If no item needs the user's decision",
+                       "write no status, note, review, decision, or other record",
+                       "do not carry out the reported next steps"):
+            self.assertIn(phrase, text)
+
     def test_reply_is_drafted_and_released_by_its_own_commands(self):
         """Replies to a review: /ptt-pr-draft-reply writes nothing, /ptt-pr-reply
         releases; /ptt-pr-submit no longer replies."""
