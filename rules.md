@@ -167,6 +167,7 @@ project's development notes.
 | G20 | A holder answers an amendment it has acted on with an adopt event (`ptt adopt`); an amendment waits in its inbox until adopted, across resumes; a new take reads them all and starts with none waiting; a disagreement is a note to the designer | Adopted |
 | G21 | Taking or resuming names the session `<project>-<holder>-<hash>` (four-letter codes; the session ID's last six hex digits, the window sliding on a collision), recorded once in that event; the user applies it with the printed `/rename` line so that nudges reach the session | Exercised |
 | G22 | When a task is released or a role becomes free, `ptt` prints a ready-to-paste start line: `claude -n <project>-<holder part> "/ptt-take N"` (a provisional name until take prints the full one) and, for Codex, `codex '$ptt-take N'` | Adopted |
+| G23 | A holder's inbox mark moves only when its bound session, or a session without a session ID, reads its inbox; another session reading it by name (a cleared session reached by a nudge before `/ptt-resume`, a supervisor) sees the same items and leaves them new | Proposed |
 
 ## Nesting rules
 
