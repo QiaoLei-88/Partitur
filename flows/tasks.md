@@ -35,7 +35,13 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
    `track-T0007-2` for a task's second holder), which is its `--as` name and
    its `session:` in every message (G1, G2).
 2. **Conflicts are refused.** A held role or task cannot be taken; a second
-   simultaneous take loses. Nothing is overridden silently (G1).
+   simultaneous take loses. A charter's optional `tool:` restricts taking
+   to `claude` or `codex`; absent or `any` accepts either, including an
+   unknown tool. A restricted task refuses a mismatch or unknown tool.
+   Identity comes from `CLAUDE_CODE_SESSION_ID`, then `CODEX_THREAD_ID` or
+   `CODEX_SESSION_ID`; `PTT_SESSION_ID` alone names no tool. `mktask --tool`
+   sets the field, and `amend --tool` replaces it for future takes without
+   changing an existing hold. Nothing is overridden silently (G1).
 3. **Taking is not approval to work.** The user's command records the role;
    writes still need the user's AtE (A2).
 4. **Supervision is a tree.** A top-level task's (`T0007`) supervisor is

@@ -138,7 +138,8 @@ hash, the part known before the take; the take then prints the full name
 and its `/rename` line. Codex cannot name a session at start (no such
 option), so its line only takes; its prompt names the skill as `$ptt-take`
 in single quotes, so that the shell leaves the `$` alone. A blocked task
-gets no lines until it can be taken.
+gets no lines until it can be taken. A task restricted by `tool:` prints
+only that tool's line; `any` or an absent field prints both.
 
 Any session can derive a holder's current session name from the records:
 the address a later cross-session message would use. Without a session ID

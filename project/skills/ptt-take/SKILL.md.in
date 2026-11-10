@@ -14,7 +14,7 @@ takes, approves recording it (an AtE does not); the work itself needs AtE
    which one. Stop.
 2. `<records>/bin/ptt take <designer|integrator|task>` (`designer` is
    `T0000`; a task by ID `T0007`, `7`, `T0007.1`, or name `wall-distance`).
-   If refused (held, draft, blocked), report why and stop; never work around
+   If refused (held, draft, blocked, or incompatible/unknown tool), report why and stop; never work around
    it.
 3. The tool prints your holder name (`designer-g2`, `integrator-1`,
    `track-T0007`). It is your name from now on: `--as NAME` (the NAME

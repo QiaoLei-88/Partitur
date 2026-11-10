@@ -5,6 +5,11 @@ released; later changes are amendments (`ptt amend`). The holder writes only
 `status.md` next to it. This charter authorizes nothing: writes, builds,
 commits, and requests need the user's AtE as usual.
 
+The optional front-matter `tool:` is `claude`, `codex`, or `any` (the
+default when absent). Set it with `ptt mktask --tool` or in this draft;
+after release, change it with `ptt amend --tool`. A restricted task can be
+taken only by a session whose tool is known and matches.
+
 ## Goal
 
 {{WHAT this task must achieve, and why, in two or three sentences}}

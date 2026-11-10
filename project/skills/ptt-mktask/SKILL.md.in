@@ -16,8 +16,9 @@ subtasks of its scope. `<name>` is your holder name.
 1. From the recent discussion, decide with the user: a slug
    (`wall-distance`), the kind (`track` research, `worker` implementation,
    `design` a sub-scope with its own tasks), and the tasks it depends on, if
-   any.
-2. `<records>/bin/ptt mktask <slug> --as <name> --kind <kind> [--depends N,N]`
+   any; also a tool restriction if needed (`claude`, `codex`, or `any`,
+   the default when absent).
+2. `<records>/bin/ptt mktask <slug> --as <name> --kind <kind> [--depends N,N] [--tool claude|codex|any]`
    prints the charter's path.
 3. Fill in the charter from the discussion (or a brief the user names, cited
    as its source): goal, read-first list by repository, path, and commit or
@@ -35,14 +36,17 @@ subtasks of its scope. `<name>` is your holder name.
 
 For a complete draft: `<records>/bin/ptt ready <N> --as <name>`: the charter
 is committed and frozen; the task can be taken (`/ptt-take <N>`). Pass on
-the printed lines that start a new session taking it (Claude Code, Codex),
+the printed lines that start a new session taking it (only the permitted
+tool for a restricted task),
 for the user to paste in the workspace root.
 
 ## Amend (`amend N`)
 
 A released charter is never edited; an agreed change is an amendment:
 `<records>/bin/ptt amend <N> --as <name> --text "<change>"`, with `--depends
-N,N` to replace its dependencies (checked for cycles). A holder sees it in
+N,N` to replace its dependencies (checked for cycles), and `--tool
+claude|codex|any` to replace its tool restriction. This affects future takes;
+an existing holder keeps the task. A holder sees it in
 its inbox (with an active prompt hook, at the user's next message;
 otherwise at its next `/ptt-inbox`).
 

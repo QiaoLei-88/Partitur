@@ -35,9 +35,10 @@ task; a task is given by its ID, `T0007` (also `0007` or `7`), sub-task
                                    supervisor (or --as user): free a task or role whose
                                    holder is gone
   ptt mktask SLUG --as NAME [--kind track|worker|design] [--depends TASK,TASK]
+             [--tool claude|codex|any]
                                    designer: create a draft task; prints its charter path
   ptt ready TASK --as NAME         designer: release a completed draft for taking
-  ptt amend TASK --as NAME --text TEXT [--depends TASK,TASK]
+  ptt amend TASK --as NAME --text TEXT [--depends TASK,TASK] [--tool claude|codex|any]
                                    designer: amend a released charter
   ptt adopt TASK N[,N] --as NAME [--text TEXT]
                                    holder: adopt the named amendment event numbers
@@ -95,7 +96,12 @@ before its `resume`, or a supervisor looking) sees the same items, and they
 stay new for NAME's own session. Hints name a skill command in the calling
 tool's notation, known from those variables: `/ptt-...` in Claude Code,
 `$ptt-...` in Codex, and both where neither is set (PTT_SESSION_ID alone
-names no tool).
+names no tool). A charter may restrict `tool:` to claude or codex (absent
+or any: unrestricted). `take` refuses a mismatch or unknown calling tool;
+`ready` and later take offers print only the allowed tool's command.
+`mktask --tool` sets it; `amend --tool` replaces it, without changing an
+existing hold. Tool identity comes from those environment variables, not
+from a session ID's shape; PTT_SESSION_ID alone identifies no tool.
 
 Session names: `take` and `resume` with a session ID also give the session a
 name, recorded in that event as `session_name` and never recomputed, and
@@ -628,7 +634,7 @@ def raw_info(place, d):
     charter = front_matter(d / "charter.md")[0] if (d / "charter.md").exists() else {}
     number = TASK_DIR.match(d.name).group(1)
     info = dict(number=number, slug=d.name.split("-", 1)[1], dir=d, place=place,
-                kind=charter.get("kind", "track"),
+                kind=charter.get("kind", "track"), tool=charter.get("tool", "any"),
                 depends=parse_ids(charter.get("depends", "")),
                 state="ready" if number == ROOT else "draft", holder=None, last_holder=None,
                 takes=0, sessions=[],
@@ -638,6 +644,8 @@ def raw_info(place, d):
         if k == "release":
             info["state"] = "ready"
         elif k == "amend":
+            if "tool" in e:
+                info["tool"] = e["tool"]
             if "depends" in e:
                 info["depends"] = parse_ids(e["depends"])
             if info["holder"]:
@@ -748,6 +756,15 @@ def session_id():
     """This session's ID, if the agent tool gives one."""
     return (os.environ.get("PTT_SESSION_ID") or os.environ.get("CLAUDE_CODE_SESSION_ID")
             or os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID") or None)
+
+
+def calling_tool():
+    """The calling tool, independent of an overridden session ID."""
+    if os.environ.get("CLAUDE_CODE_SESSION_ID"):
+        return "claude"
+    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID"):
+        return "codex"
+    return None
 
 
 def short_code(word):
@@ -865,24 +882,26 @@ def rename_line(name):
     by that name; Codex gets no nudges, so there it only shows the name."""
     claude = f"so that automatic messages reach this session, rename it: /rename {name}"
     codex = f"to show it, type: /rename {name}"
-    if os.environ.get("CLAUDE_CODE_SESSION_ID"):
+    if calling_tool() == "claude":
         return claude[0].upper() + claude[1:]
-    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID"):
+    if calling_tool() == "codex":
         return codex
     return f"In Claude Code, {claude}; in Codex, {codex}"
 
 
-def take_lines(what, holder):
+def take_lines(what, holder, tool="any"):
     """Print ready-to-paste lines that start a session in the workspace root
     taking WHAT (`designer`, `integrator`, or a task as typed: `10`, `7.1`),
     whose holder will be `holder`. Claude Code names the new session by its
     session name without the hash, until take prints the full name and its
     /rename line; Codex cannot name a session at start, so its line only
-    takes."""
+    takes. A restricted task prints only its tool's line."""
     name = f"{project_code()}-{holder_code(holder)}"
-    print(f"to take it in a new session, in {REC.parent}:\n"
-          f"  Claude Code: claude -n {name} \"/ptt-take {what}\"\n"
-          f"  Codex: codex '$ptt-take {what}'")
+    print(f"to take it in a new session, in {REC.parent}:")
+    if tool in ("any", "claude"):
+        print(f'  Claude Code: claude -n {name} "/ptt-take {what}"')
+    if tool in ("any", "codex"):
+        print(f"  Codex: codex '$ptt-take {what}'")
 
 
 def offer_task(number):
@@ -891,7 +910,7 @@ def offer_task(number):
     if i["state"] == "ready":
         first, *rest = number.split(".")
         take_lines("designer" if number == ROOT else ".".join([str(int(first)), *rest]),
-                   holder_name(i))
+                   holder_name(i), i["tool"])
 
 
 def offer_role(role):
@@ -909,9 +928,9 @@ def show_session_name(name):
 def skill(command):
     """COMMAND (`ptt-resume NAME`) as the user types it in the calling tool:
     `/ptt-...` in Claude Code, `$ptt-...` in Codex, both when neither is known."""
-    if os.environ.get("CLAUDE_CODE_SESSION_ID"):
+    if calling_tool() == "claude":
         return f"/{command}"
-    if os.environ.get("CODEX_THREAD_ID") or os.environ.get("CODEX_SESSION_ID"):
+    if calling_tool() == "codex":
         return f"${command}"
     return f"/{command} in Claude Code, ${command} in Codex"
 
@@ -1171,6 +1190,10 @@ def cmd_take(a):
     detail = (f" (held by {i['holder']})" if i["holder"] else "") + \
              (f" (waits for {', '.join(map(tid, i['blocked_by']))})" if i.get("blocked_by") else "")
     need(i["state"] == "ready", f"task {tid(i['number'])} is {i['state']}{detail}; cannot take it")
+    need(i["tool"] in ("claude", "codex", "any"), "task tool must be claude, codex, or any")
+    need(i["tool"] == "any" or i["tool"] == calling_tool(),
+         f"task {tid(i['number'])} requires tool {i['tool']}; "
+         f"this session's tool is {calling_tool() or 'unknown'}")
     name = holder_name(i)
     status = i["dir"] / "status.md"
     extra = []
@@ -1305,7 +1328,8 @@ def cmd_mktask(a):
     template = TASKS / "charter-template.md"
     body = template.read_text() if template.exists() else "# Task {{NUMBER}}: {{TITLE}}\n"
     text = (f"---\ntask: {tid(number)}\nkind: {a.kind}\ndepends: {', '.join(map(tid, depends))}\n"
-            f"designer: {a.as_}\ndate: {date.today().isoformat()}\n---\n\n"
+            + (f"tool: {a.tool}\n" if a.tool is not None else "")
+            + f"designer: {a.as_}\ndate: {date.today().isoformat()}\n---\n\n"
             + body.replace("{{TITLE}}", a.slug.replace("-", " ").capitalize())
                   .replace("{{NUMBER}}", tid(number)))
     (d / "charter.md").write_text(text)
@@ -1321,6 +1345,7 @@ def cmd_ready(a):
     need("{{" not in charter, f"the charter of task {tid(i['number'])} still has {{{{...}}}} "
          "placeholders; fill them in first")
     need(i["kind"] in KINDS, f"kind '{i['kind']}' must be one of {', '.join(KINDS)}")
+    need(i["tool"] in ("claude", "codex", "any"), "task tool must be claude, codex, or any")
     deps = check_depends(i["number"], i["depends"])
     need(deps == i["depends"], "write the charter's `depends:` as task IDs: "
          + ", ".join(map(tid, deps)))
@@ -1337,6 +1362,8 @@ def cmd_amend(a):
          f"task {tid(i['number'])} is {i['state']}: a draft is edited directly, a finished task "
          "is not amended")
     fields = dict(by=a.as_)
+    if a.tool is not None:
+        fields["tool"] = a.tool
     if a.depends is not None:
         fields["depends"] = ", ".join(map(tid, check_depends(
             i["number"], [x.strip() for x in a.depends.split(",") if x.strip()])))
@@ -2014,9 +2041,11 @@ def run_main():
     add("leave", "name", status=dict())
     add("approve-leave", "task", as_=True)
     add("free", "what", as_=True, reason=dict(required=True), force=dict(action="store_true"))
-    add("mktask", "slug", as_=True, kind=dict(default="track"), depends=dict())
+    add("mktask", "slug", as_=True, kind=dict(default="track"), depends=dict(),
+        tool=dict(choices=("claude", "codex", "any")))
     add("ready", "task", as_=True)
-    add("amend", "task", as_=True, text=dict(required=True), depends=dict())
+    add("amend", "task", as_=True, text=dict(required=True), depends=dict(),
+        tool=dict(choices=("claude", "codex", "any")))
     add("adopt", "task", "numbers", as_=True, text=dict())
     add("done", "task", as_=True, requests=dict(), text=dict())
     add("close", "task", as_=True)

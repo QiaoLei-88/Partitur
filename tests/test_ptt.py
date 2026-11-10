@@ -1505,6 +1505,67 @@ class Ptt(unittest.TestCase):
         self.assertIn("(unknown tool) type /ptt-inbox (Claude Code) or $ptt-inbox (Codex)", out)
         self.assertNotIn("nudge:", out)
 
+    def test_tool_bound_tasks_check_environment_and_amendments(self):
+        d = self.designer()
+        for tool, key, other in (("claude", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID"),
+                                  ("codex", "CODEX_SESSION_ID", "CLAUDE_CODE_SESSION_ID")):
+            with self.subTest(tool=tool):
+                path = Path(self.ptt("mktask", tool, "--as", d, "--tool", tool).stdout.strip())
+                self.fill(path)
+                n = path.parent.name.split("-")[0]
+                ready = self.ptt("ready", n, "--as", d).stdout
+                self.assertEqual("  Claude Code:" in ready, tool == "claude")
+                self.assertEqual("  Codex:" in ready, tool == "codex")
+                for wrong in (None, "PTT_SESSION_ID", other):
+                    env = dict(self.env(), **({wrong: "wrong"} if wrong else {}))
+                    r = run("python3", str(self.rec / "bin/ptt"), "take", n, env=env, check=False)
+                    self.assertNotEqual(r.returncode, 0)
+                    self.assertIn(f"requires tool {tool}", r.stderr)
+                    self.assertFalse((path.parent / "status.md").exists())
+                env = dict(self.env(), **{key: tool})
+                r = run("python3", str(self.rec / "bin/ptt"), "take", n, env=env)
+                holder = r.stdout.strip()
+                run("python3", str(self.rec / "bin/ptt"), "leave", holder, env=env)
+                out = self.ptt("approve-leave", n, "--as", d).stdout
+                self.assertEqual("  Claude Code:" in out, tool == "claude")
+                self.assertEqual("  Codex:" in out, tool == "codex")
+                replacement = "codex" if tool == "claude" else "claude"
+                self.ptt("amend", n, "--as", d, "--text", "switch tool", "--tool", replacement)
+                refused = run("python3", str(self.rec / "bin/ptt"), "take", n, env=env, check=False)
+                self.assertNotEqual(refused.returncode, 0)
+                self.assertIn(f"requires tool {replacement}", refused.stderr)
+                env = dict(self.env(), **{other: "replacement"})
+                holder = run("python3", str(self.rec / "bin/ptt"), "take", n, env=env).stdout.strip()
+                self.ptt("free", n, "--as", d, "--reason", "test", "--force")
+                self.ptt("amend", n, "--as", d, "--text", "remove tool restriction", "--tool", "any")
+                self.ptt("take", n)  # unknown tool now accepted
+                self.ptt("free", n, "--as", d, "--reason", "test", "--force")
+
+    def test_any_tool_and_invalid_tool_values(self):
+        d = self.designer()
+        path = Path(self.ptt("mktask", "any-tool", "--as", d, "--tool", "any").stdout.strip())
+        self.fill(path)
+        n = path.parent.name.split("-")[0]
+        ready = self.ptt("ready", n, "--as", d).stdout
+        self.assertIn("  Claude Code:", ready)
+        self.assertIn("  Codex:", ready)
+        for key in (None, "PTT_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID", "CODEX_SESSION_ID"):
+            env = dict(self.env(), **({key: "test-id"} if key else {}))
+            run("python3", str(self.rec / "bin/ptt"), "take", n, env=env)
+            self.ptt("free", n, "--as", d, "--reason", "test", "--force")
+        before = run("git", "-C", str(self.rec), "rev-parse", "HEAD").stdout
+        self.assertIn("invalid choice", self.refused("mktask", "bad", "--as", d, "--tool", "other"))
+        self.assertIn("invalid choice", self.refused("amend", n, "--as", d, "--text", "bad", "--tool", "other"))
+        self.assertEqual(before, run("git", "-C", str(self.rec), "rev-parse", "HEAD").stdout)
+        invalid = Path(self.ptt("mktask", "invalid", "--as", d, "--tool", "any").stdout.strip())
+        self.fill(invalid)
+        invalid.write_text(invalid.read_text().replace("tool: any", "tool: other"))
+        self.assertIn("tool must be", self.refused("ready", "invalid", "--as", d))
+        self.assertFalse(list(invalid.parent.glob("*-release.md")))
+        # Invalid metadata is also refused at take, including an older released charter.
+        path.write_text(path.read_text().replace("tool: any", "tool: other"))
+        self.assertIn("tool must be", self.refused("take", n))
+
     def test_freed_roles_and_tasks_print_take_lines(self):
         (self.rec / "project-code").write_text("prtr\n")
         root = self.root.resolve()
