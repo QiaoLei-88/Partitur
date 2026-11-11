@@ -26,6 +26,10 @@ skipped in practice, are as valuable as new rules.
 - Run the tests before submitting: `python3 -m unittest discover -s tests`.
   A change to a tool comes with a test.
 - One logical change per commit, with its tests and documentation.
+- Each request changing user-facing behavior adds an entry at the top of
+  `Unreleased` in [RELEASE-NOTES.md](RELEASE-NOTES.md): what changed and any
+  action needed after updating. Use one or two lines per entry, newest first,
+  with a `- ` bullet and indented continuation; keep entries independent.
 - `bin/install` must stay safe to rerun: it never overwrites or deletes,
   and it never compares a file the project owns once created.
 

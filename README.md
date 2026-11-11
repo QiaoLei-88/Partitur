@@ -202,6 +202,7 @@ still *Proposed*, such as freeing a silent holder or sub-design scopes.
 
 ## Contents
 
+- [Release notes](RELEASE-NOTES.md): user-facing changes and actions after updating.
 - [Model](model.md): concepts, invariants, scopes and nesting, information
   flow.
 - Roles: [user](roles/user.md), [designer](roles/designer.md),
