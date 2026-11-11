@@ -34,8 +34,9 @@ project's development notes.
 | A14 | The decision list follows its question line directly, never another numbered list (Markdown renders adjacent lists as one and renumbers the second) | Adopted |
 | A15 | A number that is not an option means the user may have seen another rendering: the session says so and asks again as the user saw it | Adopted |
 | A16 | A read-only step started by a nudge (reporting an item, reading a note, checking a done report, a review by `ptt-pr-review` steps 1-6, a reply drafted but not recorded) is approved as the command it replaces would be, for that command's own records only; everything else waits for the user | Adopted |
-| A17 | Two or more decisions in one message are labelled: a letter per question, its options a bulleted list (`A1`, `A2`; bullets, which nothing renumbers), recommendation first, the last `No decision, discuss further`; the user answers with labels and AtE, any subset; a label without AtE is discussion; the message ends with the line `ALL1 AtE`: accept every recommendation, which takes option 1 of every question, exceptions following (`ALL1 B2 AtE`) | Adopted |
+| A17 | Two or more decisions of one topic in one message are labelled: a letter per question, its options a bulleted list (`A1`, `A2`; bullets, which nothing renumbers), recommendation first, the last `No decision, discuss further`; the user answers with labels and AtE, any subset; a label without AtE is discussion; the message ends with the line `ALL1 AtE`: accept every recommendation, which takes option 1 of every question, exceptions following (`ALL1 B2 AtE`) | Adopted |
 | A18 | After taking or resuming a role or task, a session goes on read-only by itself: a task holder reads its charter's sources and amendments, inspects the code, and presents a plan ending in a decision list; the integrator lists requests and `pr gc`; a designer reports what waits on it; writing still waits for AtE | Adopted |
+| A19 | Reports to the user go one topic at a time, concise and to the point (cut words, never parts): an overview line per topic saying what happened and who acts next; then the topic alone: its goal, where it stands, and the user's part, one of none (why, and who drives the work), an action (where, and the exact text ready to paste; what the session can do itself, it does), or a decision (first its conflict, two sides, wording or behaviour, apart from the background; then the options, each with cost and gain); short IDs without leading zeros, a request named with its task (`PR 29 (T18)`), every subject named | Proposed |
 
 ## Roles
 
@@ -78,6 +79,9 @@ project's development notes.
 | C17 | Every message names the session that wrote it; sessions are named when they are opened | Exercised |
 | C18 | Merge messages read `Merge <branch> (pr NNNNNN)` | Exercised |
 | C19 | A request may be withdrawn: the user decides, the integrator records it and moves the request to `closed/` | Proposed |
+| C20 | Each charter states its merge order (which requests merge first, why, and when the condition lapses); `depends:` gates taking, merge order gates merging; a change of order is an amendment of the waiting task; the integrator checks the order against request states, ancestry, and file overlap in its review and sends order questions to the designer | Proposed |
+| C21 | Reviewing `all` selects, per repository, only the first request in merge order and reviews those of different repositories in the same run; the others are listed as waiting for a rebase; decisions are asked one request per message, labelled within one request (A17) | Proposed |
+| C22 | A merged request naming a task gives the task's direct supervisor an inbox notice and nudge, unless the supervisor authored it; a request without a task, or closed without merge, gives none | Proposed |
 
 ## Handoff and information flow
 
@@ -94,7 +98,9 @@ project's development notes.
 | D9 | Findings meant for another session go into a file, not only into chat | Exercised |
 | D10 | Two label axes. Decisions: Agreed, Proposed, Open. Evidence: Documented, Source, Inferred, Tested, Unknown | Exercised for the decision axis and for Source, Inferred, Tested, Unknown; Adopted for Documented |
 | D17 | Agreed applies only to the wording the user agreed; an agreed intent with changed wording goes back to the user | Exercised |
-| D18 | After a record, the writing session nudges each holder it gave inbox news (except a subordinate's `status.md`) by a cross-session message to its recorded session name, if listed: it subscribes to the recipient's idle notice and on it sends only "new in your inbox"; fire-and-forget, the inbox stays the source of truth and `ptt who` shows unseen items; a master switch (`ptt nudges`) turns nudges off; Claude Code only | Exercised by hand; Adopted as printed by `ptt` |
+| D18 | After a record, the writing session nudges each holder it gave inbox news (except a subordinate's `status.md`) by a cross-session message to its recorded session name, if listed: it subscribes to the recipient's idle notice and on it sends only "new in your inbox"; fire-and-forget, the inbox stays the source of truth and `ptt who` shows unseen items; a master switch (`ptt nudges`) turns nudges off; between Claude Code sessions, by live session name (Codex: D20) | Exercised by hand; Adopted as printed by `ptt` |
+| D19 | The user dictates a note with `/ptt-note <recipient>` (a user-only command): the session writes it from the user's gist and records it at once, without a draft, a correction being a new note; a notice to a target the writer cannot nudge prints a `carry:` line naming the session, its tool, and the command to type | Proposed |
+| D20 | Between Codex sessions on one machine, `ptt` queues the inbox notice by the recipient's recorded session UUID (`codex queue`, command configurable); accepted is not delivered, and a closed session may receive it on resume (deferred delivery accepted); a failed queue keeps the record and prints a carry line; a session started by a nudge first rechecks the switch and that it is still bound to the addressed holder; other tool pairs and machines carry by hand | Proposed |
 | D11 | A stage closes with a written close: results, carried-forward items, and the next stage's charter | Exercised |
 | D12 | Findings travel between sessions as files; the user carries notices between sessions | Exercised |
 | D12b | Sessions message each other directly | Proposed |
@@ -168,6 +174,9 @@ project's development notes.
 | G21 | Taking or resuming names the session `<project>-<holder>-<hash>` (four-letter codes; the session ID's last six hex digits, the window sliding on a collision), recorded once in that event; the user applies it with the printed `/rename` line so that nudges reach the session | Exercised |
 | G22 | When a task is released or a role becomes free, `ptt` prints a ready-to-paste start line: `claude -n <project>-<holder part> "/ptt-take N"` (a provisional name until take prints the full one) and, for Codex, `codex '$ptt-take N'` | Adopted |
 | G23 | A holder's inbox mark moves only when its bound session, or a session without a session ID, reads its inbox; another session reading it by name (a cleared session reached by a nudge before `/ptt-resume`, a supervisor) sees the same items and leaves them new | Proposed |
+| G24 | When a hold ends (closed, cancelled, left, freed), `ptt` prints a rename line for the last bound session with that word in place of the hash; nudges never go to an ended name | Proposed |
+| G25 | A charter's optional `tool:` (`claude`, `codex`, `any`, the default) restricts taking to that tool; `ptt mktask --tool` sets it and `ptt amend --tool` changes it for later takes | Proposed |
+| G26 | When a done report misses an acceptance criterion, the supervisor offers to reopen the task with the missing criteria as reason; waiting applies only before a done report | Proposed |
 
 ## Nesting rules
 
