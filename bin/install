@@ -105,6 +105,14 @@ its output and the next steps, for an agent session to read ("Read
 partitur-install-report.md and help me finish the Partitur install"). It
 lies outside the records repository, is never committed, and is
 overwritten by the next run.
+For an existing project, --update prints new RELEASE-NOTES.md entries
+compared with the stamped commit in this clone. Plain install counts them and keeps
+that comparison stamp until --update; its other install behavior is unchanged.
+An older commit without RELEASE-NOTES.md gives a reading pointer instead.
+An unknown commit shows Unreleased, labelled as an inexact comparison. First installs
+point to RELEASE-NOTES.md. Release notes output is also in the install report.
+The installed and source commits show their annotated v0.N tags, when this
+clone has tags pointing directly at those commits; hashes remain the identity.
 The user scope is one link per tool and keeps no stamp: its installed sides
 are the `partitur` links to a Partitur clone. Install adds the detected or
 --tool sides and reports the others present; --uninstall removes every
@@ -120,6 +128,7 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -136,6 +145,7 @@ LEGACY_RULES = "CLAUDE.md"         # the rules file's name in the records before
 class Report:
     def __init__(self, base):
         self.base, self.counts, self.paths = base, {}, []
+        self.changes_pending = False
 
     def __call__(self, kind, path, note=""):
         self.counts[kind] = self.counts.get(kind, 0) + 1
@@ -154,12 +164,32 @@ def file_sha(path):
 def partitur_commit():
     """The Partitur commit being installed, or None for uncommitted changes."""
     r = subprocess.run(["git", "-C", str(HERE), "status", "--porcelain", "--untracked-files=no",
-                        "--", "bin", "project", "templates"], capture_output=True, text=True)
+                        "--", "bin", "project", "templates", "RELEASE-NOTES.md"],
+                       capture_output=True, text=True)
     if r.returncode or r.stdout.strip():
         return None
     r = subprocess.run(["git", "-C", str(HERE), "rev-parse", "HEAD"], capture_output=True,
                        text=True)
     return r.stdout.strip() or None
+
+
+def version_label(commit):
+    """Add exact annotated v0.N tags without replacing the commit identity."""
+    if commit is None:
+        return "uncommitted"
+    result = subprocess.run(
+        ["git", "-C", str(HERE), "for-each-ref", f"--points-at={commit}",
+         "--format=%(refname:strip=2) %(objecttype)", "refs/tags/v0.*"],
+        capture_output=True, text=True)
+    if result.returncode:
+        return commit
+    tags = []
+    # shortcut: v0.N versions only; extend the pattern at the first stable release.
+    for line in result.stdout.splitlines():
+        name, kind = line.split()
+        if kind == "tag" and re.fullmatch(r"v0\.[1-9][0-9]*", name):
+            tags.append(name)
+    return commit + (f" ({', '.join(tags)})" if tags else "")
 
 
 class Source:
@@ -198,6 +228,52 @@ def rules_name(src):
 def known_commit(commit):
     return commit and subprocess.run(["git", "-C", str(HERE), "cat-file", "-e",
                                       f"{commit}^{{commit}}"], capture_output=True).returncode == 0
+
+
+def change_entries(text, section=None):
+    """Read top-level '- ' entries with indented continuation lines."""
+    entries, active, continuing = [], section is None, False
+    for line in text.splitlines():
+        if line.startswith("## "):
+            active = section is None or line[3:].strip() == section
+            continuing = False
+        elif active and line.startswith("- "):
+            entries.append(line.rstrip())
+            continuing = True
+        elif continuing and line.startswith("  "):
+            entries[-1] += "\n" + line.rstrip()
+        else:
+            continuing = False
+    return entries
+
+
+def report_changes(before, update):
+    """Print the changelog comparison; return whether its stamp must wait."""
+    current, path = Source(), HERE / "RELEASE-NOTES.md"
+    if not current.has("RELEASE-NOTES.md"):
+        print("\nRelease notes: this Partitur has no RELEASE-NOTES.md.")
+        return False
+    text = current.read("RELEASE-NOTES.md").decode()
+    if before is None:
+        entries = change_entries(text, "Unreleased")
+        print(f"\nRelease notes: {len(entries)} Unreleased entries; installing commit unknown, "
+              "not an exact difference.")
+    elif not Source(before).has("RELEASE-NOTES.md"):
+        print(f"\nRelease notes: installed commit has no RELEASE-NOTES.md; new entries cannot be "
+              f"counted. Read {path}.")
+        return True
+    else:
+        old = {" ".join(entry.split()) for entry in
+               change_entries(Source(before).read("RELEASE-NOTES.md").decode())}
+        entries = [entry for entry in change_entries(text)
+                   if " ".join(entry.split()) not in old]
+        print(f"\nRelease notes: {len(entries)} new entries.")
+    if update:
+        for entry in entries:
+            print(entry)
+    elif entries:
+        print("Run with --update to show them.")
+    return bool(entries) or before is None
 
 
 def delivered(plan):
@@ -877,6 +953,8 @@ def scope_project(a, report):
     held = records_lock(rec) if (rec / ".git").exists() else None
     name = a.name or root.name
     before, clone, stamped = read_stamp(stamp)
+    if stamp.exists():
+        print(f"Installed Partitur: {version_label(before)}")
     # the sides installed before: the stamp's, or for a stamp without them
     # the project's; a later run keeps them wherever it runs
     recorded, origin = (stamped, "stamp") if stamped is not None else \
@@ -975,9 +1053,15 @@ def scope_project(a, report):
         else:
             report("redundant", link, "linked for the user already; --update removes it")
     set_repos(a, root, rec, table, repos, add_repos, report)
+    if stamp.exists():
+        report.changes_pending = report_changes(before, a.update) and not a.update
+    else:
+        print(f"\nRelease notes: read {HERE / 'RELEASE-NOTES.md'} for changes and update actions.")
     now = partitur_commit()
+    print(f"Source Partitur: {version_label(now)}")
     c = report.counts
-    pending = any(c.get(k) for k in ("outdated", "obsolete", "superseded", "redundant"))
+    pending = report.changes_pending or any(
+        c.get(k) for k in ("outdated", "obsolete", "superseded", "redundant"))
     if not stamp.exists() or a.update or not pending:
         write_stamp(stamp, now, HERE, tools)
     elif stamped != tools:        # the installing commit stays until --update
@@ -1141,6 +1225,9 @@ def write_report(a, tools, report, output):
     if c.get("outdated") or c.get("obsolete") or c.get("redundant"):
         steps.append("Files reported \"outdated\", \"obsolete\", or \"redundant\": "
                      "`--update` brings them up to this Partitur; ask the user.")
+    if report.changes_pending:
+        steps.append("Release notes: run install with `--update` to complete the update. "
+                     "See the release notes output above for comparison limits.")
     unlinked = [t for t in tools
                 if not (Path.home() / TOOLS[t][1] / "skills" / "partitur").exists()]
     if unlinked:
@@ -1162,7 +1249,7 @@ def write_report(a, tools, report, output):
                      "requests wait until a session holds the integrator role.")
     when = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
     text = (f"# Partitur install report\n\n"
-            f"- When: {when}\n- Partitur: {partitur_commit() or 'uncommitted'}\n"
+            f"- When: {when}\n- Partitur: {version_label(partitur_commit())}\n"
             f"- Command: `{' '.join([Path(sys.argv[0]).name] + sys.argv[1:])}`\n"
             f"- Project: `{root}`, records `{R}/`\n\n"
             "Written by Partitur's install for the user and an agent session; not part of "

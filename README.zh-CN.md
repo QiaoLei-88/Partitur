@@ -178,6 +178,7 @@ Claude Code 继续使用 `CLAUDE_CODE_SESSION_ID`；
 
 ## 内容索引
 
+- [发布说明](RELEASE-NOTES.md)：面向用户的变更，以及更新后需要做的事。
 - [模型](model.md)：概念、不变量、范围与嵌套、信息流。
 - 角色：[用户](roles/user.md)、[设计者](roles/designer.md)、
   [专题研究者（track）](roles/track.md)、[工作者](roles/worker.md)、
