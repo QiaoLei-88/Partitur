@@ -37,7 +37,8 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
 2. **Conflicts are refused.** A held role or task cannot be taken; a second
    simultaneous take loses. A charter's optional `tool:` restricts taking
    to `claude` or `codex`; absent or `any` accepts either, including an
-   unknown tool. A restricted task refuses a mismatch or unknown tool.
+   unknown tool. A restricted task refuses a mismatch or unknown tool
+   *(Proposed, G25)*.
    Identity comes from `CLAUDE_CODE_SESSION_ID`, then `CODEX_THREAD_ID` or
    `CODEX_SESSION_ID`; `PTT_SESSION_ID` alone names no tool. `mktask --tool`
    sets the field, and `amend --tool` replaces it for future takes without
@@ -72,7 +73,8 @@ holder:     /ptt-done ─► supervisor: /ptt-close N (or reopen)
    as events. The holder writes only `status.md` (G11, G12).
    The designer (including a sub-designer) states merge order with reasons
    and clearing conditions in the charter and keeps it current by amending
-   the waiting task; this gates merging, while `depends:` gates taking.
+   the waiting task; this gates merging, while `depends:` gates taking
+   *(Proposed, C20)*.
 9. **Clearing does not change the holder.** The role or task stays
    recorded; after `/clear`, the user names the holder the fresh session
    continues as (`/ptt-resume <name>`; a handover only puts its holder first
@@ -119,7 +121,8 @@ A task's state is derived from its events, as a request's is from its
 messages; there is no state file to go stale (C2).
 
 When a done report misses an acceptance criterion, the supervisor offers
-Reopen or discussion. On the user's AtE, `ptt reopen --reason` records the
+Reopen or discussion *(Proposed, G26)*.
+On the user's AtE, `ptt reopen --reason` records the
 missing criteria and clears the pending done report; the holder can then
 complete the work and report done again. Wait applies only before a done
 report exists.
@@ -172,7 +175,8 @@ In Codex the commands start with `$` instead of `/`.
   refuses a note whose front matter names no role or open task, and an
   older note without a `to:` goes to the designer, marked), a new review or
   decision on its request, a task's merged request to its direct supervisor
-  (unless that supervisor authored it), and for the integrator a new
+  (unless that supervisor authored it) *(Proposed, C22)*,
+  and for the integrator a new
   request or reply;
   and, once, to the session last bound to a holder whose hold someone else
   ended (a close, an approved leave, a freeing), or whose former task was

@@ -114,7 +114,8 @@ is `<project>-<holder>-<hash>`, lowercase:
 
 When a hold ends, the ending event records `ended_session_id` and
 `ended_session_name`: the live name with its hash replaced by `closed`,
-`cancelled`, `left`, or `freed`. A collision with another session's recorded
+`cancelled`, `left`, or `freed` *(Proposed, G24)*.
+A collision with another session's recorded
 name adds `-2`, `-3`, and so on. Only the last bound session gets the
 printed `/rename` line, once through its inbox; a root designer or
 integrator leaving gets it in the leave output. Renaming remains the
@@ -179,7 +180,7 @@ The inbox rules stay the one source of what is news:
    the routes below get a `carry:` line: in session `<name>` (`<tool>`) type `/ptt-inbox`
    or `$ptt-inbox`. Without a recorded name it gives the holder and
    "no session name"; an unknown tool gets both commands. This applies to
-   every record, including notes.
+   every record, including notes *(Proposed, D19)*.
 2. The writer's session, in Claude Code, sends a nudge only to a session
    that `ListAgents` lists by that name. It subscribes with `SendMessage`
    `notify_when_idle` and no message, whatever state the session shows, so
@@ -190,7 +191,8 @@ The inbox rules stay the one source of what is news:
 3. Between Codex sessions, `ptt` runs `codex queue --thread <recorded UUID>
    --message <text>` after recording, with neither `--resume` nor an idle
    subscription. The queue waits for a busy session. Closed sessions may
-   receive the notice when resumed: this deferred delivery is accepted.
+   receive the notice when resumed: this deferred delivery is accepted
+   *(Proposed, D20)*.
    `queued:` means accepted into the queue; delivery is unconfirmed.
    A nonzero exit, missing executable, or ten-second timeout prints a
    notice and a manual `carry:` line; the record stands. A timeout leaves

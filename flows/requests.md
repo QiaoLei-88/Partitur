@@ -44,10 +44,11 @@ repository, and a table maps repositories to checkouts and main branches
    (C5, C16).
    The integrator checks the task's merge order and amendments against
    request states, ancestry and file overlap, records the finding in the
-   review, and sends order questions to the designer.
+   review, and sends order questions to the designer *(Proposed, C20)*.
    `/ptt-pr-review all` groups requests waiting for review by repository
    and reviews only the first request per repository in merge order
-   (lowest request number when no order is stated). Requests of different
+   (lowest request number when no order is stated) *(Proposed, C21)*.
+   Requests of different
    repositories are reviewed in the same run; the others in each repository
    are listed as `waits: rebase after PR N merges`, not reviewed. An
    unresolved order question leaves that repository waiting for resolution.
