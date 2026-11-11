@@ -31,9 +31,10 @@ writes (it writes none); other work needs AtE (rules file).
    at a time. Each line says what happened and who acts next, with short
    IDs and named subjects. Mark the items waiting on the user and the
    topic now taken up. Take up the first item waiting on the user alone,
-   ending with its own decision list; the next topic follows the user's
-   answer. If no item needs the user's decision, state who acts next and
-   stop. Refresh `ptt who` before naming holders or who acts next.
+   giving the action or decision as the rules file says; the next topic
+   follows the user's answer. If no item needs the user, say why and who
+   drives the work now, then stop. Refresh `ptt who` before naming holders
+   or who acts next.
 
 This is a briefing only: write no status, note, review, decision, or other
 record, and do not carry out the reported next steps. In Codex invoke it

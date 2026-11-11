@@ -55,13 +55,14 @@ takes, approves recording it (an AtE does not); the work itself needs AtE
    - A designer: its inbox; list what waits on it (done reports, leave
      requests, notes).
 
-   Start the final report (plan or decision list) with `1. /rename <name>`,
-   using the recorded session name; the business items follow. In Claude
-   Code, compare this session's current name from `ListAgents` ("This
-   session is ...") with its recorded name; omit the reminder when they
-   match. In Codex the current name cannot be read, so always list the
-   reminder first. Introduce any decision options with their own question
-   line (rules file).
+   After the overview in the final report (plan or decision list), give
+   the rename reminder as the first action: in this session (`<tool>`),
+   type `/rename <name>`, using the recorded session name; the business
+   items follow. In Claude Code, compare this session's current name from
+   `ListAgents` ("This session is ...") with its recorded name; omit the
+   reminder when they match. In Codex the current name cannot be read, so
+   always list the reminder after the overview. Introduce any decision
+   options with their own question line (rules file).
 5. If the tool notes that `T0000` is not filled in (a project just set up,
    or a placeholder left since), find what exists: earlier handover files
    in `<records>/handoff/` (not `integrator.md`, `notes/`), "superseded"
