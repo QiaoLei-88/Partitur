@@ -183,6 +183,11 @@ commit and clone installed it, and for which tools
 the `partitur` skill link when you run it from another clone, but leaves your
 rules, your records, and any file you changed (`--force` replaces those,
 after copying each into a backup directory).
+The update also prints new [release notes](RELEASE-NOTES.md) entries and
+any actions they require. Plain install counts entries while keeping its other behavior;
+it retains the comparison stamp until `--update` shows them. An older commit
+without release notes gives a reading pointer; an unknown commit shows the
+`Unreleased` section with a note that the difference is unknown.
 `--uninstall` removes what was installed the same way. Every later run
 serves the recorded tools, also on a machine that lacks one of them (a
 workspace shared between machines); `--tool` adds a tool, and with

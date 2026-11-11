@@ -30,6 +30,8 @@ skipped in practice, are as valuable as new rules.
   `Unreleased` in [RELEASE-NOTES.md](RELEASE-NOTES.md): what changed and any
   action needed after updating. Use one or two lines per entry, newest first,
   with a `- ` bullet and indented continuation; keep entries independent.
+  Install compares whole entries, ignoring whitespace and section moves;
+  editing an entry's words makes it new again. Keep existing entries stable.
 - `bin/install` must stay safe to rerun: it never overwrites or deletes,
   and it never compares a file the project owns once created.
 

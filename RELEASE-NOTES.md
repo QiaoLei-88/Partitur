@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Project updates print new release notes entries and required actions;
+  plain install counts them, preserving the comparison until `--update`.
+
 ## Before version tags
 
 - Codex sessions queue local inbox notices by recorded UUID (PR 29).
