@@ -136,21 +136,24 @@ class Repo(unittest.TestCase):
         self.assertIn("what remains, from `status.md`", resume)
 
     def test_take_and_resume_repeat_rename_in_the_final_report(self):
-        """T0017 amendment 0004: the reminder survives the read-only work."""
+        """T0021 amendment 0003: keep the reminder, after the overview."""
         def text(name):
             return " ".join((ROOT / "project/skills" / name / "SKILL.md.in").read_text().split())
         take = text("ptt-take")
         resume = text("ptt-resume")
         for wording in (take, resume):
-            for phrase in ("final report (plan or decision list)", "`1. /rename <name>`",
-                           "recorded session name", "the business items"):
+            for phrase in ("final report (plan or decision list)", "`/rename <name>`",
+                           "recorded session name", "the business items",
+                           "first action: in this session (`<tool>`)"):
                 self.assertIn(phrase, wording)
         for phrase in ('`ListAgents` ("This session is ...")',
                        "omit the reminder when they match",
-                       "In Codex the current name cannot be read, so always list the reminder first",
+                       "In Codex the current name cannot be read, so always list the reminder after the overview",
                        "Introduce any decision options with their own question line"):
             self.assertIn(phrase, take)
+        self.assertIn("After the overview in the final report", take)
         self.assertIn("apply the rename check in `/ptt-take`, step 4", resume)
+        self.assertIn("give the rename reminder after the overview", resume)
 
     def test_rules_name_commands_in_the_sessions_tool(self):
         rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
@@ -234,16 +237,29 @@ class Repo(unittest.TestCase):
         self.assertIn("Wait only when no done report exists", text)
 
     def test_reports_take_one_topic_at_a_time(self):
-        """T0017: preserve the agreed rule and point reporting skills to it."""
+        """T0021 amendment 0003: preserve the full agreed reporting rule."""
         rules = " ".join((ROOT / "templates/rules.md").read_text().split())
         expected = " ".join("""
-            - Report to the user one topic at a time. Read a change before reporting
-              it. Start with an overview: one line per topic, about 20 to 30 Chinese
-              characters or 15 English words, saying what happened and who acts next
-              (`PR 24 merged into master; T13 to send its done report`), never only
-              that something changed; mark the topic now taken up. Then take up that
-              topic alone, ending with its own decision; the next topic follows the
-              user's answer. Use short IDs (`PR 24`, `T13`) and name every subject;
+            - Report to the user one topic at a time, concise and to the point:
+              cut words, never parts. Read a change before reporting it. Start
+              with an overview: one line per topic, about 20 to 30 Chinese
+              characters or 15 English words, saying what happened and who acts
+              next (`PR 24 merged into master; T13 to send its done report`),
+              never only that something changed; mark the topic now taken up.
+              Then take up that topic alone: its goal in one line; where it
+              stands; and the user's part, one of three:
+              - None: say why, and who drives the work now.
+              - An action: where, and the exact text ready to paste (in session
+                `<name>` (`<tool>`) type `<command>`; in a terminal in
+                `<directory>` run `<command>`); without such text, the steps
+                and what to check. Do yourself what the tools let you.
+              - A decision: first its conflict, two sides (X against Y), wording
+                or behaviour, apart from the background; then the options that
+                resolve it, each with its cost and gain, as its own decision
+                list. The next topic follows the user's answer.
+
+              Use short IDs without leading zeros (`PR 24`, `T13`), name a
+              request with its task (`PR 29 (T18)`), and name every subject;
               no pronoun without a clear antecedent.
         """.split())
         self.assertIn(expected + " - When the user must decide,", rules)
@@ -265,7 +281,8 @@ class Repo(unittest.TestCase):
                        "overview line per item, then one topic at a time",
                        "Mark the items waiting on the user",
                        "first item waiting on the user alone",
-                       "If no item needs the user's decision",
+                       "giving the action or decision as the rules file says",
+                       "If no item needs the user, say why and who drives the work now",
                        "write no status, note, review, decision, or other record",
                        "do not carry out the reported next steps"):
             self.assertIn(phrase, text)

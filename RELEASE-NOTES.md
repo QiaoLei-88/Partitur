@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Reports give goals, status, actions or decisions with tradeoffs. Short IDs
+  omit leading zeros and pair requests with tasks.
+- After updating the reporting rules and skills, clear and resume running
+  holders to load them.
 - Release notes use version headings backed by annotated `v0.N` tags;
   install shows those tags alongside the installed and source commits.
 - Project updates print new release notes entries and required actions;
