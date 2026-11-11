@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Release notes use version headings backed by annotated `v0.N` tags;
+  install shows those tags alongside the installed and source commits.
 - Project updates print new release notes entries and required actions;
   plain install counts them, preserving the comparison until `--update`.
 

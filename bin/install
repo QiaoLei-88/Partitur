@@ -111,6 +111,8 @@ that comparison stamp until --update; its other install behavior is unchanged.
 An older commit without RELEASE-NOTES.md gives a reading pointer instead.
 An unknown commit shows Unreleased, labelled as an inexact comparison. First installs
 point to RELEASE-NOTES.md. Release notes output is also in the install report.
+The installed and source commits show their annotated v0.N tags, when this
+clone has tags pointing directly at those commits; hashes remain the identity.
 The user scope is one link per tool and keeps no stamp: its installed sides
 are the `partitur` links to a Partitur clone. Install adds the detected or
 --tool sides and reports the others present; --uninstall removes every
@@ -126,6 +128,7 @@ import importlib.machinery
 import importlib.util
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -168,6 +171,25 @@ def partitur_commit():
     r = subprocess.run(["git", "-C", str(HERE), "rev-parse", "HEAD"], capture_output=True,
                        text=True)
     return r.stdout.strip() or None
+
+
+def version_label(commit):
+    """Add exact annotated v0.N tags without replacing the commit identity."""
+    if commit is None:
+        return "uncommitted"
+    result = subprocess.run(
+        ["git", "-C", str(HERE), "for-each-ref", f"--points-at={commit}",
+         "--format=%(refname:strip=2) %(objecttype)", "refs/tags/v0.*"],
+        capture_output=True, text=True)
+    if result.returncode:
+        return commit
+    tags = []
+    # shortcut: v0.N versions only; extend the pattern at the first stable release.
+    for line in result.stdout.splitlines():
+        name, kind = line.split()
+        if kind == "tag" and re.fullmatch(r"v0\.[1-9][0-9]*", name):
+            tags.append(name)
+    return commit + (f" ({', '.join(tags)})" if tags else "")
 
 
 class Source:
@@ -931,6 +953,8 @@ def scope_project(a, report):
     held = records_lock(rec) if (rec / ".git").exists() else None
     name = a.name or root.name
     before, clone, stamped = read_stamp(stamp)
+    if stamp.exists():
+        print(f"Installed Partitur: {version_label(before)}")
     # the sides installed before: the stamp's, or for a stamp without them
     # the project's; a later run keeps them wherever it runs
     recorded, origin = (stamped, "stamp") if stamped is not None else \
@@ -1034,6 +1058,7 @@ def scope_project(a, report):
     else:
         print(f"\nRelease notes: read {HERE / 'RELEASE-NOTES.md'} for changes and update actions.")
     now = partitur_commit()
+    print(f"Source Partitur: {version_label(now)}")
     c = report.counts
     pending = report.changes_pending or any(
         c.get(k) for k in ("outdated", "obsolete", "superseded", "redundant"))
@@ -1224,7 +1249,7 @@ def write_report(a, tools, report, output):
                      "requests wait until a session holds the integrator role.")
     when = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%SZ")
     text = (f"# Partitur install report\n\n"
-            f"- When: {when}\n- Partitur: {partitur_commit() or 'uncommitted'}\n"
+            f"- When: {when}\n- Partitur: {version_label(partitur_commit())}\n"
             f"- Command: `{' '.join([Path(sys.argv[0]).name] + sys.argv[1:])}`\n"
             f"- Project: `{root}`, records `{R}/`\n\n"
             "Written by Partitur's install for the user and an agent session; not part of "

@@ -1131,6 +1131,7 @@ class InstallProject(unittest.TestCase):
                 stamp.write_text(before)
                 out = self.install_from(clone).stdout
                 self.assertIn("1 Unreleased entries; installing commit unknown", out)
+                self.assertIn(f"Installed Partitur: {commit}\n", out)
                 self.assertIn("not an exact difference", out)
                 self.assertNotIn("- Current change.", out)
                 self.assertEqual(stamp.read_text(), before)
@@ -1144,7 +1145,8 @@ class InstallProject(unittest.TestCase):
         clone, changes = self.install_changelog(
             "# Changes\n\n## Unreleased\n\n- Same words,\n  same action.\n")
         changes.write_text(
-            "# Changes\n\n## Unreleased\n\n## Earlier\n\n- Same words, same action.\n")
+            "# Changes\n\n## Unreleased\n\n## v0.1 (2026-11-10)\n\n"
+            "- Same words, same action.\n")
         self.commit_clone(clone, "move and rewrap entry")
         out = self.install_from(clone).stdout
         self.assertIn("Release notes: 0 new entries.", out)
@@ -1166,11 +1168,59 @@ class InstallProject(unittest.TestCase):
 
     def test_changelog_first_install_and_uninstall(self):
         clone = self.partitur_clone()
+        head = git(clone, "rev-parse", "HEAD")
         out = self.install_from(clone).stdout
+        self.assertIn(f"Source Partitur: {head}\n", out)
         self.assertIn(f"Release notes: read {clone / 'RELEASE-NOTES.md'}", out)
         self.assertNotIn("installing commit unknown", out)
         out = self.install_from(clone, "--uninstall").stdout
         self.assertNotIn("Release notes:", out)
+        self.assertIn(f"Installed Partitur: {head}\n", out)
+
+    def test_changelog_versions_are_exact_annotated_tags(self):
+        clone, notes = self.install_changelog("# Release notes\n\n## Unreleased\n")
+        old = git(clone, "rev-parse", "HEAD")
+        git(clone, "-c", "user.name=t", "-c", "user.email=t@x",
+            "tag", "-a", "v0.1", "-m", "old release")
+        notes.write_text("# Release notes\n\n## Unreleased\n\n"
+                         "## v0.2 (2026-11-10)\n\n- Tagged action.\n")
+        self.commit_clone(clone, "release notes for v0.2")
+        head = git(clone, "rev-parse", "HEAD")
+        for tag in ("v0.2", "v0.3-rc1", "maintenance"):
+            git(clone, "-c", "user.name=t", "-c", "user.email=t@x",
+                "tag", "-a", tag, "-m", tag)
+        git(clone, "tag", "v0.99")
+        git(clone, "branch", "v0.2")
+        for args in ((), ("--update",)):
+            out = self.install_from(clone, *args).stdout
+            self.assertIn(f"Installed Partitur: {old} (v0.1)\n", out)
+            self.assertIn(f"Source Partitur: {head} (v0.2)\n", out)
+            self.assertIn("Release notes: 1 new entries.", out)
+            report = (self.root / "partitur-install-report.md").read_text()
+            self.assertIn(f"Installed Partitur: {old} (v0.1)\n", report)
+            self.assertIn(f"- Partitur: {head} (v0.2)\n", report)
+        self.assertIn("- Tagged action.", out)
+
+    def test_changelog_versions_do_not_follow_ancestors_or_dirty_heads(self):
+        clone, notes = self.install_changelog("# Release notes\n\n## Unreleased\n")
+        old = git(clone, "rev-parse", "HEAD")
+        git(clone, "-c", "user.name=t", "-c", "user.email=t@x",
+            "tag", "-a", "v0.1", "-m", "old release")
+        readme = clone / "README.md"
+        readme.write_text(readme.read_text() + "\nNew documentation.\n")
+        self.commit_clone(clone, "untagged commit after v0.1")
+        head = git(clone, "rev-parse", "HEAD")
+        out = self.install_from(clone, "--update").stdout
+        self.assertIn(f"Installed Partitur: {old} (v0.1)\n", out)
+        self.assertIn(f"Source Partitur: {head}\n", out)
+        git(clone, "-c", "user.name=t", "-c", "user.email=t@x",
+            "tag", "-a", "v0.2", "-m", "new release")
+        notes.write_text(notes.read_text() + "\n- Uncommitted action.\n")
+        out = self.install_from(clone, "--update").stdout
+        self.assertIn(f"Installed Partitur: {head} (v0.2)\n", out)
+        self.assertIn("Source Partitur: uncommitted\n", out)
+        report = (self.root / "partitur-install-report.md").read_text()
+        self.assertIn("- Partitur: uncommitted\n", report)
 
     def test_changelog_reads_old_commit_in_new_clone(self):
         a, b, link = self.two_releases()
