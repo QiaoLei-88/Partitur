@@ -7,12 +7,14 @@ Usage:
 
 `new` creates <root>/<id>/ with id = <UTC timestamp>-<short commit SHA>, for
 example 20261009T061500Z-7099ba2, writes run.md with the checkout's identity
-and its creator (`by:`, the holder bound to this session by `ptt`, beside this
-tool; `unknown` without one), and prints the directory path. The caller puts
-the command, logs, outputs, exit status and counts there; large outputs are
-recorded by SHA-256, size, and a compact numerical summary. A run directory is
-written by one run and never reused. The default root is test-runs/ in the
-workspace root (the parent of the records repository holding this tool's
+and its creator (`by:`, the holder bound to this session by `ptt`, beside
+this tool; `unknown` without one), and prints the directory path. Its
+`builds:` field accepts `[]` as empty, one relative path, or an indented
+block list of relative paths; `new` writes `builds: []`. The caller puts the
+command, logs, outputs, exit status and counts there; large outputs are
+recorded by SHA-256, size, and a compact numerical summary. A run directory
+is written by one run and never reused. The default root is test-runs/ in
+the workspace root (the parent of the records repository holding this tool's
 directory).
 
 `gc` is read-only: it prints a table of the run records and the commands that
@@ -25,8 +27,9 @@ when its request is merged or closed, or its task done or cancelled. A run is
 cited when its id appears in a file of the records repository at HEAD, in a
 records commit message, or in a commit message of a main branch in pr/repos.
 - head open: the run is kept whole;
-- cited, head concluded: its build directories may go (a directory named
-  build or build-*, or holding CMakeCache.txt);
+- cited, head concluded: its declared build directories may go; directories
+  found by the transition rule (named build or build-*, or holding
+  CMakeCache.txt) are marked inferred and may also go after inspection;
 - not cited, head concluded: the whole directory may go;
 - no head (a main branch, detached, or not found) and not cited: listed
   apart, never in the commands unless named.
@@ -123,6 +126,7 @@ def cmd_new(a):
         f"branch: {branch}\n"
         f"commit: {sha}\n"
         f"worktree_clean: {'no' if dirty else 'yes'}\n"
+        "builds: []\n"
         "---\n\n"
         "# Test run\n\n"
         "## Purpose\n\n## Commands\n\n## Environment\n\n"
@@ -140,46 +144,69 @@ def cmd_new(a):
 
 # --- gc ---------------------------------------------------------------------
 
-def disk_usage(path, seen):
-    """Bytes allocated under `path`, symbolic links not followed; files already
-    in `seen` (device, inode) are not counted again."""
+def disk_summary(path, seen, largest_limit=0):
+    """Allocated bytes and largest regular files under `path`, in one walk.
+    File sizes in the list are apparent sizes. Symbolic links are not
+    followed, and files already in `seen` (device, inode) are not counted."""
     total = 0
+    largest = []
+    root = Path(path)
     try:
         st = os.lstat(path)
     except OSError:
-        return 0
+        return 0, []
+
     stack = [(path, st)]
     while stack:
-        p, st = stack.pop()
-        if (st.st_dev, st.st_ino) in seen:
+        p, info = stack.pop()
+        if (info.st_dev, info.st_ino) in seen:
             continue
-        seen.add((st.st_dev, st.st_ino))
-        total += st.st_blocks * 512
-        if stat.S_ISDIR(st.st_mode):
+        seen.add((info.st_dev, info.st_ino))
+        total += info.st_blocks * 512
+        if largest_limit and stat.S_ISREG(info.st_mode):
+            largest.append((info.st_size, str(Path(p).relative_to(root))))
+            largest.sort(key=lambda item: (-item[0], item[1]))
+            del largest[largest_limit:]
+        if stat.S_ISDIR(info.st_mode):
             try:
-                with os.scandir(p) as it:
-                    for e in it:
+                with os.scandir(p) as entries:
+                    for entry in entries:
                         try:
-                            stack.append((e.path, e.stat(follow_symlinks=False)))
+                            stack.append((entry.path, entry.stat(follow_symlinks=False)))
                         except OSError:
                             pass
             except OSError:
                 pass
-    return total
+    return total, largest
 
 
-def build_dirs(run):
-    """Build directories inside a run record: named build or build-*, or
-    holding CMakeCache.txt; nothing below one is searched."""
+def disk_usage(path, seen):
+    """Allocated bytes under `path`; see `disk_summary()` for the walk."""
+    return disk_summary(path, seen)[0]
+
+
+def inferred_build_dirs(run, declared=()):
+    """Inferred build directories: named build or build-*, or holding
+    CMakeCache.txt. Nothing below a declared directory is searched; an
+    ancestor of one is walked into and not inferred. A chosen inferred
+    directory ends the search below it. `declared` contains validated paths
+    relative to `run`; returns (relative path, reason) pairs."""
+    declared_paths = set(declared)
+    ancestors = {parent for path in declared_paths for parent in path.parents}
     found = []
     for directory, dirs, files in os.walk(run):
-        if Path(directory) == run:
+        current = Path(directory).relative_to(run)
+        dirs[:] = sorted(d for d in dirs if current / d not in declared_paths)
+        if current == Path("."):
             continue
-        name = os.path.basename(directory)
-        if name == "build" or name.startswith("build-") or "CMakeCache.txt" in files:
-            found.append(Path(directory))
+        reasons = []
+        if current.name == "build" or current.name.startswith("build-"):
+            reasons.append("name")
+        if "CMakeCache.txt" in files:
+            reasons.append("CMakeCache.txt")
+        if reasons and current not in ancestors:
+            found.append((current, ", ".join(reasons)))
             dirs[:] = []
-        dirs.sort()
     return sorted(found)
 
 
@@ -195,20 +222,103 @@ def removal(path):
     return shlex.join(rm + [str(path)])
 
 
+def largest_text(files):
+    return ", ".join(f"{name} ({human(size)})" for size, name in files) or "-"
+
+
 def run_header(run):
     path = run / "run.md"
     if not path.is_file():
         return None
     fields = {}
+    builds = None
+    builds_errors = []
+    section = None
     lines = path.read_text(errors="replace").splitlines()
     if lines and lines[0] == "---":
         for line in lines[1:]:
             if line == "---":
                 break
+            if line[:1].isspace():
+                item = line.strip()
+                if section == "builds" and item:
+                    match = re.fullmatch(r"-\s+(.+)", item)
+                    if match:
+                        builds.append(match.group(1).strip())
+                    else:
+                        builds_errors.append(
+                            (item, "expected a '- path' list item")
+                        )
+                continue
             key, sep, value = line.partition(":")
             if sep:
-                fields[key.strip()] = value.strip()
+                key, value = key.strip(), value.strip()
+                section = key
+                if key == "builds":
+                    if value in ("", "[]"):
+                        builds = []
+                    elif value.startswith("[") and value.endswith("]"):
+                        builds = []
+                        builds_errors.append(
+                            (value, "flow lists are not supported; "
+                                     "use one path or a block list"))
+                    else:
+                        builds = [value]
+                else:
+                    fields[key] = value
+    if builds is not None:
+        fields["builds"] = builds
+        fields["builds_errors"] = builds_errors
     return fields
+
+
+def declared_build_dirs(run, header):
+    """(valid, invalid) declarations; valid maps relative paths to written text.
+    Duplicate and nested paths are pruned without changing written order."""
+    invalid = list(header.get("builds_errors", []))
+    candidates = {}
+    root = run.resolve()
+    for text in header.get("builds", []):
+        if "\0" in text:
+            invalid.append((text, "path contains a null byte"))
+            continue
+        rel = Path(text)
+        if rel.is_absolute():
+            invalid.append((text, "absolute path"))
+            continue
+        if ".." in rel.parts:
+            invalid.append((text, "leaves the run record"))
+            continue
+        current = run
+        problem = None
+        for part in rel.parts:
+            current /= part
+            try:
+                mode = current.lstat().st_mode
+            except OSError:
+                problem = "does not exist"
+                break
+            if stat.S_ISLNK(mode):
+                problem = "path contains a symbolic link"
+                break
+        if problem:
+            invalid.append((text, problem))
+            continue
+        if not current.is_dir():
+            invalid.append((text, "not a directory"))
+            continue
+        resolved = current.resolve()
+        if resolved == root:
+            invalid.append((text, "must be below the run record"))
+            continue
+        if root not in resolved.parents:
+            invalid.append((text, "leaves the run record"))
+            continue
+        candidates.setdefault(rel, text)
+
+    valid = {relative: text for relative, text in candidates.items()
+             if not any(parent in candidates for parent in relative.parents)}
+    return valid, invalid
 
 
 class Heads:
@@ -369,7 +479,13 @@ def plan(a):
     headers = {r: run_header(r) for r in runs}
     cited = citations({r.name for r, h in headers.items() if h is not None}, heads.mains)
     seen = set()
-    rows, apart, commands = [], [], []
+    rows, apart = [], []
+    declared_rows, inferred_rows, invalid_rows = [], [], []
+    commands = {
+        "declared build directories": [],
+        "inferred build directories": [],
+        "run records, named paths, and scratchpad": [],
+    }
     for r in runs:
         h = headers[r]
         is_named = r in named
@@ -378,7 +494,8 @@ def plan(a):
                 continue
             size = disk_usage(r, seen)
             rows.append((r.name, "-", human(size), "not a run record", "-", "-", "all", size))
-            commands.append((removal(r), size))
+            commands["run records, named paths, and scratchpad"].append(
+                (removal(r), size))
             continue
         label, state, number = heads.find(h)
         if a.request is not None and number != a.request:
@@ -387,36 +504,85 @@ def plan(a):
         cites = cited.get(r.name, [])
         size = disk_usage(r, set())
         mine = is_named or (caller is not None and by == caller)
+        target_seen = seen if mine else set()
+        targets = []
+        invalid_note = ""
         if state == "open":
-            goes, targets = "nothing (head open)", []
+            goes = "nothing (head open)"
         elif state == "concluded" and not cites:
-            goes, targets = "all", [r]
+            goes = "all"
+            targets.append(("run records, named paths, and scratchpad", r,
+                            disk_usage(r, target_seen)))
         elif state == "concluded":
-            builds = build_dirs(r)
-            goes = ("build: " + ", ".join(str(b.relative_to(r)) for b in builds)
-                    if builds else "nothing (cited, no build directory)")
-            targets = builds
+            declared, invalid = declared_build_dirs(r, h)
+            inferred = inferred_build_dirs(r, declared)
+            counts = []
+            if declared:
+                counts.append(f"{len(declared)} declared")
+            if inferred:
+                counts.append(f"{len(inferred)} inferred")
+            if invalid:
+                invalid_note = f"{len(invalid)} invalid declaration"
+                if len(invalid) != 1:
+                    invalid_note += "s"
+            if counts:
+                goes = "build: " + ", ".join(counts)
+                if invalid_note:
+                    goes += f"; {invalid_note}"
+            elif invalid_note:
+                goes = f"nothing ({invalid_note})"
+            else:
+                goes = "nothing (cited, no build directory)"
+            for relative, text in declared.items():
+                target = r / relative
+                target_size = disk_usage(target, target_seen)
+                declared_rows.append((r.name, by, text, target_size))
+                targets.append(("declared build directories", target, target_size))
+            for relative, reason in inferred:
+                target = r / relative
+                target_size, largest = disk_summary(target, target_seen, largest_limit=3)
+                inferred_rows.append((r.name, by, str(relative), reason,
+                                      largest_text(largest), target_size))
+                targets.append(("inferred build directories", target, target_size))
+            invalid_rows.extend(
+                (r.name, by, text, problem) for text, problem in invalid)
         elif cites:
-            goes, targets = "nothing (cited, no head)", []
+            goes = "nothing (cited, no head)"
         else:
-            goes, targets = ("all", [r]) if is_named else ("nothing (no head, not cited)", [])
-        if targets and not mine:
-            goes, targets = f"nothing (not yours; would go: {goes})", []
-        sizes = [size if t == r else disk_usage(t, seen) for t in targets]
-        commands += [(removal(t), s) for t, s in zip(targets, sizes)]
-        freed = sum(sizes)
+            if is_named:
+                goes = "all"
+                targets.append(("run records, named paths, and scratchpad", r,
+                                disk_usage(r, target_seen)))
+            else:
+                goes = "nothing (no head, not cited)"
+        if not mine:
+            if targets:
+                goes = f"nothing (not yours; would go: {goes})"
+            elif state == "concluded" and cites:
+                goes = f"nothing (not yours; {invalid_note or 'no build directory'})"
+        freed = 0
+        if mine:
+            for group, target, target_size in targets:
+                commands[group].append((removal(target), target_size))
+                freed += target_size
         row = (r.name, by, human(size), label, state,
                ", ".join(cites[:2]) + (f" +{len(cites) - 2}" if len(cites) > 2 else "")
                if cites else "none", goes, freed)
         (apart if state == "none" and not cites and not is_named else rows).append(row)
-    return caller, heads.notes, rows, apart, commands
+    return (caller, heads.notes, rows, apart, declared_rows, inferred_rows,
+            invalid_rows, commands)
 
 
-def table(rows, header):
-    rows = [header] + [tuple(str(c) for c in row[:-1]) + (human(row[-1]) if row[-1] else "-",)
-                       for row in rows]
-    widths = [max(len(x[i]) for x in rows) for i in range(len(header))]
-    for x in rows:
+def table(rows, header, human_last=False):
+    body = []
+    for row in rows:
+        values = [str(c) for c in row]
+        if human_last:
+            values[-1] = human(row[-1]) if row[-1] else "-"
+        body.append(values)
+    lines = [header] + body
+    widths = [max(len(x[i]) for x in lines) for i in range(len(header))]
+    for x in lines:
         print("  ".join(c.ljust(w) for c, w in zip(x, widths)).rstrip())
 
 
@@ -426,19 +592,31 @@ def cmd_gc(a):
         if not m:
             sys.exit(f"test-run: invalid request number: {a.request!r}")
         a.request = m.group(1).zfill(6)
-    caller, notes, rows, apart, commands = plan(a)
+    (caller, notes, rows, apart, declared_rows, inferred_rows,
+     invalid_rows, commands) = plan(a)
     print(f"caller: {caller or 'unknown (no bound holder; --as NAME)'}")
     for n in notes:
         print(f"note: {n}")
     header = ("run", "by", "size", "head", "state", "cited by", "goes", "frees")
     if rows:
         print()
-        table(rows, header)
+        table(rows, header, human_last=True)
     if apart:
         print("\nno head, not cited (information only; removed only when named):")
-        table(apart, header)
+        table(apart, header, human_last=True)
     if not rows and not apart:
         print("no run records")
+    if declared_rows:
+        print("\ndeclared build directories:")
+        table(declared_rows, ("run", "by", "path", "size"), human_last=True)
+    if inferred_rows:
+        print("\ninferred build directories:")
+        table(inferred_rows,
+              ("run", "by", "inferred path", "reason", "largest files", "size"),
+              human_last=True)
+    if invalid_rows:
+        print("\ninvalid build declarations:")
+        table(invalid_rows, ("run", "by", "entry", "reason"))
     if a.scratch:
         scratch = Path(os.path.abspath(a.scratch))
         entries = sorted(scratch.iterdir()) if scratch.is_dir() else []
@@ -448,12 +626,18 @@ def cmd_gc(a):
         for p in entries:
             size = disk_usage(p, set())
             print(f"  {human(size):>7}  {p.name}{'/' if p.is_dir() and not p.is_symlink() else ''}")
-            commands.append((removal(p), size))
-    total = sum(size for _, size in commands)
-    print(f"\ncommands ({len(commands)}, frees {human(total)}):" if commands
+            commands["run records, named paths, and scratchpad"].append(
+                (removal(p), size))
+    entries = [(name, items) for name, items in commands.items() if items]
+    total = sum(size for _, items in entries for _, size in items)
+    count = sum(len(items) for _, items in entries)
+    print(f"\ncommands ({count}, frees {human(total)}):" if entries
           else "\ncommands: none")
-    for c, _ in commands:
-        print(f"  {c}")
+    for name, items in entries:
+        group_total = sum(size for _, size in items)
+        print(f"{name} ({len(items)}, frees {human(group_total)}):")
+        for command, _ in items:
+            print(f"  {command}")
 
 
 def main():
