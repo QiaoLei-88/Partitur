@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Run records declare build directories in `builds:`; `test-run gc` shows
+  declared and inferred groups with details. Clear and resume running holders.
 - `/ptt-pr-review all` reviews one request per repository in merge order;
   others wait to rebase. Reviews across repositories complete in one run.
 - Reviews and replies discuss one request per message, each with its decision.

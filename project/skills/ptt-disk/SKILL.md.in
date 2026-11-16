@@ -23,9 +23,12 @@ session proposes by itself.
    shows every run with its head, citations, and what may go, and gives
    commands only for runs whose `by:` is you: a run whose head (request or
    task) is open stays whole; once it is concluded, a run cited nowhere goes
-   whole and a cited one only its build directories. Runs of others, runs
-   without `by:`, and runs with no head are for information: report them;
-   the user decides who handles them.
+   whole and a cited one only its declared and inferred build directories.
+   The table gives each inferred directory's reason, size, and largest files;
+   inspect each inferred directory of your own runs before proposing it, and
+   leave out anything holding evidence. Runs of others, runs without `by:`,
+   and runs with no head are for information: report them; the user decides
+   who handles them.
 2. Scratchpad: only this session's own. Claude Code names it in the system
    prompt (the scratchpad directory); in Codex, state what you find (a
    temporary directory this session made), or that it is Unknown. Never
@@ -42,15 +45,17 @@ session proposes by itself.
    ```
    Remove what is listed:
    1. Run all listed commands (recommended)
-   2. Run only the ones I name
-   3. Show all commands first
-   4. No decision, discuss further
+   2. Run only declared build-directory commands
+   3. Run only the ones I name
+   4. Show all commands first
+   5. No decision, discuss further
    ```
 
 ## Removal (on AtE)
 
 6. Run the inventory again with the same arguments; if an approved command
-   is gone or changed, report and stop.
+   is gone or changed, or an approved inferred directory was not inspected,
+   report and stop.
 7. Run the approved commands exactly as printed, one at a time; never edit,
    combine, or glob them. If one fails, stop and report.
 8. Run the inventory again and `df -h`; report what was freed and what

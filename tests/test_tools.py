@@ -263,6 +263,7 @@ class Workspace(unittest.TestCase):
         self.assertIn(f"commit: {self.base}", text)
         self.assertIn("worktree_clean: yes", text)
         self.assertIn("by: unknown", text)
+        self.assertIn("builds: []\n", text)
 
     def records_with_ptt(self):
         """Make the records directory a ptt records repository."""
@@ -310,14 +311,19 @@ class RunGc(unittest.TestCase):
         self.runs = self.root / "test-runs"
         self.runs.mkdir()
 
-    def make_run(self, rid, by, branch, commit, checkout=None, files=()):
+    def make_run(self, rid, by, branch, commit, checkout=None, files=(), builds=None):
         d = self.runs / rid
         d.mkdir()
         head = "---\n" + f"id: {rid}\n"
         if by is not None:
             head += f"by: {by}\n"
         head += (f"checkout: {checkout or self.code}\nbranch: {branch}\n"
-                 f"commit: {commit}\n---\n")
+                 f"commit: {commit}\n")
+        if isinstance(builds, str):
+            head += f"builds: {builds}\n"
+        elif builds is not None:
+            head += "builds:\n" + "".join(f"  - {path}\n" for path in builds)
+        head += "---\n"
         (d / "run.md").write_text(head)
         for f in files:
             (d / f).parent.mkdir(parents=True, exist_ok=True)
@@ -342,7 +348,20 @@ class RunGc(unittest.TestCase):
                    check=check)
 
     def commands(self, out):
-        return [line.strip() for line in out.split("\ncommands")[1].splitlines()[1:]]
+        tail = out.split("\ncommands")[1]
+        return [line.strip() for line in tail.splitlines()
+                if line.strip().startswith("rm ")]
+
+    def cited_run(self, files=(), builds=None, by="me"):
+        merged = self.branch_commit("feat")
+        self.request("merged", "000001", "feat", merged,
+                     dict(kind="decision", author="user", head=merged, decision="merge",
+                          date="2026-01-01"))
+        run_dir = self.make_run("20260101T000000Z-aaaaaaa", by, "feat", merged,
+                                files=files, builds=builds)
+        (self.records / "evidence.md").write_text(f"Run {run_dir.name}.\n")
+        self.records_commit()
+        return run_dir
 
     def test_heads_citations_and_ownership(self):
         merged = self.branch_commit("feat")
@@ -363,6 +382,11 @@ class RunGc(unittest.TestCase):
         by_log = self.make_run("20260101T000003Z-ddddddd", "me", "feat", merged)
         open_run = self.make_run("20260101T000004Z-eeeeeee", "me", "wip", opened)
         other = self.make_run("20260101T000005Z-fffffff", "someone", "feat", merged)
+        other_cited = self.make_run("20260101T000008Z-2222222", "someone", "feat", merged,
+                                    files=("build/other.o",))
+        (d / "0001-request.md").write_text(
+            (d / "0001-request.md").read_text()
+            + f"Other evidence: run {other_cited.name}.\n")
         legacy = self.make_run("20260101T000006Z-0000000", None, "feat", merged)
         nohead = self.make_run("20260101T000007Z-1111111", "me", "master", self.base)
         self.records_commit("evidence in 20260101T000003Z-ddddddd")
@@ -377,11 +401,20 @@ class RunGc(unittest.TestCase):
             for b in ("build", "build-rel", "cmake", "out/build"):
                 self.assertIn(f"rm -rf -- {cited / b}", cmds)
             self.assertNotIn(f"{cited / 'build' / 'sub'}", "\n".join(cmds))
+        self.assertIn("\ninferred build directories:", out)
+        self.assertIn("CMakeCache.txt", out)
+        inferred = out.split("\ninferred build directories:", 1)[1].split(
+            "\ncommands", 1)[0]
+        other_line = next(line for line in inferred.splitlines()
+                          if line.startswith(other_cited.name))
+        self.assertIn("someone", other_line)
         self.assertIn("pr/open/000002-wip/0001-request.md", out)
         self.assertRegex(out, r"code [0-9a-f]{7}")
         self.assertRegex(out, r"records [0-9a-f]{7}")
         self.assertIn("nothing (cited, no build directory)", out)
-        for kept in (by_log, open_run, other, legacy, nohead):
+        log_line = next(line for line in out.splitlines() if line.startswith(by_log.name))
+        self.assertTrue(log_line.rstrip().endswith("-"), log_line)
+        for kept in (by_log, open_run, other, other_cited, legacy, nohead):
             self.assertNotIn(str(kept), "\n".join(cmds))
         self.assertIn("nothing (head open)", out)
         self.assertIn("nothing (not yours", out)
@@ -426,6 +459,242 @@ class RunGc(unittest.TestCase):
         self.assertNotIn(str(r2), "\n".join(self.commands(out)))
         self.assertIn(f"worktree {other}", out)
 
+    def test_declared_and_inferred_build_directories(self):
+        run_dir = self.cited_run(
+            files=("out-a/result.txt", "declared-build/result.txt",
+                   "build-x/result.csv", "build-x/notes.txt",
+                   "build-x/other.txt", "build-x/tiny.txt"),
+            builds=("out-a", "declared-build"),
+        )
+        run_dir.joinpath("build-x/result.csv").write_text("x" * 8000)
+        run_dir.joinpath("build-x/notes.txt").write_text("x" * 7000)
+        run_dir.joinpath("build-x/other.txt").write_text("x" * 6000)
+        run_dir.joinpath("build-x/tiny.txt").write_text("x")
+        before = sorted(p for p in self.root.rglob("*"))
+
+        out = self.gc("--as", "me").stdout
+
+        self.assertEqual(sorted(p for p in self.root.rglob("*")), before, "gc removed something")
+        declared = out.split("\ndeclared build directories:", 1)[1].split(
+            "\ninferred build directories:", 1)[0]
+        inferred = out.split("\ninferred build directories:", 1)[1].split(
+            "\ncommands", 1)[0]
+        self.assertIn("out-a", declared)
+        self.assertIn("declared-build", declared)
+        self.assertIn("build-x", inferred)
+        self.assertIn("name", inferred)
+        for name in ("result.csv (7.8K)", "notes.txt (6.8K)", "other.txt (5.9K)"):
+            self.assertIn(name, inferred)
+        self.assertNotIn("tiny.txt", inferred)
+        self.assertLess(out.index("declared build directories ("),
+                        out.index("inferred build directories ("))
+        cmds = self.commands(out)
+        self.assertIn(f"rm -rf -- {run_dir / 'out-a'}", cmds)
+        self.assertIn(f"rm -rf -- {run_dir / 'build-x'}", cmds)
+
+    def test_declared_build_wins_over_inferred_rule(self):
+        run_dir = self.cited_run(
+            files=("build/CMakeCache.txt", "build/nested/result.txt"),
+            builds=("build",),
+        )
+
+        out = self.gc("--as", "me").stdout
+
+        self.assertNotIn("\ninferred build directories:", out)
+        self.assertIn("build: 1 declared", out)
+        cmds = self.commands(out)
+        self.assertEqual(cmds, [f"rm -rf -- {run_dir / 'build'}"])
+
+    def test_inferred_ancestor_walks_around_declared_subtree(self):
+        run_dir = self.cited_run(
+            files=("build/evidence.csv", "build/out/result.txt"),
+            builds=("build/out",),
+        )
+
+        out = self.gc("--as", "me").stdout
+
+        self.assertIn("build: 1 declared", out)
+        self.assertNotIn("\ninferred build directories:", out)
+        self.assertEqual(self.commands(out), [f"rm -rf -- {run_dir / 'build/out'}"])
+
+    def test_invalid_build_declarations_get_no_command(self):
+        outside = self.runs / "outside"
+        outside.mkdir()
+        run_dir = self.cited_run(
+            files=("file.txt",),
+            builds=(str(outside), "../outside", "build-link", "build-link/child",
+                    "missing", "file.txt", ".", "bad\0path"),
+        )
+        (run_dir / "build-link").symlink_to(outside, target_is_directory=True)
+
+        out = self.gc("--as", "me").stdout
+
+        invalid = out.split("\ninvalid build declarations:", 1)[1].split(
+            "\ncommands", 1)[0]
+        self.assertIn("absolute path", invalid)
+        self.assertIn("leaves the run record", invalid)
+        self.assertIn("path contains a symbolic link", invalid)
+        self.assertIn("does not exist", invalid)
+        self.assertIn("not a directory", invalid)
+        self.assertIn("must be below the run record", invalid)
+        self.assertIn("path contains a null byte", invalid)
+        self.assertIn("commands: none", out)
+
+    def test_malformed_build_list_item_is_reported_once(self):
+        run_dir = self.cited_run(builds="[]")
+        header = run_dir / "run.md"
+        header.write_text(header.read_text().replace(
+            "builds: []\n", "builds:\n  broken-item\n"))
+
+        out = self.gc("--as", "me").stdout
+
+        invalid = out.split("\ninvalid build declarations:", 1)[1].split(
+            "\ncommands", 1)[0]
+        self.assertEqual(invalid.count("broken-item"), 1)
+        self.assertIn("expected a '- path' list item", invalid)
+        self.assertIn("nothing (1 invalid declaration)", out)
+        self.assertIn("commands: none", out)
+
+    def test_builds_scalar_is_declared(self):
+        run_dir = self.cited_run(
+            files=("out-a/result.txt",),
+            builds="out-a",
+        )
+
+        out = self.gc("--as", "me").stdout
+
+        declared = out.split("\ndeclared build directories:", 1)[1].split(
+            "\ncommands", 1)[0]
+        self.assertIn("out-a", declared)
+        self.assertNotIn("invalid build declarations:", out)
+        self.assertEqual(self.commands(out), [f"rm -rf -- {run_dir / 'out-a'}"])
+
+    def test_builds_flow_list_is_rejected_with_reason(self):
+        self.cited_run(builds="[a, b]")
+
+        out = self.gc("--as", "me").stdout
+
+        self.assertIn("flow lists are not supported; use one path or a block list", out)
+        self.assertIn("nothing (1 invalid declaration)", out)
+        invalid = out.split("\ninvalid build declarations:", 1)[1].split(
+            "\ncommands", 1)[0]
+        self.assertIn("[a, b]", invalid)
+        self.assertNotIn("(header)", invalid)
+        self.assertIn("commands: none", out)
+
+    def test_invalid_declarations_do_not_count_as_going(self):
+        self.cited_run(builds=("missing",), by="someone")
+
+        own = self.gc("--as", "someone").stdout
+        other = self.gc("--as", "me").stdout
+
+        self.assertIn("nothing (1 invalid declaration)", own)
+        self.assertIn("nothing (not yours; 1 invalid declaration)", other)
+        invalid = other.split("\ninvalid build declarations:", 1)[1].split(
+            "\ncommands", 1)[0]
+        invalid_line = next(line for line in invalid.splitlines()
+                            if line.startswith("20260101T000000Z-aaaaaaa"))
+        self.assertIn("someone", invalid_line)
+
+    def test_other_holder_mixed_declarations(self):
+        self.cited_run(files=("out-a/file",), builds=("out-a", "missing"),
+                       by="someone")
+
+        out = self.gc("--as", "me").stdout
+
+        self.assertIn(
+            "nothing (not yours; would go: build: 1 declared; "
+            "1 invalid declaration)",
+            out,
+        )
+
+    def test_block_item_bracket_name_is_declared(self):
+        run_dir = self.cited_run(files=("[x]/file",), builds=("[x]",))
+
+        out = self.gc("--as", "me").stdout
+
+        declared = out.split("\ndeclared build directories:", 1)[1].split(
+            "\ncommands", 1)[0]
+        self.assertIn("[x]", declared)
+        self.assertNotIn("invalid build declarations:", out)
+        self.assertEqual(self.commands(out), [f"rm -rf -- '{run_dir / '[x]'}'"])
+
+    def test_largest_files_break_size_ties_by_name(self):
+        self.cited_run(files=("build-x/a.txt", "build-x/m.txt",
+                              "build-x/w.txt", "build-x/z.txt"))
+
+        out = self.gc("--as", "me").stdout
+
+        inferred = out.split("\ninferred build directories:", 1)[1].split(
+            "\ncommands", 1)[0]
+        positions = [inferred.index(name) for name in ("a.txt", "m.txt", "w.txt")]
+        self.assertEqual(positions, sorted(positions))
+        self.assertNotIn("z.txt", inferred)
+
+    def test_declared_order_is_preserved(self):
+        run_dir = self.cited_run(
+            files=("z-last/file", "a-first/file", "m-middle/file"),
+            builds=("z-last", "a-first", "m-middle"),
+        )
+
+        out = self.gc("--as", "me").stdout
+
+        declared = out.split("\ndeclared build directories:", 1)[1].split(
+            "\ncommands", 1)[0]
+        positions = [declared.index(name) for name in ("z-last", "a-first", "m-middle")]
+        self.assertEqual(positions, sorted(positions))
+        self.assertEqual(self.commands(out), [
+            f"rm -rf -- {run_dir / 'z-last'}",
+            f"rm -rf -- {run_dir / 'a-first'}",
+            f"rm -rf -- {run_dir / 'm-middle'}",
+        ])
+
+    def test_declared_duplicates_and_children_are_pruned(self):
+        run_dir = self.cited_run(
+            files=("tree/child/file", "z/file"),
+            builds=("tree/child", "z", "tree", "tree", "./z"),
+        )
+
+        out = self.gc("--as", "me").stdout
+
+        self.assertIn("build: 2 declared", out)
+        self.assertEqual(self.commands(out), [
+            f"rm -rf -- {run_dir / 'z'}",
+            f"rm -rf -- {run_dir / 'tree'}",
+        ])
+
+    def test_other_holders_run_does_not_change_target_size(self):
+        run_dir = self.cited_run(files=("out/file",), builds="out")
+        before = self.gc("--as", "me").stdout
+        other = self.make_run("20251231T000000Z-0000000", "someone", "feat", self.base)
+        os.link(run_dir / "out/file", other / "shared-file")
+
+        after = self.gc("--as", "me").stdout
+
+        def declared_table(out):
+            return out.split("\ndeclared build directories:", 1)[1].split(
+                "\ncommands", 1)[0]
+
+        self.assertEqual(declared_table(after), declared_table(before))
+
+    def test_symlinked_run_name_uses_resolved_walk_path(self):
+        run_dir = self.cited_run(
+            files=("build/evidence.csv", "build/out/result.txt"),
+            builds=("build/out",),
+        )
+        real = self.root / "real-runs" / run_dir.name
+        real.parent.mkdir()
+        shutil.move(run_dir, real)
+        run_dir.symlink_to(real, target_is_directory=True)
+        empty = self.root / "empty-runs"
+        empty.mkdir()
+
+        out = self.gc("--as", "me", "--root", str(empty), str(run_dir)).stdout
+
+        self.assertIn("build: 1 declared", out)
+        self.assertNotIn("\ninferred build directories:", out)
+        self.assertEqual(self.commands(out), [f"rm -rf -- {run_dir / 'build/out'}"])
+
     def test_task_heads_by_worktree_slug(self):
         """T0010 amendment 0006: worktrees/<slug> is the task with that slug,
         found after the worktree is removed."""
@@ -461,6 +730,7 @@ class RunGc(unittest.TestCase):
         (scratch / "f;1").write_text("y")
         out = self.gc("--as", "me", "--root", str(self.runs), "--scratch", str(scratch)).stdout
         cmds = self.commands(out)
+        self.assertIn("run records, named paths, and scratchpad (", out)
         self.assertEqual(cmds, [f"rm -rf -- '{r}'", f"rm -rf -- '{scratch / 'dir $x'}'",
                                 f"rm -- '{scratch / 'f;1'}'"])
         for c in cmds:

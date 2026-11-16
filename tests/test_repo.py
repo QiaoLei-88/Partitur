@@ -110,13 +110,17 @@ class Repo(unittest.TestCase):
         # T0010 amendment 0008: the rules block says the same as the skills.
         rules = " ".join((ROOT / "templates" / "rules.md").read_text().split())
         self.assertIn("`test-run new` records the run's creator (`by:`)", rules)
-        self.assertIn("a run nobody cites may go whole and a cited one keeps all but its build directories", rules)
+        self.assertIn("a run nobody cites may go whole and a cited one keeps all but its declared and inferred build directories", rules)
+        self.assertIn("`builds:` accepts one path or a block list of paths relative to the run directory", rules)
+        self.assertIn("a session inspects its own inferred directories before proposing them", rules)
         self.assertIn("as static removal commands run only on the user's AtE", rules)
         self.assertIn("Run records or a scratchpad the user names, any session removes.", rules)
         self.assertIn("a task's: `worktrees/<task slug>`", rules)
         self.assertIn("`by:`", evidence)
         self.assertIn("worktrees/<task slug>", evidence)
         self.assertIn("Run all listed commands", disk)
+        self.assertIn("inspect each inferred directory of your own runs", disk)
+        self.assertIn("Run only declared build-directory commands", disk)
 
     def test_read_only_start_after_take_and_resume(self):
         """T0010 amendment 0004: after a take or resume, a session goes on

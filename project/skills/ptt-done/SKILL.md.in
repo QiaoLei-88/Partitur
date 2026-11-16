@@ -15,8 +15,8 @@ writes; other work needs AtE (rules file).
    state unknowns and skipped work as such.
 2. Disk: follow `/ptt-disk` for your own run records and your scratchpad
    (`<records>/skills/ptt-disk/SKILL.md`, steps 1-8): inventory, the
-   reviewed commands, removal only on AtE. Runs whose head is still open
-   (an undecided request) stay; say so.
+   reviewed commands, inspection of inferred build directories, removal only
+   on AtE. Runs whose head is still open (an undecided request) stay; say so.
 3. Write that check, criterion by criterion, into `status.md`, with what was
    removed or kept and why, and record it:
    `<records>/bin/ptt record -m "task <N>: status" <status.md>`.

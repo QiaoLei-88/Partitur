@@ -26,12 +26,21 @@ A claim without a label is a claim the reader cannot weigh.
   ([tasks](tasks.md)). Once the head is concluded (the request merged,
   rejected, or withdrawn; the task closed or cancelled), a run nobody cites
   may go whole, and a cited one keeps everything but its build directories.
+  `run.md` declares those in `builds:`, one relative path or a block list of
+  paths; `test-run new` writes an empty list. Absolute paths, `..`, symbolic
+  links, missing paths, and non-directories are invalid and get no command.
+  The transition rule finds directories named `build` or `build-*` or
+  holding `CMakeCache.txt` and marks them inferred, with their reason, size,
+  and largest files. A declaration wins where both apply. A session inspects
+  each inferred directory of its own runs before proposing it and leaves out
+  anything holding evidence.
   Cited means its id is in a records file, a records commit message, or a
   main-branch commit message. There is no cooldown. `bin/test-run gc` lists
-  this, read-only, with static removal commands for the caller's own runs
-  (`by:`); runs on a main branch or with no head stay until someone names
-  them. The user's direction is not limited by this: when the user names
-  run records or a scratchpad to clean up, any session does it.
+  this, read-only, with declared removal commands before inferred ones and
+  static commands for the caller's own runs (`by:`); runs on a main branch or
+  with no head stay until someone names them. The user's direction is not
+  limited by this: when the user names run records or a scratchpad to clean
+  up, any session does it.
 - Outside every repository (E7). A one-off probe's driver is kept in the
   run record with its outputs; a reusable driver belongs in the code
   repository's tests *(Adopted)* (E8).
