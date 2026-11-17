@@ -5,6 +5,8 @@
 | Choice | Option | Default |
 | --- | --- | --- |
 | Agent tools | `--tool auto`, `claude`, `codex`, or `all` | `auto`: on the first install, the tools found on this machine; later, the tools in the stamp |
+| Release version | `--release TAG_OR_COMMIT` | run this clone's installer directly when omitted; with it, resolve an annotated `v0.N` tag or commit ID locally and install from a detached clone holding only that version and its release tags; existing directories with other refs or objects are refused unchanged |
+| Release clones directory | `--releases-dir PATH`, with `--release` | `$XDG_DATA_HOME/partitur/releases`; `~/.local/share/partitur/releases` when `XDG_DATA_HOME` is unset, empty or relative; clones are named `partitur-<first seven commit digits>` and kept while projects link to them |
 | Project name | `--name` | the workspace root's directory name |
 | Records repository | `--records` | `workspace`, directly in the workspace root |
 | Its main branch | `--branch` | `master` |

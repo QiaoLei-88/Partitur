@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- `install --release TAG_OR_COMMIT` prepares a detached clone containing
+  only the selected version and its release tags. A matching clean clone
+  is reused; an incompatible existing path is refused unchanged. Clones
+  default to `$XDG_DATA_HOME/partitur/releases`, or
+  `~/.local/share/partitur/releases` when `XDG_DATA_HOME` is unset, empty
+  or relative; `--releases-dir PATH` overrides the directory.
 - Installed manifests let update and uninstall work without old Git history.
   Legacy installs migrate once; keep their source clone until migrated.
 - Run records declare build directories in `builds:`; `test-run gc` shows

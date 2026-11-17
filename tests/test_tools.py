@@ -757,7 +757,7 @@ class InstallProject(unittest.TestCase):
         self.home = Path(tempfile.mkdtemp())
         self.env = dict(os.environ, HOME=str(self.home))
         for key in ("PTT_SESSION_ID", "CLAUDE_CODE_SESSION_ID", "CODEX_THREAD_ID",
-                    "CODEX_SESSION_ID"):
+                    "CODEX_SESSION_ID", "XDG_DATA_HOME"):
             self.env.pop(key, None)
         code = self.root / "code"
         code.mkdir()
@@ -922,6 +922,250 @@ class InstallProject(unittest.TestCase):
     def install_from(self, clone, *extra, check=True, tool="claude"):
         return run("python3", str(clone / "bin" / "install"), "--tool", tool, "--scope",
                    "project", str(self.root), *extra, check=check, env=self.env)
+
+    def test_release_tag_reused_without_writing_even_git_metadata(self):
+        seed = self.partitur_clone()
+        commit = git(seed, "rev-parse", "HEAD")
+        git(seed, "-c", "user.name=t", "-c", "user.email=t@x",
+            "tag", "-a", "v0.1", "-m", "release")
+        (seed / "README.md").write_text("another version\n")
+        self.commit_clone(seed, "newer seed")
+        git(seed, "branch", "v0.1")  # The tag wins over a branch with the same name.
+        releases = self.home / "releases with spaces"
+        args = ("--release=v0.1", "--releases-dir", str(releases), "--records", "records")
+        self.install_from(seed, *args, tool="all")
+        clone = releases / f"partitur-{commit[:7]}"
+        self.assertEqual(git(clone, "rev-parse", "HEAD"), commit)
+        self.assertEqual(git(clone, "branch", "--show-current"), "")
+        self.assertEqual((self.root / ".agents/skills/partitur").resolve(), clone)
+        self.assertEqual((self.root / "records/.partitur-version").read_text().splitlines(),
+                         [f"partitur {commit}", f"source {clone}", "tools claude codex"])
+        before = tree_snapshot(clone)
+        self.install_from(seed, *args, "--update", tool="all")
+        self.assertEqual(tree_snapshot(clone), before)
+
+    def test_release_commit_and_default_directory(self):
+        seed = self.partitur_clone()
+        commit = git(seed, "rev-parse", "HEAD")
+        self.install_from(seed, "--release", commit[:12])
+        clone = self.home / ".local/share/partitur/releases" / f"partitur-{commit[:7]}"
+        self.assertEqual(git(clone, "rev-parse", "HEAD"), commit)
+        self.assertEqual(git(clone, "branch", "--show-current"), "")
+        self.assertEqual((self.root / ".claude/skills/partitur").resolve(), clone)
+        before = tree_snapshot(clone)
+        run("python3", str(seed / "bin/install"), "--release", commit,
+            "--scope", "user", "--tool", "codex", env=self.env)
+        self.assertEqual((self.home / ".agents/skills/partitur").resolve(), clone)
+        self.assertEqual(tree_snapshot(clone), before)
+
+    def test_release_xdg_data_home(self):
+        seed = self.partitur_clone()
+        commit = git(seed, "rev-parse", "HEAD")
+        fallback = self.home / ".local/share/partitur/releases"
+        data = self.home / "xdg data"
+        for i, (value, directory) in enumerate(((None, fallback), ("", fallback),
+                ("relative data", fallback), (str(data), data / "partitur/releases"))):
+            with self.subTest(value=value):
+                project = self.root / f"project-{i}"
+                project.mkdir()
+                env = dict(self.env)
+                if value is not None:
+                    env["XDG_DATA_HOME"] = value
+                run("python3", str(seed / "bin/install"), "--release", commit,
+                    "--scope", "project", str(project), "--tool", "codex",
+                    cwd=project, env=env)
+                clone = directory / f"partitur-{commit[:7]}"
+                self.assertEqual((project / ".agents/skills/partitur").resolve(), clone)
+                self.assertEqual(git(clone, "rev-parse", "HEAD"), commit)
+                self.assertFalse((project / "relative data").exists())
+
+    def test_release_directory_overrides_xdg_data_home(self):
+        seed = self.partitur_clone()
+        commit = git(seed, "rev-parse", "HEAD")
+        data = self.home / "xdg data"
+        directory = self.home / "explicit releases"
+        run("python3", str(seed / "bin/install"), "--release", commit,
+            "--releases-dir", str(directory), "--scope", "project", str(self.root),
+            "--tool", "codex", env=dict(self.env, XDG_DATA_HOME=str(data)))
+        clone = directory / f"partitur-{commit[:7]}"
+        self.assertEqual((self.root / ".agents/skills/partitur").resolve(), clone)
+        self.assertFalse(data.exists())
+
+    def test_release_missing_or_invalid_version_creates_nothing(self):
+        seed = self.partitur_clone()
+        git(seed, "tag", "v0.1")  # Lightweight tags are not release tags.
+        git(seed, "branch", "abcd")  # A hexadecimal branch name is not a commit ID.
+        releases = self.home / "no releases yet"
+        for version in ("v0.999", "v0.1", "v0.0", "master", "abcd", "", "f" * 40):
+            with self.subTest(version=version):
+                result = self.install_from(seed, "--release", version,
+                                           "--releases-dir", str(releases), check=False)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(repr(version), result.stderr)
+                self.assertFalse(releases.exists())
+                self.assertFalse((self.root / "workspace").exists())
+
+    def test_release_rejects_existing_paths_untouched(self):
+        seed = self.partitur_clone()
+        commit = git(seed, "rev-parse", "HEAD")
+        for kind in ("empty", "file", "symlink", "dangling", "attached", "wrong-commit",
+                     "modified", "untracked", "worktree", "extra-history", "extra-ref",
+                     "extra-object", "alternate"):
+            with self.subTest(kind=kind):
+                releases = self.home / kind
+                releases.mkdir()
+                clone = releases / f"partitur-{commit[:7]}"
+                if kind == "empty":
+                    clone.mkdir()
+                elif kind == "file":
+                    clone.write_text("keep this\n")
+                elif kind == "symlink":
+                    clone.symlink_to(seed, target_is_directory=True)
+                elif kind == "dangling":
+                    clone.symlink_to(self.home / "missing")
+                elif kind == "worktree":
+                    git(seed, "worktree", "add", "--detach", str(clone), commit)
+                else:
+                    git(self.home, "clone", "-q", *(["--shared"] if kind == "alternate" else []),
+                        str(seed), str(clone))
+                    if kind != "attached":
+                        git(clone, "checkout", "-q", "--detach", commit)
+                    if kind in ("wrong-commit", "modified"):
+                        (clone / "README.md").write_text("changed\n")
+                    if kind == "wrong-commit":
+                        self.commit_clone(clone, "different version")
+                    if kind == "untracked":
+                        (clone / "keep.txt").write_text("keep this too\n")
+                    if kind.startswith("extra-") or kind == "alternate":
+                        for ref in git(clone, "for-each-ref", "--format=%(refname)").splitlines():
+                            git(clone, "update-ref", "-d", ref)
+                    if kind == "extra-history":
+                        (clone / "README.md").write_text("another commit\n")
+                        self.commit_clone(clone, "unreferenced version")
+                        git(clone, "checkout", "-q", "--detach", commit)
+                    if kind == "extra-ref":
+                        git(clone, "branch", "unrelated")
+                    if kind == "extra-object":
+                        subprocess.run(["git", "-C", str(clone), "hash-object", "-w", "--stdin"],
+                                       input=b"unreferenced object\n", capture_output=True, check=True)
+                before = tree_snapshot(clone)
+                result = self.install_from(seed, "--release", commit, "--releases-dir",
+                                           str(releases), check=False)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("existing path left untouched", result.stderr)
+                self.assertEqual(tree_snapshot(clone), before)
+                self.assertFalse((self.root / "workspace").exists())
+
+    def test_release_copies_only_selected_version_and_updates_from_manifest(self):
+        seed = self.partitur_clone()
+        old_commit = git(seed, "rev-parse", "HEAD")
+        old_readme = (seed / "README.md").read_bytes()
+        git(seed, "-c", "user.name=t", "-c", "user.email=t@x",
+            "tag", "-a", "v0.1", "-m", "old release")
+        old_tag = git(seed, "rev-parse", "refs/tags/v0.1")
+        (seed / "README.md").write_text("new version\n")
+        tool = seed / "project/bin/test-run"
+        tool.write_text(tool.read_text() + "\n# new version\n")
+        self.commit_clone(seed, "new release")
+        new_commit = git(seed, "rev-parse", "HEAD")
+        for tag in ("v0.2", "recovery/unused"):
+            git(seed, "-c", "user.name=t", "-c", "user.email=t@x",
+                "tag", "-a", tag, "-m", tag)
+        git(seed, "branch", "unused")
+        blob = subprocess.run(["git", "-C", str(seed), "hash-object", "-w", "--stdin"],
+                              input=b"unreachable seed object\n", capture_output=True,
+                              check=True).stdout.decode().strip()
+        releases = self.home / "releases"
+        args = ("--releases-dir", str(releases))
+        self.install_from(seed, "--release", "v0.1", *args)
+        old = releases / f"partitur-{old_commit[:7]}"
+        self.assertEqual((old / "README.md").read_bytes(), old_readme)
+        self.assertEqual(git(old, "rev-list", "--count", "HEAD"), "1")
+        self.assertEqual(git(old, "for-each-ref", "--format=%(refname)"), "refs/tags/v0.1")
+        objects = git(old, "cat-file", "--batch-all-objects",
+                      "--batch-check=%(objectname) %(objecttype)").splitlines()
+        self.assertEqual([line for line in objects if line.endswith(" commit")],
+                         [old_commit + " commit"])
+        self.assertEqual([line for line in objects if line.endswith(" tag")], [old_tag + " tag"])
+        for excluded in (new_commit, blob, git(seed, "rev-parse", "refs/tags/recovery/unused")):
+            self.assertNotEqual(run("git", "-C", str(old), "cat-file", "-e", excluded,
+                                    check=False).returncode, 0)
+        before = tree_snapshot(old)
+        out = self.install_from(seed, "--release", "v0.2", *args, "--update").stdout
+        new = releases / f"partitur-{new_commit[:7]}"
+        self.assertIn(f"Installed Partitur: {old_commit} (v0.1)", out)
+        self.assertIn("# new version", (self.root / "workspace/bin/test-run").read_text())
+        self.assertNotEqual(run("git", "-C", str(new), "cat-file", "-e", old_commit,
+                                check=False).returncode, 0)
+        self.assertEqual(git(new, "for-each-ref", "--format=%(refname)"), "refs/tags/v0.2")
+        self.assertEqual(tree_snapshot(old), before)
+
+    def test_release_can_use_a_single_version_seed_without_modifying_it(self):
+        seed = self.partitur_clone()
+        commit = git(seed, "rev-parse", "HEAD")
+        first_dir, second_dir = self.home / "first", self.home / "second"
+        self.install_from(seed, "--release", commit, "--releases-dir", str(first_dir))
+        first = first_dir / f"partitur-{commit[:7]}"
+        before = tree_snapshot(first)
+        run("python3", str(first / "bin/install"), "--release", commit,
+            "--releases-dir", str(second_dir), "--scope", "user", "--tool", "codex", env=self.env)
+        second = second_dir / f"partitur-{commit[:7]}"
+        self.assertEqual((self.home / ".agents/skills/partitur").resolve(), second)
+        self.assertEqual(git(second, "rev-list", "--count", "HEAD"), "1")
+        self.assertFalse((second / ".git/objects/info/alternates").exists())
+        self.assertEqual(tree_snapshot(first), before)
+
+    def test_release_failed_preparation_removes_new_clone(self):
+        seed = self.partitur_clone()
+        (seed / "project/bin/ptt").unlink()
+        self.commit_clone(seed, "not an installable version")
+        commit = git(seed, "rev-parse", "HEAD")
+        releases = self.home / "releases"
+        result = self.install_from(seed, "--release", commit, "--releases-dir", str(releases),
+                                   check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("new clone removed", result.stderr)
+        self.assertEqual(list(releases.iterdir()), [])
+        self.assertFalse((self.root / "workspace").exists())
+
+    def test_release_dispatches_selected_installer_with_options_and_exit_status(self):
+        seed = self.partitur_clone()
+        installer = seed / "bin/install"
+        current = installer.read_text()
+        installer.write_text("import sys\nprint(repr(sys.argv[1:]))\nsys.exit(17)\n")
+        self.commit_clone(seed, "older installer")
+        commit = git(seed, "rev-parse", "HEAD")
+        installer.write_text(current)
+        self.commit_clone(seed, "current installer")
+        result = self.install_from(seed, "--release", commit, "--releases-dir="
+                                   + str(self.home / "releases"), "--name=--release",
+                                   "--records=records", "--update", check=False)
+        self.assertEqual(result.returncode, 17)
+        self.assertEqual(result.stdout.strip(), repr(["--tool", "claude", "--scope",
+                         "project", str(self.root), "--name=--release", "--records=records",
+                         "--update"]))
+
+    def test_release_options_require_scope_and_version(self):
+        for args in (("--release", "v0.1"),
+                     ("--scope", "project", "--releases-dir", str(self.home / "releases"))):
+            result = run("python3", str(INSTALL), *args, env=self.env, check=False)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((self.home / "releases").exists())
+            self.assertFalse((self.home / ".local/share/partitur/releases").exists())
+
+    def test_release_refuses_a_project_inside_its_clone(self):
+        seed = self.partitur_clone()
+        commit = git(seed, "rev-parse", "HEAD")
+        run("python3", str(seed / "bin/install"), "--release", commit,
+            "--scope", "user", "--tool", "claude", env=self.env)
+        clone = self.home / ".local/share/partitur/releases" / f"partitur-{commit[:7]}"
+        before = tree_snapshot(clone)
+        result = run("python3", str(seed / "bin/install"), "--release", commit,
+                     "--scope", "project", str(clone), "--tool", "claude", env=self.env,
+                     check=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("outside the release clone", result.stderr)
+        self.assertEqual(tree_snapshot(clone), before)
 
     def single_version(self, seed, name):
         clone = self.home / name

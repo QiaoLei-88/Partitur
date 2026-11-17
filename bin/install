@@ -7,6 +7,22 @@ Usage:
           [--update | --uninstall] [--force [--backup-to PATH]] [--merge-rules]
           [--name NAME] [--records DIR] [--branch MAIN]
           [--repo NAME:CHECKOUT:MAIN ...] [--add-repo NAME:CHECKOUT:MAIN ...]
+  Add --release TAG_OR_COMMIT [--releases-dir PATH] to install from a release clone.
+
+--release
+  Resolves an annotated v0.N tag or a commit ID locally. Installs from a
+  detached, single-version clone at that commit under
+  $XDG_DATA_HOME/partitur/releases (or --releases-dir PATH), named
+  partitur-<first seven commit digits>. If XDG_DATA_HOME is unset, empty or
+  relative, use ~/.local/share/partitur/releases.
+
+  An existing path must be a clean, detached clone at that exact commit,
+  containing only that version and its release tags; otherwise install
+  stops and leaves it alone. Missing versions create no directories.
+  Newly created clones are removed if preparation fails.
+
+  Other options are passed to the selected version's installer. Keep release
+  clones while projects link to them; never pull or switch them.
 
 --scope user
   Links this repository as the skill `partitur` in the user's skill
@@ -1209,8 +1225,97 @@ def scope_project(a, report):
     return tools
 
 
+def release_clone(version, directory):
+    """Prepare a release from this clone; never repair an existing path."""
+    git = ["git", "--no-optional-locks", "-C", str(HERE)]
+    if re.fullmatch(r"v0\.[1-9][0-9]*", version):
+        ref = f"refs/tags/{version}"
+        kind = subprocess.run(git + ["cat-file", "-t", ref], capture_output=True, text=True)
+        if kind.returncode or kind.stdout.strip() != "tag":
+            sys.exit(f"install: annotated release tag {version!r} not found in {HERE}")
+    elif re.fullmatch(r"[0-9a-fA-F]{4,64}", version):
+        ref = version
+    else:
+        sys.exit(f"install: release {version!r}: expected an annotated v0.N tag or commit ID")
+    resolved = subprocess.run(git + ["rev-parse", "--verify", f"{ref}^{{commit}}"],
+                              capture_output=True, text=True)
+    if resolved.returncode or (ref == version
+                              and not resolved.stdout.strip().startswith(version.lower())):
+        sys.exit(f"install: release {version!r} not found in {HERE}")
+    commit = resolved.stdout.strip()
+    if directory is None:
+        data_home = Path(os.environ.get("XDG_DATA_HOME", ""))
+        if not data_home.is_absolute():
+            data_home = Path.home() / ".local/share"
+        directory = data_home / "partitur/releases"
+    directory = directory.expanduser().resolve()
+    clone = directory / f"partitur-{commit[:7]}"
+    created = False
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        try:
+            clone.mkdir()
+            created = True
+        except FileExistsError:
+            pass
+        if created:
+            subprocess.run(["git", "init", "-q", "-b", "master", str(clone)], check=True)
+            selected = f"{ref}:{ref}" if ref.startswith("refs/tags/") else commit
+            subprocess.run(["git", "-C", str(clone), "fetch", "-q", "--depth=1", "--no-tags",
+                            str(HERE), selected], check=True)
+            subprocess.run(["git", "-C", str(clone), "checkout", "-q", "--detach", commit],
+                           check=True)
+        if (clone.is_symlink() or not (clone / ".git").is_dir()
+                or (clone / ".git").is_symlink()
+                or (clone / ".git/objects/info/alternates").exists() or not is_partitur(clone)):
+            raise ValueError(f"{clone} is not a standalone Partitur clone")
+        git = ["git", "--no-optional-locks", "-C", str(clone)]
+        head = subprocess.run(git + ["rev-parse", "HEAD"], capture_output=True, text=True)
+        branch = subprocess.run(git + ["symbolic-ref", "-q", "HEAD"], capture_output=True)
+        status = subprocess.run(git + ["status", "--porcelain", "--untracked-files=all"],
+                                capture_output=True, text=True)
+        if (head.returncode or head.stdout.strip() != commit or branch.returncode != 1
+                or status.returncode or status.stdout):
+            raise ValueError(f"{clone} must be clean, detached, and at commit {commit}")
+        history = subprocess.run(git + ["rev-list", "--count", "HEAD"],
+                                 capture_output=True, text=True, check=True)
+        refs = subprocess.run(git + ["for-each-ref", "--format=%(refname) %(objecttype)"],
+                              capture_output=True, text=True, check=True)
+        if history.stdout.strip() != "1":
+            raise ValueError(f"{clone} contains other versions")
+        for line in refs.stdout.splitlines():
+            name, kind = line.split()
+            if kind != "tag" or not re.fullmatch(r"refs/tags/v0\.[1-9][0-9]*", name):
+                raise ValueError(f"{clone} contains refs outside its release version")
+            target = subprocess.run(git + ["rev-parse", f"{name}^{{commit}}"],
+                                    capture_output=True, text=True, check=True)
+            if target.stdout.strip() != commit:
+                raise ValueError(f"{clone} contains a tag for another version")
+        objects = subprocess.run(git + ["cat-file", "--batch-all-objects",
+                                        "--batch-check=%(objectname)"],
+                                 capture_output=True, text=True, check=True)
+        reachable = subprocess.run(git + ["rev-list", "--objects", "--no-object-names",
+                                          "--all", "HEAD"],
+                                   capture_output=True, text=True, check=True)
+        if set(objects.stdout.splitlines()) != set(reachable.stdout.splitlines()):
+            raise ValueError(f"{clone} contains objects outside its release version")
+    except (OSError, subprocess.CalledProcessError, ValueError) as error:
+        if created:
+            shutil.rmtree(clone)
+        sys.exit(f"install: release {version!r}: {error}; "
+                 + ("new clone removed" if created else "existing path left untouched"))
+    return clone
+
+
 def main():
-    ap = argparse.ArgumentParser(prog="install", description=__doc__,
+    release = argparse.ArgumentParser(add_help=False)
+    release.add_argument("--release", metavar="TAG_OR_COMMIT",
+                         help="install from a clean, detached release clone at this version")
+    release.add_argument("--releases-dir", type=Path, metavar="PATH",
+                         help="release clones directory (default: "
+                              "$XDG_DATA_HOME/partitur/releases; "
+                              "fallback: ~/.local/share/partitur/releases)")
+    ap = argparse.ArgumentParser(prog="install", description=__doc__, parents=[release],
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tool", choices=("auto", "claude", "codex", "all"), default="auto")
     ap.add_argument("--scope", choices=("user", "project"))
@@ -1245,6 +1350,17 @@ def main():
         sys.exit(2)
     if a.force and not (a.update or a.uninstall):
         sys.exit("install: --force goes with --update or --uninstall")
+    if a.releases_dir is not None and a.release is None:
+        sys.exit("install: --releases-dir requires --release")
+    if a.release is not None:
+        clone = release_clone(a.release, a.releases_dir)
+        if a.scope == "project" and (a.project.resolve() == clone
+                                    or clone in a.project.resolve().parents):
+            sys.exit("install: the project must be outside the release clone")
+        forwarded = release.parse_known_args()[1]
+        env = dict(os.environ, GIT_OPTIONAL_LOCKS="0", PYTHONDONTWRITEBYTECODE="1")
+        sys.exit(subprocess.run([sys.executable, "-B", str(clone / "bin" / "install"),
+                                 *forwarded], env=env).returncode)
     a.named = None if a.tool == "auto" else tuple(TOOLS) if a.tool == "all" else (a.tool,)
     report = Report(a.project.resolve() if a.scope == "project" else Path.home())
     if a.scope == "user":
