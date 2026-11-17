@@ -36,6 +36,7 @@ Changing one of these means changing the tools or skills that use it.
 | Root design task | `<records>/tasks/open/T0000-design/`, held by the designer, supervised by the user, never closed; `designer` names it in commands | D8, G10 |
 | Role records | `<records>/roles/integrator/MMMM-<kind>.md` | G1 |
 | Installed version | `<records>/.partitur-version`: the Partitur commit that installed or last updated the project (`partitur <commit>`), the clone it ran from (`source <path>`), and the tools installed (`tools <tool> [<tool>]`) | F12 |
+| Installed manifest | `<records>/.partitur-manifest.json`, format 1: delivered entry kinds, SHA-256 hashes, link targets, tool ownership, version label, and release-notes baseline; update and uninstall use it without old Git history. Skipped local changes retain their previous baseline; project-owned seeded files stay. Legacy installs recover a baseline once from the installing commit in the current or recorded source clone. | F10, F12 |
 | Prompt hooks | `.claude/settings.json` (Claude Code) and `.codex/hooks.json` (Codex, trusted in Codex first) in the workspace root, each running `ptt inbox --quiet`; other settings there are kept | G17 |
 | Session IDs | `PTT_SESSION_ID`, else `CLAUDE_CODE_SESSION_ID`, `CODEX_THREAD_ID`, `CODEX_SESSION_ID`; Codex's hook reads the event's `session_id` | G16 |
 | Handover markers | `<records>/.git/ptt-handover/<holder name>`: left at a quiet point (`ptt handover`), orders the list of `ptt resume` without a name; lapse by events; not committed | G19 |

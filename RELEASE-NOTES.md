@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Installed manifests let update and uninstall work without old Git history.
+  Legacy installs migrate once; keep their source clone until migrated.
 - Run records declare build directories in `builds:`; `test-run gc` shows
   declared and inferred groups with details. Clear and resume running holders.
 - `/ptt-pr-review all` reviews one request per repository in merge order;

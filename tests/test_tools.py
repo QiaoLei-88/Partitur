@@ -4,6 +4,7 @@ each in a temporary directory.
 Run: python3 -m unittest discover -s tests   (from the repository root)
 """
 import json
+import hashlib
 import os
 import re
 import sys
@@ -46,6 +47,14 @@ def skill_files(root):
     return [Path(directory) / "SKILL.md"
             for directory, _, files in os.walk(root, followlinks=True)
             if "SKILL.md" in files]
+
+
+def tree_snapshot(root):
+    """Include Git files and timestamps, without following directory symlinks."""
+    return {p.relative_to(root):
+            (p.lstat().st_mode, p.lstat().st_mtime_ns,
+             os.readlink(p) if p.is_symlink() else p.read_bytes() if p.is_file() else None)
+            for p in [root, *root.rglob("*")]}
 
 
 def message(path, **fields):
@@ -914,6 +923,157 @@ class InstallProject(unittest.TestCase):
         return run("python3", str(clone / "bin" / "install"), "--tool", tool, "--scope",
                    "project", str(self.root), *extra, check=check, env=self.env)
 
+    def single_version(self, seed, name):
+        clone = self.home / name
+        git(self.home, "init", "-q", str(clone))
+        git(clone, "fetch", "-q", "--depth=1", "--no-tags", str(seed),
+            git(seed, "rev-parse", "HEAD"))
+        git(clone, "checkout", "-q", "--detach", "FETCH_HEAD")
+        self.assertEqual(git(clone, "rev-list", "--count", "HEAD"), "1")
+        return clone
+
+    def test_manifest_updates_and_uninstalls_without_old_clone_or_history(self):
+        seed = self.partitur_clone()
+        old = self.single_version(seed, "release-old")
+        old_commit = git(old, "rev-parse", "HEAD")
+        self.install_from(old, tool="all")
+        manifest = self.root / "workspace/.partitur-manifest.json"
+        state = json.loads(manifest.read_text())
+        self.assertEqual(state["format"], 1)
+        self.assertEqual(state["entries"]["workspace/bin/pr"]["sha"],
+                         hashlib.sha256((old / "project/bin/pr").read_bytes()).hexdigest())
+        self.assertEqual(state["entries"][".codex/hooks.json"]["tool"], "codex")
+        modified = self.root / "workspace/bin/pr"
+        modified.write_text(modified.read_text() + "\n# local change\n")
+        local = modified.read_bytes()
+        own = self.root / "workspace/own-note.md"
+        own.write_text("project-owned\n")
+        rules = self.root / "workspace/PROJECT-RULES.md"
+        rules.write_text(rules.read_text() + "\nProject-owned rule.\n")
+        settings = self.root / ".codex/hooks.json"
+        config = json.loads(settings.read_text())
+        config["custom"] = "keep"
+        settings.write_text(json.dumps(config))
+        for name in ("pr", "test-run"):
+            (seed / "project/bin" / name).unlink()
+        skill = seed / "project/skills/ptt-inbox/SKILL.md.in"
+        skill.write_text(skill.read_text() + "\nNew skill instructions.\n")
+        (seed / "project/bin/new-helper").write_text("#!/bin/sh\nexit 0\n")
+        notes = seed / "RELEASE-NOTES.md"
+        notes.write_text(notes.read_text().replace("## Unreleased\n",
+                         "## Unreleased\n\n- Manifest test action.\n", 1))
+        self.commit_clone(seed, "new release")
+        new = self.single_version(seed, "release-new")
+        shutil.rmtree(old)
+        self.assertNotEqual(run("git", "-C", str(new), "cat-file", "-e", old_commit,
+                                check=False).returncode, 0)
+        out = self.install_from(new, "--update", tool="all").stdout
+        self.assertIn("Release notes: 1 new entries.", out)
+        self.assertIn("Manifest test action.", out)
+        self.assertEqual(modified.read_bytes(), local)
+        self.assertFalse((self.root / "workspace/bin/test-run").exists())
+        self.assertTrue((self.root / "workspace/bin/new-helper").is_file())
+        self.assertIn("New skill instructions.",
+                      (self.root / "workspace/skills/ptt-inbox/SKILL.md").read_text())
+        self.assertEqual(json.loads(settings.read_text())["custom"], "keep")
+        state = json.loads(manifest.read_text())
+        self.assertIn("workspace/bin/pr", state["entries"])
+        self.assertNotIn("workspace/bin/test-run", state["entries"])
+        backup = self.home / "backup"
+        self.install_from(new, "--update", "--force", "--backup-to", str(backup), tool="all")
+        self.assertFalse(modified.exists())
+        self.assertEqual((backup / "workspace/bin/pr").read_bytes(), local)
+        self.assertNotIn("workspace/bin/pr", json.loads(manifest.read_text())["entries"])
+        shutil.rmtree(new / ".git")
+        self.install_from(new, "--uninstall", tool="all")
+        self.assertFalse(manifest.exists())
+        self.assertFalse((self.root / "workspace/bin/new-helper").exists())
+        self.assertEqual(own.read_text(), "project-owned\n")
+        self.assertIn("Project-owned rule.", rules.read_text())
+        self.assertEqual(json.loads(settings.read_text()), {"custom": "keep"})
+
+    def test_manifest_migrates_legacy_baseline_once_from_stamped_clone(self):
+        seed = self.partitur_clone()
+        old = self.single_version(seed, "release-old")
+        self.install_from(old)
+        manifest = self.root / "workspace/.partitur-manifest.json"
+        manifest.unlink()  # Model an installation predating manifests.
+        original_hash = hashlib.sha256((old / "project/bin/pr").read_bytes()).hexdigest()
+        modified = self.root / "workspace/bin/pr"
+        modified.write_text(modified.read_text() + "\n# project change\n")
+        local = modified.read_bytes()
+        for name in ("pr", "test-run"):
+            path = seed / "project/bin" / name
+            path.write_text(path.read_text() + "\n# new release\n")
+        self.commit_clone(seed, "new release")
+        new = self.single_version(seed, "release-new")
+        self.install_from(new, "--update")
+        self.assertEqual(modified.read_bytes(), local)
+        self.assertIn("# new release", (self.root / "workspace/bin/test-run").read_text())
+        self.assertEqual(json.loads(manifest.read_text())["entries"]["workspace/bin/pr"]["sha"],
+                         original_hash)
+        shutil.rmtree(old)
+        shutil.rmtree(new / ".git")
+        out = self.install_from(new, "--update").stdout
+        self.assertNotIn("original commit unavailable", out)
+        self.assertEqual(modified.read_bytes(), local)
+        self.assertEqual(json.loads(manifest.read_text())["entries"]["workspace/bin/pr"]["sha"],
+                         original_hash)
+
+    def test_manifest_partial_uninstall_needs_no_source_history(self):
+        seed = self.partitur_clone()
+        self.install_from(seed, tool="all")
+        shutil.rmtree(seed / ".git")
+        self.install_from(seed, "--uninstall", tool="codex")
+        self.assertTrue((self.root / "workspace/bin/ptt").is_file())
+        self.assertTrue((self.root / "CLAUDE.md").is_symlink())
+        self.assertFalse((self.root / "AGENTS.md").exists())
+        state = json.loads((self.root / "workspace/.partitur-manifest.json").read_text())
+        self.assertFalse(any(e["tool"] == "codex" for e in state["entries"].values()))
+        self.install_from(seed, "--uninstall", tool="claude")
+        self.assertFalse((self.root / "workspace/.partitur-manifest.json").exists())
+        self.assertTrue((self.root / "workspace/tasks/open/T0000-design/charter.md").is_file())
+
+    def test_manifest_unknown_legacy_baseline_preserves_unknown_files(self):
+        seed = self.partitur_clone()
+        self.install_from(seed)
+        manifest = self.root / "workspace/.partitur-manifest.json"
+        manifest.unlink()
+        stamp = self.root / "workspace/.partitur-version"
+        lines = stamp.read_text().splitlines()
+        lines[0] = "partitur " + "f" * 40
+        stamp.write_text("\n".join(lines) + "\n")
+        modified = self.root / "workspace/bin/pr"
+        modified.write_text("project edit\n")
+        own = self.root / "workspace/bin/own-file"
+        own.write_text("keep\n")
+        out = self.install_from(seed, "--update").stdout
+        self.assertIn("original commit unavailable", out)
+        self.assertEqual(modified.read_text(), "project edit\n")
+        self.assertEqual(own.read_text(), "keep\n")
+        self.assertNotIn("workspace/bin/pr", json.loads(manifest.read_text())["entries"])
+
+    def test_manifest_invalid_data_changes_nothing(self):
+        seed = self.partitur_clone()
+        self.install_from(seed)
+        manifest = self.root / "workspace/.partitur-manifest.json"
+        original = json.loads(manifest.read_text())
+        bad_entry = dict(original["entries"]["workspace/bin/pr"], sha="bad")
+        cases = ["{", "null", json.dumps(dict(original, format=2)),
+                 json.dumps(dict(original, commit=17)),
+                 json.dumps(dict(original, release_notes="bad")),
+                 json.dumps(dict(original, entries={"../outside":
+                            original["entries"]["workspace/bin/pr"]})),
+                 json.dumps(dict(original, entries={"workspace/bin/pr": bad_entry}))]
+        for content in cases:
+            with self.subTest(content=content[:50]):
+                manifest.write_text(content)
+                before = tree_snapshot(self.root)
+                result = self.install_from(seed, "--update", check=False)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("project left untouched", result.stderr)
+                self.assertEqual(tree_snapshot(self.root), before)
+
     def test_update_from_skill_files(self):
         clone = self.partitur_clone()
         for path in (clone / "project/skills").glob("*/SKILL.md.in"):
@@ -1222,6 +1382,7 @@ class InstallProject(unittest.TestCase):
         self.assertEqual(stamp.read_text().splitlines()[1], f"source {a}")
         if old_stamp:
             stamp.write_text(f"partitur {git(a, 'rev-parse', 'HEAD')}\n")
+            (self.root / "workspace/.partitur-manifest.json").unlink()  # Predates manifests too.
         return a, b, self.root / ".claude/skills/partitur"
 
     def check_relinks_from_another_release(self, old_stamp):
