@@ -1167,6 +1167,90 @@ class InstallProject(unittest.TestCase):
         self.assertIn("outside the release clone", result.stderr)
         self.assertEqual(tree_snapshot(clone), before)
 
+    def bootstrap_fixture(self):
+        seed = self.partitur_clone()
+        installer = seed / "bin/install"
+        installer.write_text(installer.read_text().replace(
+            'if __name__ == "__main__":\n    main()\n',
+            '''if __name__ == "__main__":
+    if "--release" in sys.argv:
+        print("BOOTSTRAP_SEED=" + json.dumps({
+            key: subprocess.check_output(["git", "-C", str(HERE), *args],
+                                         text=True).strip()
+            for key, args in (("head", ["rev-parse", "HEAD"]),
+                              ("shallow", ["rev-parse", "--is-shallow-repository"]),
+                              ("commits", ["rev-list", "--count", "HEAD"]))
+        }))
+    main()
+'''))
+        self.commit_clone(seed, "tagged bootstrap fixture")
+        commit = git(seed, "rev-parse", "HEAD")
+        git(seed, "-c", "user.name=t", "-c", "user.email=t@x",
+            "tag", "-a", "v0.2", "-m", "bootstrap release")
+        (seed / "bin/install").write_text("raise SystemExit(99)\n")
+        self.commit_clone(seed, "default branch must not run")
+        git(seed, "branch", "v0.2")
+        git(seed, "branch", "v0.3")  # A branch without a release tag.
+        bare = self.home / "remote.git"
+        git(self.home, "clone", "-q", "--bare", str(seed), str(bare))
+        config = self.home / "bootstrap.gitconfig"
+        git(self.home, "config", "--file", str(config),
+            f"url.{bare.as_uri()}.insteadOf", "https://github.com/QiaoLei-88/Partitur")
+        staging = self.home / "bootstrap tmp"
+        staging.mkdir()
+        env = dict(self.env, GIT_CONFIG_GLOBAL=str(config), GIT_CONFIG_NOSYSTEM="1",
+                   GIT_ALLOW_PROTOCOL="file", GIT_TERMINAL_PROMPT="0", TMPDIR=str(staging))
+        return commit, staging, env
+
+    def test_bootstrap_installs_tag_offline_and_reuses_without_writes(self):
+        commit, staging, env = self.bootstrap_fixture()
+        releases = self.home / "releases"
+        options = ["v0.2", "--scope", "project", "--tool", "codex",
+                   "--releases-dir", str(releases), "--records", "records"]
+        result = subprocess.run(["sh", "-s", "--", *options], cwd=self.root, env=env,
+                                input=(HERE / "bin/bootstrap").read_text(),
+                                capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        audit = next(line.removeprefix("BOOTSTRAP_SEED=")
+                     for line in result.stdout.splitlines()
+                     if line.startswith("BOOTSTRAP_SEED="))
+        self.assertEqual(json.loads(audit),
+                         {"head": commit, "shallow": "true", "commits": "1"})
+        clone = releases / f"partitur-{commit[:7]}"
+        self.assertEqual((self.root / "records/.partitur-version").read_text().splitlines(),
+                         [f"partitur {commit}", f"source {clone}", "tools codex"])
+        self.assertEqual((self.root / ".agents/skills/partitur").resolve(), clone)
+        self.assertEqual(git(clone, "rev-parse", "HEAD"), commit)
+        self.assertEqual(git(clone, "branch", "--show-current"), "")
+        self.assertEqual(list(staging.iterdir()), [])
+        self.assertFalse((clone / ".git/objects/info/alternates").exists())
+        git(clone, "fsck", "--full")  # Objects remain available after the seed is removed.
+        before = tree_snapshot(clone)
+        run("sh", str(HERE / "bin/bootstrap"), *options, cwd=self.root, env=env)
+        self.assertEqual(list(staging.iterdir()), [])
+        self.assertEqual(tree_snapshot(clone), before)
+
+    def test_bootstrap_failure_cleans_seed_and_installs_nothing(self):
+        _, staging, env = self.bootstrap_fixture()
+        for options in (("v0.999", "--scope", "project"),
+                        ("v0.3", "--scope", "project"),
+                        ("v0.2~1", "--scope", "project"),
+                        ("v0.2", "--scope", "invalid")):
+            with self.subTest(options=options):
+                result = run("sh", str(HERE / "bin/bootstrap"), *options, cwd=self.root,
+                             env=env, check=False)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(list(staging.iterdir()), [])
+                self.assertFalse((self.home / ".local/share/partitur/releases").exists())
+                self.assertFalse((self.root / "workspace").exists())
+
+    def test_bootstrap_requires_a_tag(self):
+        result = run("sh", str(HERE / "bin/bootstrap"), cwd=self.root, env=self.env,
+                     check=False)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("usage: bootstrap TAG", result.stderr)
+        self.assertFalse((self.home / ".local/share/partitur/releases").exists())
+
     def single_version(self, seed, name):
         clone = self.home / name
         git(self.home, "init", "-q", str(clone))

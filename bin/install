@@ -24,6 +24,13 @@ Usage:
   Other options are passed to the selected version's installer. Keep release
   clones while projects link to them; never pull or switch them.
 
+Bootstrap
+  bin/bootstrap TAG --scope project [PROJECT] [install options]
+  Obtain the script from a URL pinned to the same published TAG, then run
+  it from the project's workspace root. It obtains a temporary seed, runs
+  install --release TAG with the remaining options, and removes its seed
+  on exit. The release clone stays at its lasting path.
+
 --scope user
   Links this repository as the skill `partitur` in the user's skill
   directories: ~/.claude/skills (Claude Code) and ~/.agents/skills (Codex).
