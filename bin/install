@@ -7,6 +7,29 @@ Usage:
           [--update | --uninstall] [--force [--backup-to PATH]] [--merge-rules]
           [--name NAME] [--records DIR] [--branch MAIN]
           [--repo NAME:CHECKOUT:MAIN ...] [--add-repo NAME:CHECKOUT:MAIN ...]
+  Add --release TAG_OR_COMMIT [--releases-dir PATH] to install from a release clone.
+
+--release
+  Resolves an annotated v0.N tag or a commit ID locally. Installs from a
+  detached, single-version clone at that commit under
+  $XDG_DATA_HOME/partitur/releases (or --releases-dir PATH), named
+  partitur-<first seven commit digits>. If XDG_DATA_HOME is unset, empty or
+  relative, use ~/.local/share/partitur/releases.
+
+  An existing path must be a clean, detached clone at that exact commit,
+  containing only that version and its release tags; otherwise install
+  stops and leaves it alone. Missing versions create no directories.
+  Newly created clones are removed if preparation fails.
+
+  Other options are passed to the selected version's installer. Keep release
+  clones while projects link to them; never pull or switch them.
+
+Bootstrap
+  bin/bootstrap TAG --scope project [PROJECT] [install options]
+  Obtain the script from a URL pinned to the same published TAG, then run
+  it from the project's workspace root. It obtains a temporary seed, runs
+  install --release TAG with the remaining options, and removes its seed
+  on exit. The release clone stays at its lasting path.
 
 --scope user
   Links this repository as the skill `partitur` in the user's skill
@@ -71,9 +94,9 @@ recorded counts the tools whose entries are present in the project.
 last side. Each run prints the tools it uses and where each came from
 (stamp, project, detected, --tool).
 
-A project records which Partitur commit installed it, from which clone, and
-for which tools, in <records>/.partitur-version. Git already knows what
-Partitur ships, so install rebuilds from that commit what it delivered then:
+A project records its commit, source clone, and tools in
+<records>/.partitur-version. <records>/.partitur-manifest.json records the
+installed entry types, hashes, link targets, and release-notes baseline:
 "maintained" files (tools, skills, pr/README.md, the charter template),
 "seeded" files (the rules file, the root design task's charter and status,
 the integrator's file, repository table, directory markers: the project's
@@ -97,8 +120,11 @@ Compared with the project:
                      files changed here, after copying each into a backup
                      directory (PROJECT/partitur-backup-<UTC time>/, or
                      --backup-to PATH).
-Install from a committed Partitur: with uncommitted changes there is no
-commit to stamp, and a later update cannot find what was dropped.
+Later updates and uninstall use the manifest without old Git history.
+An older installation migrates its baseline once from its installing
+commit, in this clone or the stamped source clone. An unavailable baseline
+is reported; unknown files are preserved. Use a committed Partitur so its
+version can be identified; the manifest also tracks uncommitted installs.
 Nothing is ever committed; the tool prints the `ptt record` command for it.
 Each project run except --uninstall also writes PROJECT/partitur-install-report.md:
 its output and the next steps, for an agent session to read ("Read
@@ -106,10 +132,10 @@ partitur-install-report.md and help me finish the Partitur install"). It
 lies outside the records repository, is never committed, and is
 overwritten by the next run.
 For an existing project, --update prints new RELEASE-NOTES.md entries
-compared with the stamped commit in this clone. Plain install counts them and keeps
+compared with the manifest's baseline. Plain install counts them and keeps
 that comparison stamp until --update; its other install behavior is unchanged.
 An older commit without RELEASE-NOTES.md gives a reading pointer instead.
-An unknown commit shows Unreleased, labelled as an inexact comparison. First installs
+An unavailable baseline shows Unreleased, labelled as an inexact comparison. First installs
 point to RELEASE-NOTES.md. Release notes output is also in the install report.
 The installed and source commits show their annotated v0.N tags, when this
 clone has tags pointing directly at those commits; hashes remain the identity.
@@ -133,6 +159,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent.parent
@@ -173,12 +200,12 @@ def partitur_commit():
     return r.stdout.strip() or None
 
 
-def version_label(commit):
+def version_label(commit, root=HERE):
     """Add exact annotated v0.N tags without replacing the commit identity."""
     if commit is None:
         return "uncommitted"
     result = subprocess.run(
-        ["git", "-C", str(HERE), "for-each-ref", f"--points-at={commit}",
+        ["git", "-C", str(root), "for-each-ref", f"--points-at={commit}",
          "--format=%(refname:strip=2) %(objecttype)", "refs/tags/v0.*"],
         capture_output=True, text=True)
     if result.returncode:
@@ -195,25 +222,25 @@ def version_label(commit):
 class Source:
     """Partitur's files, from the working tree or from a past commit."""
 
-    def __init__(self, commit=None):
-        self.commit = commit
+    def __init__(self, commit=None, root=HERE):
+        self.commit, self.root = commit, root
 
     def read(self, rel):
         if self.commit is None:
-            return (HERE / rel).read_bytes()
-        return subprocess.run(["git", "-C", str(HERE), "show", f"{self.commit}:{rel}"],
+            return (self.root / rel).read_bytes()
+        return subprocess.run(["git", "-C", str(self.root), "show", f"{self.commit}:{rel}"],
                               capture_output=True, check=True).stdout
 
     def has(self, rel):
         if self.commit is None:
-            return (HERE / rel).exists()
-        return subprocess.run(["git", "-C", str(HERE), "cat-file", "-e", f"{self.commit}:{rel}"],
+            return (self.root / rel).exists()
+        return subprocess.run(["git", "-C", str(self.root), "cat-file", "-e", f"{self.commit}:{rel}"],
                               capture_output=True).returncode == 0
 
     def names(self, rel):
         if self.commit is None:
-            return sorted(p.name for p in (HERE / rel).iterdir())
-        out = subprocess.run(["git", "-C", str(HERE), "ls-tree", "--name-only",
+            return sorted(p.name for p in (self.root / rel).iterdir())
+        out = subprocess.run(["git", "-C", str(self.root), "ls-tree", "--name-only",
                               f"{self.commit}:{rel}"], capture_output=True, text=True,
                              check=True).stdout
         return sorted(out.split())
@@ -225,8 +252,8 @@ def rules_name(src):
     return RULES if RULES.encode() in src.read("templates/rules.md") else LEGACY_RULES
 
 
-def known_commit(commit):
-    return commit and subprocess.run(["git", "-C", str(HERE), "cat-file", "-e",
+def known_commit(commit, root=HERE):
+    return commit and subprocess.run(["git", "-C", str(root), "cat-file", "-e",
                                       f"{commit}^{{commit}}"], capture_output=True).returncode == 0
 
 
@@ -247,24 +274,23 @@ def change_entries(text, section=None):
     return entries
 
 
-def report_changes(before, update):
+def report_changes(state, update):
     """Print the changelog comparison; return whether its stamp must wait."""
     current, path = Source(), HERE / "RELEASE-NOTES.md"
     if not current.has("RELEASE-NOTES.md"):
         print("\nRelease notes: this Partitur has no RELEASE-NOTES.md.")
         return False
     text = current.read("RELEASE-NOTES.md").decode()
-    if before is None:
+    if not state["notes_known"]:
         entries = change_entries(text, "Unreleased")
         print(f"\nRelease notes: {len(entries)} Unreleased entries; installing commit unknown, "
               "not an exact difference.")
-    elif not Source(before).has("RELEASE-NOTES.md"):
+    elif state["release_notes"] is None:
         print(f"\nRelease notes: installed commit has no RELEASE-NOTES.md; new entries cannot be "
               f"counted. Read {path}.")
         return True
     else:
-        old = {" ".join(entry.split()) for entry in
-               change_entries(Source(before).read("RELEASE-NOTES.md").decode())}
+        old = {" ".join(entry.split()) for entry in state["release_notes"]}
         entries = [entry for entry in change_entries(text)
                    if " ".join(entry.split()) not in old]
         print(f"\nRelease notes: {len(entries)} new entries.")
@@ -273,7 +299,7 @@ def report_changes(before, update):
             print(entry)
     elif entries:
         print("Run with --update to show them.")
-    return bool(entries) or before is None
+    return bool(entries) or not state["notes_known"]
 
 
 def delivered(plan):
@@ -284,7 +310,7 @@ def delivered(plan):
             digest = sha(block_of(e["data"].decode()) or "")
         else:
             digest = sha(e["data"]) if "data" in e else None
-        out[rel] = dict(kind=e["kind"], target=e.get("target"), sha=digest)
+        out[rel] = dict(kind=e["kind"], target=e.get("target"), sha=digest, tool=e.get("tool"))
     return out
 
 
@@ -709,6 +735,7 @@ def project_plan(a, tools, repos, name, src, quiet=False, clone=None):
         if src.has(policy):
             add(f"{R}/skills/{skill}/agents/openai.yaml", "maintained", src.read(policy))
     for tool in tools:
+        shared = set(plan)
         entry, tool_dir = TOOLS[tool]
         plan[entry] = dict(kind="link", target=rules)
         for skill in skills:
@@ -727,6 +754,8 @@ def project_plan(a, tools, repos, name, src, quiet=False, clone=None):
             command = shlex.quote(str(a.project.resolve() / R)) + "/bin/ptt inbox --quiet --hook"
             hook = {"hooks": [{"type": "command", "command": command}]}
             add(".codex/hooks.json", "hook", json.dumps(hook))
+        for rel in plan.keys() - shared:
+            plan[rel]["tool"] = tool
     return plan
 
 
@@ -820,6 +849,96 @@ def restamp_tools(path, tools):
     """Record the tools in a stamp that keeps its installing commit and clone."""
     lines = [line for line in path.read_text().splitlines() if line.partition(" ")[0] != "tools"]
     path.write_text("\n".join(lines + [f"tools {' '.join(tools)}"]) + "\n")
+
+
+def read_manifest(path):
+    """Validate persisted ownership before any project mutation."""
+    if not path.exists():
+        return None
+    try:
+        state = json.loads(path.read_text())
+        if (not isinstance(state, dict)
+                or not {"format", "entries", "notes_known", "release_notes", "commit", "version"}
+                       <= state.keys()
+                or type(state.get("format")) is not int
+                or state["format"] != 1 or not isinstance(state.get("entries"), dict)
+                or type(state.get("notes_known")) is not bool
+                or not isinstance(state.get("version"), str)
+                or (state.get("commit") is not None
+                    and not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", state["commit"]))
+                or (state.get("release_notes") is not None
+                    and (not isinstance(state["release_notes"], list)
+                         or any(not isinstance(e, str) for e in state["release_notes"])))):
+            raise ValueError("invalid manifest header")
+        for rel, entry in state["entries"].items():
+            if (not isinstance(rel, str) or Path(rel).is_absolute()
+                    or any(p in ("", ".", "..") for p in rel.split("/"))
+                    or not isinstance(entry, dict)
+                    or not {"kind", "sha", "target", "tool"} <= entry.keys()
+                    or entry.get("kind") not in ("maintained", "seeded", "rules", "hook", "link")
+                    or entry.get("tool") not in (None, *TOOLS)
+                    or (entry["kind"] == "link"
+                        and (not isinstance(entry.get("target"), str) or not entry["target"]
+                             or entry["sha"] is not None))
+                    or (entry["kind"] != "link"
+                        and not re.fullmatch(r"[0-9a-f]{64}", entry.get("sha") or ""))):
+                raise ValueError(f"invalid manifest entry {rel!r}")
+        return state
+    except (OSError, ValueError, TypeError) as error:
+        sys.exit(f"install: cannot read {path}: {error}; project left untouched")
+
+
+def write_manifest(path, state, report):
+    text = json.dumps(state, indent=2, sort_keys=True) + "\n"
+    existed = path.exists()
+    if existed and path.read_text() == text:
+        return
+    with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, prefix=path.name + ".",
+                                     delete=False) as stream:
+        temporary = Path(stream.name)
+        try:
+            stream.write(text)
+            stream.flush()
+            temporary.chmod(0o644)
+            os.replace(temporary, path)
+        finally:
+            if temporary.exists():
+                temporary.unlink()
+    report("updated" if existed else "created", path, "installed manifest")
+
+
+def legacy_manifest(a, before, clone, tools, name):
+    """Recover an older install's baseline once; never baseline local edits."""
+    state = dict(format=1, entries={}, notes_known=False, release_notes=None,
+                 commit=before, version=version_label(before))
+    for root in (HERE, Path(clone)) if clone else (HERE,):
+        if known_commit(before, root):
+            src = Source(before, root)
+            state["entries"] = delivered(project_plan(a, tools, [], name, src,
+                                                      quiet=True, clone=clone))
+            state["notes_known"] = True
+            if src.has("RELEASE-NOTES.md"):
+                state["release_notes"] = change_entries(src.read("RELEASE-NOTES.md").decode())
+            state["version"] = version_label(before, root)
+            break
+    return state
+
+
+def installed_entries(root, plan, old, report, update=False):
+    """Advance only successfully delivered entries; retain skipped baselines."""
+    entries, desired = dict(old), delivered(plan)
+    for action, rel in report.paths:
+        if action == "removed":
+            entries.pop(rel, None)
+        elif rel in desired and action in ("kept", "created", "updated", "replaced", "merged"):
+            if action != "kept" or rel not in entries or desired[rel]["kind"] != "seeded":
+                entries[rel] = desired[rel]
+    for rel in old.keys() - plan.keys():
+        path = root / rel
+        if ((update and old[rel]["kind"] == "seeded")
+                or (not path.exists() and not path.is_symlink())):
+            entries.pop(rel, None)
+    return entries
 
 
 def is_partitur(path):
@@ -950,21 +1069,33 @@ def scope_project(a, report):
         sys.exit("install: --records must be a directory name directly in the project")
     rec = root / a.records
     stamp = rec / ".partitur-version"
+    manifest = rec / ".partitur-manifest.json"
+    state = read_manifest(manifest)
     held = records_lock(rec) if (rec / ".git").exists() else None
+    if held:
+        state = read_manifest(manifest)
     name = a.name or root.name
     before, clone, stamped = read_stamp(stamp)
-    if stamp.exists():
-        print(f"Installed Partitur: {version_label(before)}")
     # the sides installed before: the stamp's, or for a stamp without them
     # the project's; a later run keeps them wherever it runs
     recorded, origin = (stamped, "stamp") if stamped is not None else \
         (present_sides(root, a.records), "project") if stamp.exists() else ((), None)
-    if before and not known_commit(before):
-        print(f"warning    this Partitur clone does not have commit {before[:12]}, which "
-              "installed the project; files no longer shipped cannot be found")
-        before = None
     if before and not clone:
         clone = stamped_clone(root, tuple(TOOLS), before)
+    if state is not None and state["commit"] != before:
+        print("warning    installed manifest and version stamp differ; recovering the baseline")
+        state = None
+    if state is None:
+        state = legacy_manifest(a, before, clone, recorded, name)
+        if stamp.exists() and not state["notes_known"]:
+            print("warning    installed manifest and original commit unavailable; "
+                  "unknown files will be preserved")
+    if stamp.exists():
+        label = version_label(before)
+        if label == before and state["commit"] == before:
+            label = state["version"]
+        print(f"Installed Partitur: {label}")
+    old = dict(state["entries"])
 
     if a.uninstall:
         if not stamp.exists():
@@ -972,24 +1103,29 @@ def scope_project(a, report):
         tools = a.named or recorded
         print_tools({t: "--tool" if a.named else origin for t in tools})
         remaining = tuple(t for t in recorded if t not in tools)
-        src = Source(before)
-        if before is None:
-            print("warning   unknown installing commit; comparing with this Partitur instead")
-            src = Source()
-        old = delivered(project_plan(a, tools, [], name, src, quiet=True, clone=clone))
-        if remaining:             # only these sides: what the others share stays
-            shared = project_plan(a, remaining, [], name, src, quiet=True, clone=clone)
-            old = {rel: e for rel, e in old.items() if rel not in shared}
-        kept = [rel for rel, e in old.items() if not remove_entry(root, rel, e, a, report)]
+        selected = {rel: e for rel, e in old.items()
+                    if (e.get("tool") in tools or (e.get("tool") is None and not remaining)
+                        or (not a.named and not remaining))}
+        for tool in tools:
+            rel = ".codex/hooks.json" if tool == "codex" else ".claude/settings.json"
+            if rel not in selected and read_settings(root / rel) is None:
+                report("not merged", root / rel, "invalid hook settings; left alone")
+        kept = [rel for rel, e in selected.items()
+                if not remove_entry(root, rel, e, a, report)]
         for link in redundant_links(root, tools, clone):
             link.unlink()
             report("removed", link)
         if remaining:
             restamp_tools(stamp, remaining)
             report("updated", stamp, "tools " + " ".join(remaining))
+            state["entries"] = installed_entries(root, {}, old, report)
+            write_manifest(manifest, state, report)
         else:
             stamp.unlink()
             report("removed", stamp)
+            if manifest.exists():
+                manifest.unlink()
+                report("removed", manifest)
         if kept:
             print(f"\n{len(kept)} path(s) kept: the project's own files, or files changed "
                   "here (--force removes changed ones). Records (tasks, requests, roles) are "
@@ -1007,8 +1143,6 @@ def scope_project(a, report):
         sources = {t: "detected" for t in detect_tools()}
     tools = tuple(t for t in TOOLS if t in sources)
     print_tools({t: sources[t] for t in tools})
-    old = delivered(project_plan(a, recorded, [], name, Source(before), quiet=True,
-                                 clone=clone)) if before else None
 
     def parse(specs, option):
         out = []
@@ -1054,7 +1188,7 @@ def scope_project(a, report):
             report("redundant", link, "linked for the user already; --update removes it")
     set_repos(a, root, rec, table, repos, add_repos, report)
     if stamp.exists():
-        report.changes_pending = report_changes(before, a.update) and not a.update
+        report.changes_pending = report_changes(state, a.update) and not a.update
     else:
         print(f"\nRelease notes: read {HERE / 'RELEASE-NOTES.md'} for changes and update actions.")
     now = partitur_commit()
@@ -1064,11 +1198,17 @@ def scope_project(a, report):
         c.get(k) for k in ("outdated", "obsolete", "superseded", "redundant"))
     if not stamp.exists() or a.update or not pending:
         write_stamp(stamp, now, HERE, tools)
+        state["commit"], state["version"] = now, version_label(now)
+        state["notes_known"] = True
+        state["release_notes"] = (change_entries(Source().read("RELEASE-NOTES.md").decode())
+                                  if Source().has("RELEASE-NOTES.md") else None)
     elif stamped != tools:        # the installing commit stays until --update
         restamp_tools(stamp, tools)
+    state["entries"] = installed_entries(root, plan, old, report, update=a.update)
+    write_manifest(manifest, state, report)
     if not now:
-        print("\nwarning   this Partitur has uncommitted changes; a later update cannot find "
-              "files it no longer ships. Install from a committed Partitur.")
+        print("\nwarning   this Partitur has uncommitted changes; its version cannot be "
+              "identified. Installed files are tracked in the manifest.")
     if (c.get("outdated") or c.get("obsolete") or c.get("redundant")) and not a.update:
         print("\nThis Partitur is newer: rerun with --update to bring the project up to it.")
     if c.get("superseded"):
@@ -1092,8 +1232,97 @@ def scope_project(a, report):
     return tools
 
 
+def release_clone(version, directory):
+    """Prepare a release from this clone; never repair an existing path."""
+    git = ["git", "--no-optional-locks", "-C", str(HERE)]
+    if re.fullmatch(r"v0\.[1-9][0-9]*", version):
+        ref = f"refs/tags/{version}"
+        kind = subprocess.run(git + ["cat-file", "-t", ref], capture_output=True, text=True)
+        if kind.returncode or kind.stdout.strip() != "tag":
+            sys.exit(f"install: annotated release tag {version!r} not found in {HERE}")
+    elif re.fullmatch(r"[0-9a-fA-F]{4,64}", version):
+        ref = version
+    else:
+        sys.exit(f"install: release {version!r}: expected an annotated v0.N tag or commit ID")
+    resolved = subprocess.run(git + ["rev-parse", "--verify", f"{ref}^{{commit}}"],
+                              capture_output=True, text=True)
+    if resolved.returncode or (ref == version
+                              and not resolved.stdout.strip().startswith(version.lower())):
+        sys.exit(f"install: release {version!r} not found in {HERE}")
+    commit = resolved.stdout.strip()
+    if directory is None:
+        data_home = Path(os.environ.get("XDG_DATA_HOME", ""))
+        if not data_home.is_absolute():
+            data_home = Path.home() / ".local/share"
+        directory = data_home / "partitur/releases"
+    directory = directory.expanduser().resolve()
+    clone = directory / f"partitur-{commit[:7]}"
+    created = False
+    try:
+        directory.mkdir(parents=True, exist_ok=True)
+        try:
+            clone.mkdir()
+            created = True
+        except FileExistsError:
+            pass
+        if created:
+            subprocess.run(["git", "init", "-q", "-b", "master", str(clone)], check=True)
+            selected = f"{ref}:{ref}" if ref.startswith("refs/tags/") else commit
+            subprocess.run(["git", "-C", str(clone), "fetch", "-q", "--depth=1", "--no-tags",
+                            str(HERE), selected], check=True)
+            subprocess.run(["git", "-C", str(clone), "checkout", "-q", "--detach", commit],
+                           check=True)
+        if (clone.is_symlink() or not (clone / ".git").is_dir()
+                or (clone / ".git").is_symlink()
+                or (clone / ".git/objects/info/alternates").exists() or not is_partitur(clone)):
+            raise ValueError(f"{clone} is not a standalone Partitur clone")
+        git = ["git", "--no-optional-locks", "-C", str(clone)]
+        head = subprocess.run(git + ["rev-parse", "HEAD"], capture_output=True, text=True)
+        branch = subprocess.run(git + ["symbolic-ref", "-q", "HEAD"], capture_output=True)
+        status = subprocess.run(git + ["status", "--porcelain", "--untracked-files=all"],
+                                capture_output=True, text=True)
+        if (head.returncode or head.stdout.strip() != commit or branch.returncode != 1
+                or status.returncode or status.stdout):
+            raise ValueError(f"{clone} must be clean, detached, and at commit {commit}")
+        history = subprocess.run(git + ["rev-list", "--count", "HEAD"],
+                                 capture_output=True, text=True, check=True)
+        refs = subprocess.run(git + ["for-each-ref", "--format=%(refname) %(objecttype)"],
+                              capture_output=True, text=True, check=True)
+        if history.stdout.strip() != "1":
+            raise ValueError(f"{clone} contains other versions")
+        for line in refs.stdout.splitlines():
+            name, kind = line.split()
+            if kind != "tag" or not re.fullmatch(r"refs/tags/v0\.[1-9][0-9]*", name):
+                raise ValueError(f"{clone} contains refs outside its release version")
+            target = subprocess.run(git + ["rev-parse", f"{name}^{{commit}}"],
+                                    capture_output=True, text=True, check=True)
+            if target.stdout.strip() != commit:
+                raise ValueError(f"{clone} contains a tag for another version")
+        objects = subprocess.run(git + ["cat-file", "--batch-all-objects",
+                                        "--batch-check=%(objectname)"],
+                                 capture_output=True, text=True, check=True)
+        reachable = subprocess.run(git + ["rev-list", "--objects", "--no-object-names",
+                                          "--all", "HEAD"],
+                                   capture_output=True, text=True, check=True)
+        if set(objects.stdout.splitlines()) != set(reachable.stdout.splitlines()):
+            raise ValueError(f"{clone} contains objects outside its release version")
+    except (OSError, subprocess.CalledProcessError, ValueError) as error:
+        if created:
+            shutil.rmtree(clone)
+        sys.exit(f"install: release {version!r}: {error}; "
+                 + ("new clone removed" if created else "existing path left untouched"))
+    return clone
+
+
 def main():
-    ap = argparse.ArgumentParser(prog="install", description=__doc__,
+    release = argparse.ArgumentParser(add_help=False)
+    release.add_argument("--release", metavar="TAG_OR_COMMIT",
+                         help="install from a clean, detached release clone at this version")
+    release.add_argument("--releases-dir", type=Path, metavar="PATH",
+                         help="release clones directory (default: "
+                              "$XDG_DATA_HOME/partitur/releases; "
+                              "fallback: ~/.local/share/partitur/releases)")
+    ap = argparse.ArgumentParser(prog="install", description=__doc__, parents=[release],
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--tool", choices=("auto", "claude", "codex", "all"), default="auto")
     ap.add_argument("--scope", choices=("user", "project"))
@@ -1128,6 +1357,17 @@ def main():
         sys.exit(2)
     if a.force and not (a.update or a.uninstall):
         sys.exit("install: --force goes with --update or --uninstall")
+    if a.releases_dir is not None and a.release is None:
+        sys.exit("install: --releases-dir requires --release")
+    if a.release is not None:
+        clone = release_clone(a.release, a.releases_dir)
+        if a.scope == "project" and (a.project.resolve() == clone
+                                    or clone in a.project.resolve().parents):
+            sys.exit("install: the project must be outside the release clone")
+        forwarded = release.parse_known_args()[1]
+        env = dict(os.environ, GIT_OPTIONAL_LOCKS="0", PYTHONDONTWRITEBYTECODE="1")
+        sys.exit(subprocess.run([sys.executable, "-B", str(clone / "bin" / "install"),
+                                 *forwarded], env=env).returncode)
     a.named = None if a.tool == "auto" else tuple(TOOLS) if a.tool == "all" else (a.tool,)
     report = Report(a.project.resolve() if a.scope == "project" else Path.home())
     if a.scope == "user":
