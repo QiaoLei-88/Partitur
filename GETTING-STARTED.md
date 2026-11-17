@@ -1,5 +1,7 @@
 # Getting started
 
+[简体中文](GETTING-STARTED.zh-CN.md)
+
 This guide follows one small project from a wish to a merge and explains,
 on the way, why Partitur works as it does. It takes about ten minutes to
 read. You need no other document: whatever is unclear later, ask a
