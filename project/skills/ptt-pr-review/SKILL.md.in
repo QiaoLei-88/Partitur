@@ -105,8 +105,11 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    in it; build and run outside the reviewed checkout (e.g. in the run
    record); cite its id.
 6. Write `MMMM-review.md` (one more than the highest `MMMM`; comment IDs
-   continue across rounds). Include one merge-order line: "mergeable as to
-   order", "waits on <task or request>: <reason still holding>", or "not
+   continue across rounds). Keep evidence separate (rules file, reviews
+   and done reports), using the template's model review, machine
+   verification, and user approval sections.
+   Include one merge-order line: "mergeable as to order",
+   "waits on <task or request>: <reason still holding>", or "not
    stated: <overlap finding>"; include all outstanding prerequisites and
    any unresolved designer question. List `MMMM-*` again: if another file
    has your number and is already recorded, rename yours to the next free
@@ -179,12 +182,15 @@ test_runs: <run ids, or none>
 
 # Review
 
-## Analysis
-What changed, risks, what was checked and what was not.
+## Model review
+What changed, risks, content reviewed, conclusions, and limitations.
 Merge order: <mergeable as to order | waits on N: reason | not stated: overlap finding>.
 
-## Checks
-Commands run and results; run ids.
+## Machine verification (Tested)
+Commands run and results; run ids. State what was not run.
+
+## User approval
+What the user approved and its record; mark a pending decision as pending.
 
 ## Comments
 C1 (required): <comment>

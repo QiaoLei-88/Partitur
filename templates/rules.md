@@ -51,6 +51,7 @@ command for the user in your own tool's notation.
 ## Verification and Evidence
 
 - Label decisions Agreed, Proposed, or Open, and evidence Documented, Source, Inferred, Tested, or Unknown. Agreed covers only the wording the user agreed.
+- Reviews and done reports state separately what machines checked (Tested), what a model reviewed, and what the user approved; none substitutes for another.
 - Preserve original inputs, filenames, and expected results; use ordered input manifests and checksums where needed. Promoting output to an expected result is a deliberate commit, never automatic.
 - Unit tests, test drivers, and small fixtures generated in tests live in the code repository; fixed regression cases and expected results where the project keeps them (a separate repository for large data); run records in `test-runs/<id>/` at the workspace root, unversioned. A one-off probe's driver stays in its run record. Choose paths for their purpose, not to satisfy these rules; write outputs to an explicit isolated location; keep useful review evidence.
 - Unit tests are permanent. Never delete or weaken a test to make a change pass; doing so is a change of its own, with a stated reason, visible in review.

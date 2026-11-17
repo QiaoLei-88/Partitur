@@ -465,6 +465,23 @@ class Repo(unittest.TestCase):
                 self.assertIn(phrase, wording, name)
             self.assertLess(wording.index(phrases[0]), wording.index(phrases[1]), name)
 
+    def test_reviews_and_done_reports_keep_evidence_separate(self):
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        self.assertIn("Reviews and done reports state separately what machines checked "
+                      "(Tested), what a model reviewed, and what the user approved; "
+                      "none substitutes for another.", text("templates", "rules.md"))
+        review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
+        for heading in ("## Model review", "## Machine verification (Tested)",
+                        "## User approval"):
+            self.assertIn(heading, review)
+        self.assertIn("mark a pending decision as pending", review)
+        self.assertIn("Keep evidence separate (rules file, reviews and done reports)", review)
+        done = text("project", "skills", "ptt-done", "SKILL.md.in")
+        self.assertIn("criterion by criterion", done)
+        self.assertIn("Keep machine verification (Tested), model review, and user approval "
+                      "separate (rules file, reviews and done reports), with references for each", done)
+
     def test_markdown_links_resolve(self):
         for f in tracked():
             if not f.name.endswith((".md", ".md.in")):
