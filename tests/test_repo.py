@@ -495,6 +495,21 @@ class Repo(unittest.TestCase):
         self.assertIn("Include at least one check of the goal itself, as a command where "
                       "one exists, with its expected result (rules file, goal acceptance)", draft)
 
+    def test_required_review_overrides_record_the_users_reason(self):
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        self.assertIn("A decision that overrides a required review comment names the "
+                      "comment ID and the user's reason. Ask the user for a missing "
+                      "reason before recording or carrying out the decision.",
+                      text("templates", "rules.md"))
+        review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
+        self.assertIn("check for required comments being overridden (rules file)", review)
+        self.assertIn("Merge anyway (give the comment IDs and your reason)", review)
+        self.assertLess(review.index("Obtain any missing reason from the user"),
+                        review.index("Then write `MMMM-decision.md`"))
+        self.assertIn("## Required comment overrides", review)
+        self.assertIn("Each overridden comment ID and the user's reason", review)
+
     def test_markdown_links_resolve(self):
         for f in tracked():
             if not f.name.endswith((".md", ".md.in")):

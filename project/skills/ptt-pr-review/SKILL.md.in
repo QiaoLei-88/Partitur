@@ -122,7 +122,7 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    ```
    Decide request NNNNNN:
    1. Request changes (recommended): C1, C2
-   2. Merge anyway
+   2. Merge anyway (give the comment IDs and your reason)
    3. Reject
    4. No decision, discuss further
    ```
@@ -136,8 +136,9 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
    requests in separate messages.
 7. On the user's decision (an option number, a label, or `ALL1` with AtE,
    possibly with changed comments; one that is not an option: ask again,
-   rules file), write `MMMM-decision.md` and record it before anything
-   else:
+   rules file), check for required comments being overridden (rules file).
+   Obtain any missing reason from the user before recording the decision.
+   Then write `MMMM-decision.md` and record it before anything else:
    `<records>/bin/ptt record -m "pr NNNNNN: decision <merge|changes
    requested|reject|withdraw>" <file>`. Then:
    - **Merge**: check the ancestry again (step 3; `<main>` may have moved);
@@ -218,4 +219,7 @@ decision: <merge|changes-requested|reject|withdraw>
 
 <The user's decision as stated, and any comments added, removed, or changed
 relative to the review.>
+
+## Required comment overrides
+<Each overridden comment ID and the user's reason, or "none".>
 ```
