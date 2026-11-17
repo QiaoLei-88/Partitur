@@ -86,14 +86,19 @@ At the start of an integration session, read `<records>/handoff/integrator.md`.
 4. Review `<base>..<head>` (later rounds: the commits since the last
    reviewed head, and the answers to earlier comments): each diff, `git diff
    --check`, consistency with the project instructions and design documents,
-   and the history (`git log --stat <base>..<head>`). Each commit is one
-   logical change with its tests and documentation, and its message says
-   what it changes. Messy history (fixup or WIP commits, a change and its
-   revert or rework, mixed or split changes, merges of `<main>`, a commit
-   that cannot build or pass on its own) gets a required comment asking for
-   a rebase with fixup/autosquash, naming the commits and the intended
-   result; that means recommending changes. Never ask to squash meaningful
-   separate commits.
+   and the history (`git log -p <base>..<head>`), against
+   atomicity (rules file). The author keeps commits separate when in
+   doubt; the review settles that doubt. For each commit ask: is it
+   complete, or does a later commit of the branch change what it
+   introduced, or does it need something that lies in another commit?
+   Is it minimal, or does it hold a change that stands on its own? For
+   each pair of neighbouring commits ask whether they are one change.
+   Each message says what its commit changes. A history that breaks
+   atomicity gets a required comment naming the commits and the result
+   intended (fold with fixup/autosquash, or split); that means
+   recommending changes. Commits the review finds no reason to fold
+   stay separate. A claim that each commit builds and passes on its own
+   needs a run of each commit.
 5. Re-run verification when the change or its risk warrants it: for each run
    `<records>/bin/test-run new <checkout at head>`, with commands,
    environment, logs, outputs, exit status, and passed/failed/skipped counts

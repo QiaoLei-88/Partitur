@@ -52,8 +52,10 @@ Reply whenever the branch changes or a review needs an answer, without
 waiting for a decision (decisions only gate merging and closing); a reply
 pins the new head and returns the request to "waiting for review".
 
-1. Code changes are commits on the same branch, checked as for submitting
-   (`ptt-pr-submit`, steps 1-2): committed and clean (`git -C <worktree>
+1. Code changes go on the same branch: a change to an existing commit of
+   the branch is folded into that commit, and only a new logical change is
+   a new commit (rules file, atomic commits); the branch is checked as for
+   submitting (`ptt-pr-submit`, steps 1-2): committed and clean (`git -C <worktree>
    status --porcelain` empty, `git diff --check <main> HEAD` clean), history
    atomic, and `git merge-base --is-ancestor <main> HEAD` succeeds; `<main>`
    is the request's repository's main branch in `<records>/pr/repos`.

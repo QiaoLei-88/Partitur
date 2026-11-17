@@ -336,6 +336,60 @@ class Repo(unittest.TestCase):
                        "do not carry out the reported next steps"):
             self.assertIn(phrase, text)
 
+    def test_atomic_history_is_defined_once_and_checked_by_content(self):
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        rules = text("templates", "rules.md")
+        expected = " ".join("""
+            Commits are atomic: each commit is one logical change, complete and
+            minimal. Complete: everything the change needs is in the commit,
+            including its tests and documentation, and nothing of it lies in
+            another commit. Minimal: the commit holds no other change that
+            stands on its own, even one serving the same feature (for example, a
+            refactoring the feature needs is its own commit, before the
+            feature). A request's history records these changes, not how the
+            work went. A commit that breaks completeness is folded into the
+            commit it belongs to; such commits include, but are not limited to:
+            a fixup, work in progress, a revert, a later commit changing what an
+            earlier commit of the same branch introduced, and a document entry
+            added per step instead of one entry for the result. A commit that
+            breaks minimality is split. When in doubt, keep commits separate:
+            folding them later is easier than splitting one. Check the content
+            of the commits, not only the files they touch (`git log -p
+            <main>..HEAD`). Inspect status, staged changes, and whitespace before
+            committing.
+        """.split())
+        self.assertEqual(rules.split("- Commits are atomic: ")[1].split(" - ")[0],
+                         expected.removeprefix("Commits are atomic: "))
+        submit = text("project", "skills", "ptt-pr-submit", "SKILL.md.in")
+        self.assertIn("and its history atomic (rules file; `git log -p <main>..HEAD`)", submit)
+        reply = text("project", "skills", "ptt-pr-reply", "SKILL.md.in")
+        self.assertIn("Code changes go on the same branch: a change to an existing commit "
+                      "of the branch is folded into that commit, and only a new logical "
+                      "change is a new commit (rules file, atomic commits); the branch "
+                      "is checked as for submitting", reply)
+        review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
+        expected_review = " ".join("""
+            and the history (`git log -p <base>..<head>`), against
+            atomicity (rules file). The author keeps commits separate when in
+            doubt; the review settles that doubt. For each commit ask: is it
+            complete, or does a later commit of the branch change what it
+            introduced, or does it need something that lies in another commit?
+            Is it minimal, or does it hold a change that stands on its own? For
+            each pair of neighbouring commits ask whether they are one change.
+            Each message says what its commit changes. A history that breaks
+            atomicity gets a required comment naming the commits and the result
+            intended (fold with fixup/autosquash, or split); that means
+            recommending changes. Commits the review finds no reason to fold
+            stay separate. A claim that each commit builds and passes on its own
+            needs a run of each commit.
+        """.split())
+        self.assertIn(expected_review, review)
+        for wording in (submit, reply, review):
+            self.assertNotIn("git log --stat", wording)
+            self.assertNotIn("fold fixups, drop WIP", wording)
+            self.assertNotIn("Messy history (", wording)
+
     def test_reply_is_drafted_and_released_by_its_own_commands(self):
         """Replies to a review: /ptt-pr-draft-reply writes nothing, /ptt-pr-reply
         releases; /ptt-pr-submit no longer replies."""

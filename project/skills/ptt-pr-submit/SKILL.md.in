@@ -38,8 +38,7 @@ changes. If submitting needs more than the draft, stop and ask.
 
 1. In the worktree (`git -C <worktree>`): the branch is committed and clean (`git status
    --porcelain` empty, `git diff --check <main> HEAD` clean) and its history
-   atomic (`git log --stat <main>..HEAD`: fold fixups, drop WIP and
-   reverted changes).
+   atomic (rules file; `git log -p <main>..HEAD`).
 2. `base` = `git rev-parse <main>`, `head` = `git rev-parse HEAD`, full
    SHAs. If `git merge-base --is-ancestor <main> HEAD` fails, update the
    branch first.

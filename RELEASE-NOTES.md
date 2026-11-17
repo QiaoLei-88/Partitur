@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Atomic history is complete and minimal; request skills inspect commit content.
+  Clear and resume running holders after updating the rules and skills.
 - README is for people; GETTING-STARTED.md shows the process by one example.
   Install and update with `install --release`, never `git pull`: INSTALL.md.
 - `install --release TAG_OR_COMMIT` prepares a detached clone containing
