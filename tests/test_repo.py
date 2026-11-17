@@ -208,7 +208,7 @@ class Repo(unittest.TestCase):
         flow = text("flows", "authorization.md")
         self.assertIn("The list follows its question line directly, never another numbered list", flow)
         self.assertIn("A number that is not an option means the user may have seen another rendering", flow)
-        self.assertIn("right after its question line", text("SKILL.md"))
+        self.assertIn("right after its question line", text("INSTALL.md"))
         self.assertIn("decision list right after its question line", text("project", "skills", "ptt-close", "SKILL.md.in"))
         review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
         self.assertIn("decision list right after its question line, never after another numbered list", review)
@@ -222,7 +222,7 @@ class Repo(unittest.TestCase):
         self.assertIn("`ALL1 AtE`: accept every recommendation ```", flow)
         for name in ("ptt-close", "ptt-pr-cleanup", "ptt-pr-reply", "ptt-pr-review"):
             self.assertIn("ALL1 AtE", text("project", "skills", name, "SKILL.md.in"), name)
-        self.assertIn("`ALL1 AtE` line", text("SKILL.md"))
+        self.assertIn("`ALL1 AtE` line", text("INSTALL.md"))
         # T0017: labelled decisions stay within one topic.
         self.assertIn("Two or more decisions of one topic in one message are labelled", rules)
         self.assertIn("(`A1 B2 AtE`)", rules)
@@ -232,7 +232,7 @@ class Repo(unittest.TestCase):
         for name in ("ptt-close", "ptt-pr-cleanup", "ptt-pr-reply", "ptt-pr-review"):
             self.assertIn("rules file", text("project", "skills", name, "SKILL.md.in"))
             self.assertIn("A1", text("project", "skills", name, "SKILL.md.in"), name)
-        self.assertIn("label them (`A1`, `B2`)", text("SKILL.md"))
+        self.assertIn("label them (`A1`, `B2`)", text("INSTALL.md"))
 
     def test_review_all_selects_one_request_per_repository_before_decisions(self):
         """T0020: batch the reviews across repositories, not the decisions."""
@@ -361,7 +361,7 @@ class Repo(unittest.TestCase):
         index = (ROOT / "rules.md").read_text()
         known = set(re.findall(r"^\| ([A-Z]\d+[a-z]?) \|", index, re.M))
         self.assertGreater(len(known), 50)
-        docs = [ROOT / "model.md", ROOT / "SKILL.md", ROOT / "CONTRIBUTING.md",
+        docs = [ROOT / "model.md", ROOT / "SKILL.md", ROOT / "INSTALL.md", ROOT / "CONTRIBUTING.md",
                 *ROOT.glob("roles/*.md"), *ROOT.glob("flows/*.md")]
         for f in docs:
             for cited in re.findall(r"\b([A-GNT]\d{1,2}[ab]?)\b", f.read_text()):

@@ -135,7 +135,7 @@ Partitur 是一种由一位用户和多个 AI 代理会话共同开展软件项�
    如果该位置已存在，请询问：复用它（`git -C <clone> pull`），还是另选位置。
 2. 在工作区根目录运行 `<clone>/bin/install --scope project`
    （如果项目还要支持本机未安装的工具，加上 `--tool all`），并报告输出。
-3. 阅读 `<clone>/SKILL.md` 中的“Installing Partitur for a project”一节，
+3. 阅读 `<clone>/INSTALL.md`，
    以及工作区根目录中的 `partitur-install-report.md`，与用户一起完成其中的步骤。
 4. 以后更新：先 `git -C <clone> pull`，再加 `--update` 运行同一条安装命令。
 

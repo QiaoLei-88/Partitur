@@ -156,7 +156,7 @@ it; a later `--update` of a project removes the project's own link.
 2. From the workspace root, run `<clone>/bin/install --scope project`
    (add `--tool all` if the project should serve a tool not installed
    here), and report its output.
-3. Read `<clone>/SKILL.md`, section "Installing Partitur for a project",
+3. Read `<clone>/INSTALL.md`,
    and `partitur-install-report.md` in the workspace root, and work through
    the steps with the user.
 4. To update later: `git -C <clone> pull`, then the same install command
