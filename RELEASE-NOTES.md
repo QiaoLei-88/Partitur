@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Review replies brief the plan after the decision, with details on request.
 - Atomic history is complete and minimal; request skills inspect commit content.
   Clear and resume running holders after updating the rules and skills.
 - README is for people; GETTING-STARTED.md shows the process by one example.

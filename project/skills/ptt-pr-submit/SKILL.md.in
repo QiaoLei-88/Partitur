@@ -18,8 +18,9 @@ this holder's task works in (`worktrees/<topic>`; if several, list them and
 ask). Run every git command from the workspace root with `git -C
 <worktree>`; never ask the user to change directory. You write only your
 own new message files: never edit a message or move a request. A review is
-answered with `/ptt-pr-draft-reply` and `/ptt-pr-reply`; a decided request
-takes no reply, and a follow-up is a new request.
+answered under the rules file's review timing with `/ptt-pr-draft-reply`
+and `/ptt-pr-reply`; a merged, rejected, or withdrawn request takes no
+reply, and a follow-up is a new request.
 
 | Argument | Action |
 | --- | --- |

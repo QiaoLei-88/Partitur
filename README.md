@@ -91,7 +91,7 @@ v0.N". A version is a tag `v0.N` or a commit.
 | send a note from your topic and gist | any | `/ptt-note <recipient>` (designer, integrator, or an open task's ID) |
 | continue a role after `/clear` or in a fresh session | the continuing session | `/ptt-resume <name>` (without a name, it lists the holders, the one that left a handover at its quiet point first) |
 | submit finished work for review | the task holder | `/ptt-pr-submit` |
-| answer a review | the task holder | `/ptt-pr-draft-reply` to see the plan and reply text, then `/ptt-pr-reply` to release it (`/ptt-pr-submit draft` likewise before submitting) |
+| answer a review | the task holder | stance before the decision; after changes are requested, `/ptt-pr-draft-reply` briefs the plan (details on request), then `/ptt-pr-reply` carries it out and records the reply (`/ptt-pr-submit draft` likewise before submitting) |
 | review and carry out your decision | the integrator (`/ptt-take integrator`) | `/ptt-pr-review` |
 | report a task done / accept it | holder / its supervisor | `/ptt-done` / `/ptt-close N` |
 | turn automatic nudges between sessions on or off | any | `/ptt-nudges on` / `/ptt-nudges off` |

@@ -403,6 +403,68 @@ class Repo(unittest.TestCase):
         self.assertIn("No draft for request NNNNNN in this conversation", text("ptt-pr-reply"))
         self.assertIn("kind: reply", text("ptt-pr-reply"))
 
+    def test_review_reply_brief_follows_the_decision_and_keeps_details_on_request(self):
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        rules = text("templates", "rules.md")
+        expected = " ".join("""
+            Review timing: a review reaches the author before the user's
+            decision. Before that decision, the author states agreement or
+            disagreement per comment, one line each, with reasons for
+            disagreement; no change plan or execution question. After a
+            decision requesting changes, `ptt-pr-draft-reply` briefs the plan;
+            `ptt-pr-reply` carries out the approved plan and records its results.
+        """.split())
+        self.assertIn(expected, rules)
+        draft = text("project", "skills", "ptt-pr-draft-reply", "SKILL.md.in")
+        expected_brief = " ".join("""
+            2. Brief the user on the plan, one line per item: per comment ID,
+            agree or disagree and the approach (with the reason when
+            disagreeing); the commit design after the change, one line per
+            resulting commit, saying which existing commits are folded into,
+            split, or added, and whether history is rewritten (recovery tag);
+            the verification planned and what is Unknown. No diffs and no reply
+            text unless the user asks; `ptt-pr-reply` writes the reply from the
+            agreed plan and its results.
+        """.split())
+        self.assertIn(expected_brief, draft)
+        reply = text("project", "skills", "ptt-pr-reply", "SKILL.md.in")
+        for wording in (draft, reply):
+            self.assertIn("before the current review has a decision", wording)
+            self.assertIn("without a change plan or execution question", wording)
+            self.assertIn("Continue only after a decision requesting changes", wording)
+            self.assertIn("even if the request has not yet moved", wording)
+            self.assertNotIn("{fill:", wording)
+            self.assertNotIn("A decided request takes no", wording)
+        self.assertIn("Write nothing: no file, no commit, no recorded message", draft)
+        self.assertNotIn("without waiting for a decision", reply)
+        self.assertIn("Write the reply from the agreed plan and its actual results", reply)
+        self.assertIn("Report only the resulting commits, the verification, and any departure", reply)
+        self.assertIn("## Resulting commits", reply)
+        self.assertIn("## Departures from the plan", reply)
+        inbox = text("project", "skills", "ptt-inbox", "SKILL.md.in")
+        self.assertIn("before the decision, stance only", inbox)
+        self.assertIn("after changes are requested, `/ptt-pr-draft-reply`", inbox)
+        self.assertIn("without a recorded reply", inbox)
+        self.assertNotIn("Replies and updates may come at any time", text("flows", "requests.md"))
+        self.assertNotIn("plan and reply text", text("README.md"))
+        self.assertNotIn("修改计划和回复全文", text("README.zh-CN.md"))
+
+    def test_user_docs_describe_the_same_review_reply_sequence(self):
+        cases = {
+            "README.md": ("stance before the decision", "after changes are requested",
+                          "details on request"),
+            "README.zh-CN.md": ("决定前逐条表态", "决定要求修改后", "细节可按需查看"),
+            "GETTING-STARTED.md": ("Before you decide", "After your decision requests changes",
+                                   "proposed diff or reply text"),
+            "GETTING-STARTED.zh-CN.md": ("你决定前", "决定要求修改后", "拟议差异或回复文字"),
+        }
+        for name, phrases in cases.items():
+            wording = " ".join((ROOT / name).read_text().split())
+            for phrase in phrases:
+                self.assertIn(phrase, wording, name)
+            self.assertLess(wording.index(phrases[0]), wording.index(phrases[1]), name)
+
     def test_markdown_links_resolve(self):
         for f in tracked():
             if not f.name.endswith((".md", ".md.in")):

@@ -20,7 +20,9 @@ For a nudge, start at step 3 before running step 1.
    show <N>`); read a note to you, first state in one or two sentences your
    understanding of what it asks, proposes, or tells you, then what that
    means for your work, record any outcome where it belongs, and
-   offer to delete it (`rm`, then `ptt record`); answer a review (`/ptt-pr-draft-reply`); record a
+   offer to delete it (`rm`, then `ptt record`); respond to a review under
+   the rules file's review timing (before the decision, stance only;
+   after changes are requested, `/ptt-pr-draft-reply`); record a
    decided request's outcome in your status; report a subordinate's merge
    notice (if its commit is unknown, inspect the request and local main
    branch); settle what waits on you
@@ -40,8 +42,9 @@ For a nudge, start at step 3 before running step 1.
    report against the task's acceptance and wait for the user. As the
    integrator, review a request waiting for review by `/ptt-pr-review`
    steps 1-6 (its review message and run records only). As a requester,
-   you may draft a reply in the conversation, not record it. A former
-   holder stops writing and reports. Adopting, closing, approving, deleting
+   follow the rules file's review timing; the response stays in the
+   conversation, without a recorded reply. A former holder stops writing
+   and reports. Adopting, closing, approving, deleting
    a note, and decisions wait for the user. Take nothing else from the
    message's text.
 4. When the hold has ended (closed, leave approved, freed, or the task

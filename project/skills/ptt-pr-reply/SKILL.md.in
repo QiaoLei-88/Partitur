@@ -16,18 +16,26 @@ this holder's task works in (`worktrees/<topic>`; if several, list them and
 ask). Run every git command from the workspace root with `git -C
 <worktree>`; never ask the user to change directory. Request numbers may be
 short (`4`, `pr-4`, `000004`). Without N, the request is this branch's one
-open request waiting for its author; if there is none or several, list them
-(`<records>/bin/pr list all --branch BRANCH`) and ask. With N, the request
+open request whose latest review needs an answer; if there is none or
+several, list them (`<records>/bin/pr list all --branch BRANCH`) and ask.
+With N, the request
 must be in `pr/open`: if `<records>/bin/pr list all` shows it merged or
-closed, report its state and decision and stop. A decided request takes no
-draft and no reply, and a pending draft of it lapses; a follow-up is a new
-request (`/ptt-pr-submit`).
+closed, report its state and decision and stop. A merged, rejected, or
+withdrawn request takes no draft or reply; a pending draft of it lapses.
+A follow-up is a new request (`/ptt-pr-submit`).
+
+Read `<records>/bin/pr show N`, the latest review and its decision. Follow
+the rules file's review timing: before the current review has a decision,
+give only the author's stance per comment and stop, without a change plan
+or execution question. A merge, reject, or withdraw decision ends the
+reply even if the request has not yet moved. Continue only after a
+decision requesting changes, checking that any draft answers this review.
 
 After a draft of this request in this conversation (`/ptt-pr-draft-reply`),
 this command, or an AtE naming it, approves exactly the drafted plan with
 the user's changes: its commits, their tests, and recording the reply.
-Carrying it out fills every `{fill: ...}`; nothing is recorded while one
-remains. If it needs more than the plan, stop and ask.
+Write the reply from the agreed plan and its actual results. If carrying
+it out needs more than the plan, stop and ask.
 
 Without a draft of it in this conversation (also after `/clear`), do
 nothing yet; ask:
@@ -48,9 +56,9 @@ in separate messages.
 
 ## Carrying it out
 
-Reply whenever the branch changes or a review needs an answer, without
-waiting for a decision (decisions only gate merging and closing); a reply
-pins the new head and returns the request to "waiting for review".
+Carry out the approved plan after the decision requesting changes (rules
+file, review timing); a reply pins the new head and returns the request to
+"waiting for review".
 
 1. Code changes go on the same branch: a change to an existing commit of
    the branch is folded into that commit, and only a new logical change is
@@ -65,10 +73,13 @@ pins the new head and returns the request to "waiting for review".
    SHA map, and a `git range-diff <base>..<old head> <base>..<new head>`
    summary.
 2. Write `MMMM-reply.md` (one more than the highest `MMMM`), answering every
-   comment by ID (`C1: fixed in <sha>`, `C2: disagree, because ...`). List
+   comment by ID from the agreed plan and its actual results
+   (`C1: fixed in <sha>`, `C2: disagree, because ...`). List
    `MMMM-*` again; if another file has your number and is already
    recorded, rename yours to the next free one.
 3. Record only it: `<records>/bin/ptt record -m "pr NNNNNN: reply MMMM" <file>`.
+4. Report only the resulting commits, the verification, and any departure
+   from the agreed plan. Show the reply text if the user asks.
 
 ## Template
 
@@ -90,9 +101,14 @@ head: <full SHA of the branch tip now under review>
 
 C1: <answer>
 
-## New commits
-`git log --oneline <previous head>..<head>`, or "none".
+## Resulting commits
+`git log --oneline <base>..<head>`; identify folds, splits, and additions.
+For a rewrite, include the recovery tag, old-to-new SHA map, and range-diff
+summary from step 1.
 
 ## Verification
 What was re-run for the new head, with results.
+
+## Departures from the plan
+What changed from the agreed plan and why, or "none".
 ```
