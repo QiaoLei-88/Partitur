@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Charters require a check of the goal itself, with a command where available.
 - Reviews and done reports separate test results, model review, and approval.
 - Review replies brief the plan after the decision, with details on request.
 - Atomic history is complete and minimal; request skills inspect commit content.

@@ -47,5 +47,7 @@ the task until its dependencies are closed.
 
 ## Acceptance
 
+- {{CHECK of the goal itself, as a command where one exists, with its
+  expected result; rules file, goal acceptance}}
 - {{CRITERIA, checkable from records}}
 - Unknowns and skipped work stated as such.

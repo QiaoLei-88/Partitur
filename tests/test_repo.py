@@ -482,6 +482,19 @@ class Repo(unittest.TestCase):
         self.assertIn("Keep machine verification (Tested), model review, and user approval "
                       "separate (rules file, reviews and done reports), with references for each", done)
 
+    def test_charter_acceptance_checks_the_goal_itself(self):
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        self.assertIn("A task's acceptance criteria include at least one check of the goal "
+                      "itself, expressed as a command where one exists; implementation "
+                      "checks alone do not establish that goal.", text("templates", "rules.md"))
+        charter = text("templates", "charter.md").split("## Acceptance", 1)[1]
+        self.assertIn("CHECK of the goal itself, as a command where one exists", charter)
+        self.assertIn("expected result; rules file, goal acceptance", charter)
+        draft = text("project", "skills", "ptt-mktask", "SKILL.md.in")
+        self.assertIn("Include at least one check of the goal itself, as a command where "
+                      "one exists, with its expected result (rules file, goal acceptance)", draft)
+
     def test_markdown_links_resolve(self):
         for f in tracked():
             if not f.name.endswith((".md", ".md.in")):
