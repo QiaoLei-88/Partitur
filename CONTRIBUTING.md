@@ -42,12 +42,12 @@ sections `## v0.N (YYYY-MM-DD)`, newest first. Entries before the first
 version tag stay together under `Before version tags`; earlier releases
 are not assigned numbers retrospectively.
 
-When the user decides to make a release for local use, the integration
-session handles a release-notes request: change the current `Unreleased`
-heading to its version and date, and add an empty `Unreleased` above it.
-After review and the user's merge decision, the integration session
-integrates that request into master and creates an annotated `v0.N` tag
-on the resulting master commit, on the user's release decision. N starts
+The user and the root designer decide a release for local use. The
+designer then submits a release-notes request: change the current
+`Unreleased` heading to its version and date, and add an empty
+`Unreleased` above it; entries keep their words. The integration session
+reviews it, integrates it into master on the user's merge decision, and
+creates an annotated `v0.N` tag on the resulting master commit. N starts
 at 1 and counts releases used locally. The commit comes from the tag;
 do not put a commit hash in its own version heading.
 
