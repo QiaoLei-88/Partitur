@@ -66,9 +66,9 @@ project's development notes.
 | C4 | Every message pins the head SHA it refers to; a review checks the branch still points there | Exercised |
 | C5 | The review only recommends; the user's decision is recorded as its own message before any merge, change request, or rejection | Exercised |
 | C6 | Comments carry IDs continued across rounds; replies answer each by ID; required versus optional is stated | Exercised |
-| C7 | The requester may reply and update at any time; decisions only gate merging and closing | Exercised |
+| C7 | A review reaches the author before the user's decision, and the author states only agreement or disagreement per comment (one line each, reasons for disagreement); after the user requests changes, the author briefs the plan (per comment the approach; the commits after the change, one line each) and carries it out and records the reply only once the user approves the plan; decisions gate merging and closing | Exercised for decisions gating merging and closing; Proposed for the stance, plan, and reply sequence |
 | C8 | Rebase and fixup are routine on branches under review; the old head is tagged `recovery/<reason>/<slug>` first (numbered `-2`, ... when repeated), and the reply gives the old-to-new mapping and a `range-diff` summary. The tag is mandatory | Exercised |
-| C9 | Atomic commits: one logical problem with its tests and docs; history quality is a review criterion; squashing meaningful commits is not the goal | Exercised |
+| C9 | Commits are atomic, complete and minimal: everything a change needs is in its commit, including its tests and documentation, and the commit holds no other change that stands on its own; a commit that breaks completeness is folded into the commit it belongs to, one that breaks minimality is split; when in doubt, commits stay separate, and the review settles the doubt, asking of each commit whether it is complete and minimal and of each neighbouring pair whether they are one change; history is checked by content (`git log -p`) | Exercised for one logical change with its tests and documentation, and history as a review criterion; Proposed for complete and minimal as stated, folding and splitting, keeping commits separate when in doubt, and the review settling the doubt |
 | C10 | Merges are `--no-ff`, after checking that the main branch is an ancestor of the head | Exercised |
 | C11 | Decided requests are cleaned up after a cooldown; rejected heads kept as `archive/` tags; cleanup recorded as a message | Exercised |
 | C12 | Several repositories share one request system, each with its own main-branch name | Exercised |
@@ -82,12 +82,13 @@ project's development notes.
 | C20 | Each charter states its merge order (which requests merge first, why, and when the condition lapses); `depends:` gates taking, merge order gates merging; a change of order is an amendment of the waiting task; the integrator checks the order against request states, ancestry, and file overlap in its review and sends order questions to the designer | Proposed |
 | C21 | Reviewing `all` selects, per repository, only the first request in merge order and reviews those of different repositories in the same run; the others are listed as waiting for a rebase; decisions are asked one request per message, labelled within one request (A17) | Proposed |
 | C22 | A merged request naming a task gives the task's direct supervisor an inbox notice and nudge, unless the supervisor authored it; a request without a task, or closed without merge, gives none | Proposed |
+| C23 | A decision that overrides a required review comment names the comment and the user's reason in the decision message | Proposed |
 
 ## Handoff and information flow
 
 | ID | Rule | Label |
 | --- | --- | --- |
-| D1 | A charter opens a track or worker: read-first list, scope, where results go, out of scope, acceptance; written by the designer | Exercised |
+| D1 | A charter opens a track or worker: read-first list, scope, where results go, out of scope, acceptance; written by the designer; its acceptance includes at least one check of the goal itself, as a command where one exists | Exercised for the charter's parts, written by the designer; Proposed for a check of the goal itself |
 | D2 | Only the holder of a task writes its status record (`status.md`; in the origin project, the brief's status section); the designer owns the charter | Exercised |
 | D3 | A temporary note names its recipient in its front matter (`to:` a role or an open task, required for a new note and checked when it is recorded; an older note without one goes to the designer) and waits in the recipient's inbox while it exists; only its author edits it; the recipient deletes it once read and any outcome recorded where it belongs, its author may withdraw it, the root designer may delete a stale one; its text stays reachable by commit | Exercised for notes to the designer, deleted once their outcome was recorded; Adopted for recipients in front matter, checked when recorded; Proposed for who deletes |
 | D4 | A charter is kept as history after its stage closes, marked closed and no longer maintained | Exercised |
@@ -123,6 +124,7 @@ project's development notes.
 | E7 | Generated outputs go to an explicit isolated location outside every repository | Exercised |
 | E8 | A one-off probe's driver is kept in its run record; a reusable driver belongs in the code repository's tests | Exercised for probes; Adopted for reusable drivers |
 | E9 | A run record names its creator (`by:`) and may declare its build directories (`builds:`); a session proposes removing only its own runs, once the development head they tested (its request, else the task of its worktree) has a conclusion and nothing cites them (a cited run may lose its declared build directories, and inferred ones, named `build` or `build-*` or holding `CMakeCache.txt`, which the session inspects first and which are marked and listed apart), as static commands the user reviews and approves; any cleanup the user directs stays open | Exercised for proposing only one's own runs and removing build directories of cited runs on the user's approval; Adopted for finding a run's task by its worktree; Proposed for declared and inferred build directories |
+| E10 | Reviews and done reports keep apart what machines checked (Tested), what a model reviewed, and what the user approved; none stands in for another | Proposed |
 
 ## Repositories and dependencies
 

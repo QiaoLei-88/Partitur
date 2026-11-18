@@ -58,7 +58,8 @@ repository, and a table maps repositories to checkouts and main branches
    user's answer. `/ptt-pr-reply` likewise handles one request per message.
 6. **Review responses.** Follow the project rules' review timing: the
    author's stance before the decision; a brief plan after changes are
-   requested; the approved plan carried out and recorded in a reply (C7).
+   requested; the approved plan carried out and recorded in a reply (C7;
+   the stance, plan, and reply sequence *(Proposed)*).
 7. **Comments by ID**, continued across rounds, each marked required or
    optional; replies answer every ID (C6).
 8. **Rewrites.** Rebase and fixup are routine on the request's branch. Tag
