@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.1 (2026-11-18)
+
 - Decisions overriding required review comments record their IDs and user reasons.
 - Charters require a check of the goal itself, with a command where available.
 - Reviews and done reports separate test results, model review, and approval.
