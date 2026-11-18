@@ -5,47 +5,80 @@
 A partitur is the full score of a piece: every part, written out, from which
 each player reads. Players change; the score stays.
 
-Partitur is a way to run a software project with one human and several AI
-agent sessions (Claude Code, Codex, or both). It assigns each session a
-role, keeps everything a session needs in files and Git rather than in a
-conversation, and lets nothing reach a main branch without a review and the
-human's decision. Any session can end at any time, and the next one picks up
-from the records.
+Partitur is a way to run a software project with one person and several AI
+agent sessions (Claude Code, Codex, or both). Without it, each session
+forgets what it was told when its conversation ends, two sessions change
+the same file, and nobody can say later what was agreed and by whom. With
+it, each session has one role, everything it needs is kept in files and
+Git rather than in a conversation, and nothing reaches a main branch
+without a review and your decision. Any session can end at any time, and
+the next one picks up from the records.
 
-It is abstracted from the working practice of a real research software
-project (the "origin project"), and it keeps track of which of its rules
-have actually been used there.
+It is abstracted from the working practice of several real research
+software projects, and keeps track of which of its rules have actually
+been used in practice.
 
-## Principles
+## You need not read the code
 
-Six ideas decide everything else; when in doubt, ask which one applies.
+Partitur is used by talking to sessions. Ask a session anything about it,
+in your own words: "what does the integrator do?", "how do I stop working
+on a task?", "why are you waiting for me?". The session reads Partitur's
+documents and explains. Let a session install it, too.
 
-1. **You decide.** Sessions discuss, propose, and review; nothing is
-   written until you say `AtE` ("approval to execute"), or `AtEiYA` ("AtE
-   if you agree") when the session should go ahead only if it agrees.
-   Running a `/ptt-*` command is your approval for that command's own
-   record, nothing more, unless it carries out a draft you have seen.
-2. **Take a role before working.** A session is the designer, the
-   integrator, or the holder of one task, and only because it took that
-   role with a command. A role someone holds cannot be taken. Taking or
-   resuming also names the session (`prtr-wrkr-t8-d6ddbc`: project, holder,
-   part of the session ID) and prints the line that gives the session that
-   name, `/rename <name>`, so that automatic messages reach it.
-3. **Records, not memory.** What matters is in files in the records
-   repository, so a session can be cleared or replaced at any time and the
-   next one continues from them.
-4. **Review recommends, you decide.** Code reaches a main branch only
-   through a request: the integrator reviews it, you decide, and the
-   decision is recorded before the merge.
-5. **Supervisors answer for what is below them.** The designer supervises
-   the tasks it made; a holder leaves only with its supervisor's approval;
-   nobody leaves while something below them waits; a supervisor notices a
-   silent holder and frees its task.
-6. **Labels say how sure we are.** Decisions are Agreed, Proposed, or Open;
-   evidence is Source, Inferred, Tested, or Unknown; each of Partitur's own
-   rules says whether it has been used in practice ([rules index](rules.md)).
+[Getting started](GETTING-STARTED.md) follows one small project from a
+wish to a merge, in about ten minutes of reading, and explains the ideas
+behind each step.
 
-## Which command when
+Who does what (solid arrows: work passes on; dotted: every session reads
+and writes the records):
+
+```mermaid
+flowchart LR
+  U(("You<br>the user"))
+  D["Designer<br>plans tasks"]
+  W["Worker<br>does one task"]
+  I["Integrator<br>reviews and merges"]
+  R[("Records<br>charters, status,<br>requests, reviews")]
+  M[("Main branch")]
+  U -- "wish, decisions" --> D
+  D -- "task and charter" --> W
+  W -- "request" --> I
+  I -- "review and recommendation" --> U
+  U -- "decision" --> I
+  I -- "merge" --> M
+  D & W & I <-.-> R
+```
+
+## Start
+
+You need Git 2.28 or later, Python 3.8 or later, and Claude Code, Codex,
+or both, on Linux or macOS (on Windows, WSL).
+
+1. **Install.** Start a session in your project's *workspace root*, the
+   directory that holds its code checkouts, and say: "Install Partitur for
+   this project from https://github.com/QiaoLei-88/Partitur". The session
+   says where it will put Partitur and which version, and waits for your
+   go-ahead. It then installs with `install --release`, which keeps that
+   version in a clone of its own that never changes, and goes through two
+   files with you: the project's rules, and the charter of the design
+   (what the project is for). It takes no role afterwards.
+2. **Open the two standing roles.** In two fresh sessions in the workspace
+   root, type `/ptt-take designer` in one and `/ptt-take integrator` in the
+   other. In Claude Code, each prints a `/rename` line: type it in that
+   session, so that automatic messages from other sessions reach it.
+3. **Your first task.** Tell the designer what you need. When you agree on
+   a piece of work, it becomes a task; a third session takes it with
+   `/ptt-take N` and shows you its plan before writing anything.
+
+From then on, sessions ask you whenever something needs your decision,
+with numbered options and their recommendation first. You answer `1 AtE`
+("approval to execute", option 1); anything without `AtE` is discussion,
+so keep asking until the recommendation is clear.
+
+To update later, ask a session: "Update Partitur for this project to
+v0.N". A version is a tag `v0.N` or a commit.
+
+## Everyday commands
 
 | You want to... | In which session | Command |
 | --- | --- | --- |
@@ -78,178 +111,25 @@ review and its decision are then discussed in a separate message, waiting
 for your answer before the next. `/ptt-pr-reply` likewise handles one
 request per message.
 
-## Getting started
-
-Requirements: Git 2.28 or later, Python 3.8 or later, and a system with
-symbolic links (Linux or macOS; on Windows, WSL); Claude Code, Codex, or
-both.
-
-1. **Install for the project.** In its workspace root (the directory that
-   holds the project's code checkouts), start a session, the *installation
-   session*, and say: "Install Partitur for this project from
-   https://github.com/QiaoLei-88/Partitur". The session clones Partitur to
-   a lasting place (`~/partitur` unless you choose another), tells you what
-   it will run, and runs
-
-   ```
-   ~/partitur/bin/install --scope project
-   ```
-
-   You can also clone and run that command yourself (inside a Claude Code
-   session, `! ~/partitur/bin/install --scope project`, so that the session
-   sees the output). Install detects Claude Code and Codex
-   (`--tool claude`, `codex`, or `all` chooses) and reports what it created:
-   the records repository `workspace/` with
-   the rules file `PROJECT-RULES.md`, task and request directories, tools and skills, the
-   root design task `T0000` (the designer's charter and handover), the
-   integrator's file, the links your tools read, and a prompt hook that
-   shows each session what is new for it (`.claude/settings.json` for
-   Claude Code; Codex's below). It lists the code
-   repositories it found; one deeper down is added as a line in
-   `workspace/pr/repos`. If you ran install in a plain terminal instead,
-   start the installation session in the workspace root and say "Read
-   partitur-install-report.md and help me finish the Partitur install":
-   install leaves its output and the next steps in that file (not
-   committed; delete it when done).
-2. **Fill in two files** with the installation session: the "Project Rules" at the end
-   of `workspace/PROJECT-RULES.md` (your domain's rules; Partitur's own rules sit
-   in a marked block above them), and the placeholders in
-   `workspace/tasks/open/T0000-design/charter.md` (the root designer's
-   charter, filled in directly this once and amended by you afterwards;
-   its `status.md` is the designer's handover). A project that
-   already has a rules file keeps it: install reports it "not merged", and
-   the session compares both. It removes duplicates and keeps your domain
-   rules without asking; it asks you only about real conflicts and, once,
-   whether to adopt Partitur's block. On your approval `--merge-rules`
-   adds the block. Then record them:
-
-   ```
-   workspace/bin/ptt record -m "install Partitur" workspace
-   ```
-
-   From now on every write in `workspace/` goes through `ptt`. Anything
-   about the design agreed during the setup belongs in T0000's charter or
-   `status.md` before you record. The installation session then ends; it
-   takes no role.
-3. **Open fresh sessions** in the workspace root for the roles: in one,
-   `/ptt-take designer`; in another, `/ptt-take integrator`. Each starts
-   from the records, not from the setup conversation. If T0000 is not
-   filled in yet (an existing project whose handover lives elsewhere), the
-   designer proposes how to fill it from what the project has. Discuss the
-   first piece of work with the designer and make it a task; in a third
-   session, `/ptt-take` it. Requests wait until a session holds the
-   integrator role; `ptt` notes it when one is submitted without.
-
-Optionally, once per machine, `~/partitur/bin/install --scope user` links
-Partitur for all your sessions, so that a session in any directory knows it
-(in the next project, "install Partitur for this project" then needs no link). The install report offers
-it; a later `--update` of a project removes the project's own link.
-
-### If you are a session asked to install Partitur from this link
-
-1. Say where you will clone it and what you will run, and wait for the
-   user's go-ahead: the request names the action, the location is the
-   user's to confirm. Clone to a lasting place, `~/partitur` by default:
-   the project links to that clone by its absolute path, so never a
-   temporary directory. If the place exists, ask: reuse it (`git -C
-   <clone> pull`), or choose another.
-2. From the workspace root, run `<clone>/bin/install --scope project`
-   (add `--tool all` if the project should serve a tool not installed
-   here), and report its output.
-3. Read `<clone>/SKILL.md`, section "Installing Partitur for a project",
-   and `partitur-install-report.md` in the workspace root, and work through
-   the steps with the user.
-4. To update later: `git -C <clone> pull`, then the same install command
-   with `--update`.
-
-Always start sessions in the workspace root: Codex reads `AGENTS.md` and
-skills only from the Git root of its starting directory downwards, and the
-workspace root is usually not inside a Git repository.
-
-For Codex, install also adds `.codex/hooks.json`. Review and trust the
-project and its hook in Codex (`/hooks` in the CLI); until then, or on a
-client without prompt hooks, use `$ptt-inbox` manually. The hook reads the
-session ID from Codex's event and reports new records with the next user
-message. It does not wake an idle session. See the
-[official hook documentation](https://learn.chatgpt.com/docs/hooks).
-The hook uses the workspace's absolute path so it also works when the
-session changes directory; if the workspace moves, update that path and
-review/trust the hook again.
-
-Codex shell commands bind holders using `CODEX_THREAD_ID`, with
-`CODEX_SESSION_ID` as a fallback. Claude Code continues to use
-`CLAUDE_CODE_SESSION_ID`; `PTT_SESSION_ID` overrides either tool. A fresh
-chat or fork continues a holder only with `$ptt-resume <holder name>`;
-the previous session then loses write access through `ptt`. Continuing or
-compacting the same thread does not release the holder. Run `$ptt-whoami`
-to check the binding, and resume to reload the handover when needed.
-
-To bring a project up to a newer Partitur, pull this repository and rerun
-step 1's command with `--update`. The project remembers which Partitur
-commit and clone installed it, and for which tools
-(`workspace/.partitur-version`), so the update replaces what is outdated, removes what Partitur no longer ships, and moves
-the `partitur` skill link when you run it from another clone, but leaves your
-rules, your records, and any file you changed (`--force` replaces those,
-after copying each into a backup directory).
-The update also prints new [release notes](RELEASE-NOTES.md) entries and
-any actions they require. Plain install counts entries while keeping its other
-behavior; it retains the comparison stamp until `--update` shows them. An older
-commit without release notes gives a reading pointer; an unknown commit shows the
-`Unreleased` section with a note that the difference is unknown.
-Installed and source commits also show their annotated `v0.N` version tags
-when available in the source clone; the commit remains their identity.
-`--uninstall` removes what was installed the same way. Every later run
-serves the recorded tools, also on a machine that lacks one of them (a
-workspace shared between machines); `--tool` adds a tool, and with
-`--uninstall` removes only that tool's side. For the user link,
-`--scope user --uninstall` removes every `partitur` link to a Partitur
-clone in `~/.claude/skills` and `~/.agents/skills`, or only those `--tool`
-names.
-
-Both tools link `partitur` to this repository for its entry skill and
-documents. Command templates in `project/skills/` are named `SKILL.md.in`;
-install fills in the records directory and writes each project's `SKILL.md`.
-The templates themselves are not discoverable command skills.
-
-Taking roles and tasks, the install command, and the prompt hooks are in
-use in the origin project; the [rules index](rules.md) marks each rule
-still *Proposed*, such as freeing a silent holder or sub-design scopes.
-
 ## Contents
 
-- [Release notes](RELEASE-NOTES.md): user-facing changes and actions after updating.
-- [Model](model.md): concepts, invariants, scopes and nesting, information
-  flow.
-- Roles: [user](roles/user.md), [designer](roles/designer.md),
-  [track](roles/track.md), [worker](roles/worker.md),
-  [integrator](roles/integrator.md), [delegate](roles/delegate.md).
-- Flows: [roles and tasks](flows/tasks.md),
+- [Getting started](GETTING-STARTED.md): the process and its ideas, by
+  one example.
+- [Release notes](RELEASE-NOTES.md): changes and actions after updating.
+- [Rules index](rules.md): every rule with its ID and label: *Exercised*
+  (used in practice), *Adopted* (written into a project's rules, not yet
+  shown in use), or *Proposed* (Partitur's design, untested).
+- For sessions: [SKILL.md](SKILL.md), their entry point;
+  [INSTALL.md](INSTALL.md), for installing, updating, and uninstalling;
+  [model](model.md), roles ([user](roles/user.md),
+  [designer](roles/designer.md), [track](roles/track.md),
+  [worker](roles/worker.md), [integrator](roles/integrator.md),
+  [delegate](roles/delegate.md)), flows ([roles and tasks](flows/tasks.md),
   [authorization](flows/authorization.md), [requests](flows/requests.md),
   [handoff](flows/handoff.md), [evidence](flows/evidence.md),
-  [references](flows/references.md).
-- [Rules index](rules.md): every rule with its ID and label: *Exercised*
-  (used in the origin project), *Adopted* (written into its rules, not yet
-  shown in use), or *Proposed* (Partitur's design, untested).
-- [Parameters](parameters.md): what you choose at install, and what is
-  fixed.
-- `bin/install`: the one command you run (once per machine, once per
-  project).
-- `project/`: what a project receives (`bin/ptt` for roles and tasks,
-  `bin/pr` for requests, `bin/test-run`, the `ptt-*` skills).
-- `templates/`: files filled in at install (rules file, request README,
-  the root design task's charter and status, the integrator's file, the
-  task charter).
-- [SKILL.md](SKILL.md): the entry point for agent sessions.
+  [references](flows/references.md)), and [parameters](parameters.md).
 - [Contributing](CONTRIBUTING.md); tests:
   `python3 -m unittest discover -s tests`.
-
-## How Partitur is developed
-
-Partitur evolves alongside the origin project, which remains its proving
-ground: a rule becomes Exercised only when a record of real use shows it.
-Each milestone gets an independent review by a fresh agent that sees the
-records but not the author's reasoning. The evidence behind the labels and
-the reviews are kept with the development notes, outside this repository.
 
 ## Licence
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- README is for people; GETTING-STARTED.md shows the process by one example.
+  Install and update with `install --release`, never `git pull`: INSTALL.md.
 - `install --release TAG_OR_COMMIT` prepares a detached clone containing
   only the selected version and its release tags. A matching clean clone
   is reused; an incompatible existing path is refused unchanged. Clones

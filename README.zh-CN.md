@@ -5,41 +5,69 @@
 Partitur 是乐曲的总谱：每个声部都写在其中，演奏者各自照谱演奏。
 演奏者可以更换，乐谱始终保留。
 
-Partitur 是一种由一位用户和多个 AI 代理会话共同开展软件项目的方法，
-支持 Claude Code、Codex，或两者同时使用。它为每个会话分配角色，
-将会话需要的信息保存在文件和 Git 中，而不是留在对话里；
-任何改动都必须经过审查和用户决定，才能进入主分支。
-任何会话都可以随时结束，接替的会话根据记录继续工作。
+Partitur 是一种由一个人和多个 AI 代理会话共同开展软件项目的方法，
+支持 Claude Code、Codex，或两者同时使用。没有它时，会话一结束就忘了交代过的事，
+两个会话会改同一个文件，事后也说不清谁同意过什么。有了它，每个会话只担一个角色，
+需要的信息都保存在文件和 Git 中，而不是留在对话里；任何改动都要经过审查和你的决定，
+才能进入主分支。任何会话都可以随时结束，接替的会话根据记录继续工作。
 
-它提炼自一个真实科研软件项目（“来源项目”）的工作实践，
-并持续记录哪些规则已经在该项目中实际使用过。
+它提炼自几个真实科研软件项目的工作实践，
+并持续记录哪些规则已经在实践中用过。
 
-## 原则
+## 不必读代码
 
-其余安排都由以下六个理念决定；有疑问时，先判断适用哪一条。
+使用 Partitur 的方式就是和会话交谈。关于它的任何问题，都可以用自己的话问会话：
+“集成者做什么？”“我怎样退出一个任务？”“你为什么在等我？”
+会话会阅读 Partitur 的文档并解释。安装也交给会话来做。
 
-1. **由你决定。** 会话负责讨论、提案和审查；只有你说出 `AtE`
-   （approval to execute，批准执行）后，才可以写入。
-   如果希望会话仅在同意方案时执行，就使用 `AtEiYA`（AtE if you agree）。
-   执行 `/ptt-*` 命令表示你批准该命令自身的记录操作，不代表其他授权；
-   执行你已经看过的草稿时除外。
-2. **先领取角色，再开展工作。** 会话可以是设计者、集成者，或某个任务的持有者，
-   但必须通过命令领取后才具备这一身份。已经有人持有的角色不能再被领取。
-   领取或继续（resume）时还会为会话命名（如 `prtr-wrkr-t8-d6ddbc`：项目、持有者、
-   会话 ID 的一部分），并打印为会话改名的命令 `/rename <name>`，以便自动消息能送达该会话。
-3. **依靠记录，而非记忆。** 重要信息保存在记录库的文件中，
-   因此会话随时可以清空上下文或被替换，后续会话根据记录继续工作。
-4. **审查给出建议，由你作出决定。** 代码只能通过请求进入主分支：
-   集成者审查，你作出决定，合并前先记录决定。
-5. **上级对下级的工作负责。** 设计者监督自己创建的任务；
-   持有者只有得到上级批准才能离任；下级仍有事项等待处理时，上级不能离任；
-   上级应留意失去响应的持有者，并释放其任务。
-6. **用标签说明确定程度。** 决策标记为 Agreed（已达成共识）、Proposed（提议中）
-   或 Open（待定）；证据标记为 Source（来自源代码）、Inferred（推断）、
-   Tested（已测试）或 Unknown（未知）。Partitur 自身的每条规则也会注明
-   是否经过实践，见[规则索引](rules.md)。
+[上手指南](GETTING-STARTED.zh-CN.md)用一个小项目，从一个需求一直走到合并，
+大约十分钟读完，并解释每一步背后的道理。
 
-## 什么时候用哪个命令
+谁做什么（实线：工作的传递；虚线：每个会话都读写记录）：
+
+```mermaid
+flowchart LR
+  U(("你<br>用户"))
+  D["设计者<br>规划任务"]
+  W["工作者<br>完成一个任务"]
+  I["集成者<br>审查与合并"]
+  R[("记录<br>章程、状态、<br>请求、审查")]
+  M[("主分支")]
+  U -- "需求、决定" --> D
+  D -- "任务与章程" --> W
+  W -- "请求" --> I
+  I -- "审查与建议" --> U
+  U -- "决定" --> I
+  I -- "合并" --> M
+  D & W & I <-.-> R
+```
+
+## 开始
+
+环境要求：Git 2.28 或更高版本、Python 3.8 或更高版本，以及 Claude Code、Codex
+或两者；系统为 Linux 或 macOS（Windows 上使用 WSL）。
+
+1. **安装。** 在项目的*工作区根目录*（存放各代码仓库检出的目录）启动一个会话，
+   对它说：“Install Partitur for this project from
+   https://github.com/QiaoLei-88/Partitur”（用中文说也可以）。会话会告诉你
+   它打算把 Partitur 放在哪里、用哪个版本，并等你同意。然后它用
+   `install --release` 完成安装：这个版本放在一个专属的克隆里，之后不会再变；
+   接着和你一起过两个文件：项目的规则，以及设计章程（项目是做什么的）。
+   安装完成后它不担任任何角色。
+2. **开启两个常设角色。** 在工作区根目录开两个新会话，一个输入
+   `/ptt-take designer`，另一个输入 `/ptt-take integrator`。在 Claude Code 中，
+   每个会话都会打印一行 `/rename`：在该会话里输入它，其他会话的自动消息才能送达。
+3. **第一个任务。** 把你的需要告诉设计者。你们商定一项工作后，它就成为一个任务；
+   第三个会话用 `/ptt-take N` 领取它，在写任何东西之前先给你看计划。
+
+此后，凡是需要你决定的事，会话都会问你，给出编号选项，推荐项排在第一。
+你回答 `1 AtE`（approval to execute，批准执行选项 1）；不带 `AtE` 的回答都算讨论，
+所以可以一直追问，直到推荐理由清楚为止。
+
+以后要更新时，问会话：“把本项目的 Partitur 更新到 v0.N”。
+版本是一个标签 `v0.N` 或一个提交。
+
+## 日常命令
 
 | 你想要…… | 在哪个会话中 | 命令 |
 | --- | --- | --- |
@@ -69,148 +97,24 @@ Partitur 是一种由一位用户和多个 AI 代理会话共同开展软件项�
 先用总览列出已审查及等待中的请求，再逐条消息讨论一个请求及其决定，
 收到你的答复后才讨论下一个。`/ptt-pr-reply` 同样每条消息只处理一个请求。
 
-## 开始使用
-
-环境要求：Git 2.28 或更高版本、Python 3.8 或更高版本，以及支持符号链接的系统
-（Linux 或 macOS；Windows 上使用 WSL）；安装 Claude Code、Codex，或两者。
-
-1. **为项目安装。** 在项目的工作区根目录（存放项目各代码检出目录的目录）
-   启动一个会话，称为*安装会话*，然后说：“从
-   https://github.com/QiaoLei-88/Partitur 为这个项目安装 Partitur”。
-   会话会把 Partitur 克隆到一个长期保留的位置（默认 `~/partitur`，也可以由你指定），
-   先告诉你将要运行的命令，然后运行：
-
-   ```
-   ~/partitur/bin/install --scope project
-   ```
-
-   你也可以自己克隆并运行这条命令（在 Claude Code 会话中执行
-   `! ~/partitur/bin/install --scope project`，让会话看到输出）。
-   安装器会检测 Claude Code 和 Codex（可以用 `--tool claude`、`codex` 或 `all`
-   明确选择），并报告创建的内容：
-   记录库 `workspace/`，其中包含规则文件 `PROJECT-RULES.md`、任务与请求目录、工具和技能，
-   根设计任务 `T0000`（设计者的章程和交接记录）、集成者文件、
-   供代理工具读取的链接，以及向每个会话显示其新消息的提示词钩子
-   （Claude Code 为 `.claude/settings.json`；Codex 的见下文）。安装器会列出发现的代码仓库；
-   更深层目录中的仓库可以在 `workspace/pr/repos` 中添加一行。
-   如果你是在普通终端中运行安装命令，则在工作区根目录启动安装会话，并说：
-   “阅读 partitur-install-report.md，帮我完成 Partitur 安装”。
-   安装器会把输出和后续步骤写入该文件（不提交，完成后删除）。
-2. **与安装会话一起填写两个文件**：`workspace/PROJECT-RULES.md` 末尾的
-   “Project Rules”（项目规则，填写你的领域规则；Partitur 自身的规则位于上方
-   带标记的区块中），以及 `workspace/tasks/open/T0000-design/charter.md`
-   中的占位内容。后者是根设计者的章程，仅首次直接填写，此后由你提出修订；
-   同目录下的 `status.md` 是设计者的交接记录。
-   已有规则文件的项目会保留原文件：安装器报告“not merged”，由会话比较两套规则。
-   会话会直接删除重复内容、保留你的领域规则；只有遇到实际冲突时才询问你，
-   并就是否采纳 Partitur 规则区块统一询问一次。
-   经你批准后，使用 `--merge-rules` 加入规则区块。随后记录这些内容：
-
-   ```
-   workspace/bin/ptt record -m "install Partitur" workspace
-   ```
-
-   此后，对 `workspace/` 的所有写入都通过 `ptt` 完成。
-   安装期间达成共识的设计内容，应在记录前写入 T0000 的章程或 `status.md`。
-   然后结束安装会话；它不领取任何角色。
-3. **在工作区根目录新开会话**，分别领取角色：一个会话执行
-   `/ptt-take designer`，另一个执行 `/ptt-take integrator`。
-   每个会话都从记录开始，而不是依靠安装时的对话。
-   如果 T0000 尚未填写（例如已有项目的交接材料保存在别处），
-   设计者会根据项目现有材料提出填写方案。
-   与设计者讨论第一项工作并将其形成任务，然后在第三个会话中用 `/ptt-take`
-   领取该任务。请求需要等待有会话持有集成者角色才能处理；
-   提交请求时若没有集成者，`ptt` 会提示。
-
-可选：每台机器运行一次 `~/partitur/bin/install --scope user`，
-为你的所有会话链接 Partitur，使任意目录中的会话都认识它
-（之后在下一个项目中说“为这个项目安装 Partitur”就不再需要链接）。
-安装报告会给出这一建议；之后对项目执行 `--update` 时，会移除项目自己的链接。
-
-### 如果你是被要求从这个链接安装 Partitur 的会话
-
-1. 先说明将克隆到哪里、将运行什么，等待用户确认：用户的请求指定了操作，
-   位置由用户确认。克隆到长期保留的位置，默认 `~/partitur`：
-   项目会通过绝对路径链接到这份克隆，因此不能放在临时目录中。
-   如果该位置已存在，请询问：复用它（`git -C <clone> pull`），还是另选位置。
-2. 在工作区根目录运行 `<clone>/bin/install --scope project`
-   （如果项目还要支持本机未安装的工具，加上 `--tool all`），并报告输出。
-3. 阅读 `<clone>/SKILL.md` 中的“Installing Partitur for a project”一节，
-   以及工作区根目录中的 `partitur-install-report.md`，与用户一起完成其中的步骤。
-4. 以后更新：先 `git -C <clone> pull`，再加 `--update` 运行同一条安装命令。
-
-始终在工作区根目录启动会话：Codex 只读取其启动目录所属 Git 根目录及其下级
-目录中的 `AGENTS.md` 和技能，而工作区根目录通常不在 Git 仓库内部。
-
-对于 Codex，安装器还会添加 `.codex/hooks.json`。
-请在 Codex 中审阅并信任项目及其钩子（CLI 中使用 `/hooks`）；
-在完成之前，或客户端不支持提示词钩子时，手动使用 `$ptt-inbox`。
-钩子会从 Codex 事件中读取会话 ID，并在用户发送下一条消息时报告新记录。
-它不会唤醒空闲会话。详见[官方钩子文档](https://learn.chatgpt.com/docs/hooks)。
-钩子使用工作区的绝对路径，因此会话切换目录后仍能工作；
-如果移动了工作区，请更新路径，并重新审阅、信任该钩子。
-
-Codex 的 shell 命令使用 `CODEX_THREAD_ID` 绑定持有者，
-不可用时回退到 `CODEX_SESSION_ID`。
-Claude Code 继续使用 `CLAUDE_CODE_SESSION_ID`；
-`PTT_SESSION_ID` 可以覆盖任一工具提供的值。
-新会话或分叉会话只有通过 `$ptt-resume <holder name>` 才能接续原持有者；
-此后，原会话会失去通过 `ptt` 写入的权限。
-继续同一会话或压缩其上下文不会释放持有者身份。
-运行 `$ptt-whoami` 检查绑定，需要时通过 resume 重新加载交接记录。
-
-要将项目升级到新版 Partitur，请拉取本仓库，并在第 1 步的命令中加上
-`--update` 后重新运行。项目会在 `workspace/.partitur-version` 中记录
-安装时的 Partitur 提交、所用的 clone 以及为哪些工具安装，因此升级会替换过时内容、移除 Partitur
-不再提供的内容；从另一个 clone 运行时，还会把 `partitur` skill 链接改为指向该 clone；
-同时保留你的规则、记录和自行修改的文件。
-使用 `--force` 可以替换自行修改的文件，但会先将每个文件复制到备份目录。
-`--uninstall` 按同样的原则移除已安装内容。
-之后的每次运行都会服务于记录的工具，即使所在机器缺少其中某个工具
-（多台机器共享同一工作区时）；`--tool` 可增加工具，与 `--uninstall`
-一起使用时只移除该工具这一侧。
-对于用户级链接，`--scope user --uninstall` 会移除 `~/.claude/skills` 和
-`~/.agents/skills` 中所有指向 Partitur clone 的 `partitur` 链接，
-或只移除 `--tool` 指定的那些。
-
-两种工具都将 `partitur` 链接到本仓库，以访问总入口技能及文档。
-`project/skills/` 中的命令模板名为 `SKILL.md.in`；
-安装器填入记录库目录名后，为项目生成 `SKILL.md`。
-模板本身不会被发现为命令技能。
-
-角色与任务领取、安装命令以及提示词钩子已在源项目中使用；
-[规则索引](rules.md)标出了仍为 *Proposed（提议中）* 的规则，
-例如释放长期无记录的持有者，或子设计范围。
-
 ## 内容索引
 
-- [发布说明](RELEASE-NOTES.md)：面向用户的变更，以及更新后需要做的事。
-- [模型](model.md)：概念、不变量、范围与嵌套、信息流。
-- 角色：[用户](roles/user.md)、[设计者](roles/designer.md)、
-  [专题研究者（track）](roles/track.md)、[工作者](roles/worker.md)、
-  [集成者](roles/integrator.md)、[受托者](roles/delegate.md)。
-- 流程：[角色与任务](flows/tasks.md)、[授权](flows/authorization.md)、
-  [请求](flows/requests.md)、[交接](flows/handoff.md)、[证据](flows/evidence.md)、
-  [引用](flows/references.md)。
+- [上手指南](GETTING-STARTED.zh-CN.md)：用一个例子讲流程和背后的理念。
+- [发布说明](RELEASE-NOTES.md)：变更，以及更新后需要做的事。
 - [规则索引](rules.md)：每条规则的 ID 和标签：*Exercised（已实践）*
-  表示已在来源项目中使用；*Adopted（已采纳）* 表示已写入其规则，但尚无使用记录；
+  表示已在实践中用过；*Adopted（已采纳）* 表示已写入某个项目的规则，但尚无使用记录；
   *Proposed（提议中）* 表示 Partitur 提出的设计，尚未验证。
-- [参数](parameters.md)：安装时可以选择什么，以及哪些内容是固定的。
-- `bin/install`：需要运行的安装命令（每台机器一次，每个项目一次）。
-- `project/`：交付给项目的内容，包括管理角色与任务的 `bin/ptt`、
-  管理请求的 `bin/pr`、`bin/test-run`，以及 `ptt-*` 技能。
-- `templates/`：安装时填充的文件，包括规则文件、请求 README、
-  根设计任务的章程和状态、集成者文件、任务章程。
-- [SKILL.md](SKILL.md)：代理会话的入口。
+- 给会话看的：[SKILL.md](SKILL.md)，会话的入口；
+  [INSTALL.md](INSTALL.md)，安装、更新与卸载；
+  [模型](model.md)；角色（[用户](roles/user.md)、[设计者](roles/designer.md)、
+  [专题研究者（track）](roles/track.md)、[工作者](roles/worker.md)、
+  [集成者](roles/integrator.md)、[受托者](roles/delegate.md)）；
+  流程（[角色与任务](flows/tasks.md)、[授权](flows/authorization.md)、
+  [请求](flows/requests.md)、[交接](flows/handoff.md)、[证据](flows/evidence.md)、
+  [引用](flows/references.md)）；[参数](parameters.md)。
+  这些文件只有英文版，以英文版为准。
 - [贡献指南](CONTRIBUTING.md)；测试命令：
   `python3 -m unittest discover -s tests`。
-
-## Partitur 如何开发
-
-Partitur 与来源项目共同演进，来源项目始终是它的实践检验场：
-只有真实使用记录提供了证据，规则才会被标记为 Exercised（已实践）。
-每个里程碑都由一个新代理独立审查；它能看到记录，但看不到作者的推理过程。
-标签背后的证据和审查结果与开发笔记一起保存，不放在本仓库中。
 
 ## 许可证
 

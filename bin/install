@@ -1424,7 +1424,7 @@ def write_report(a, tools, report, output):
             f"rules unchanged (do not ask); ask one question per conflict, with a "
             f"recommendation, and one question for adopting the block's rules the project "
             f"lacks (name those labelled Proposed in `{HERE / 'rules.md'}`: not yet exercised "
-            f"in practice). See Partitur's SKILL.md, step Rules. "
+            f"in practice). See Partitur's INSTALL.md, step Rules. "
             + ("On the user's approval, rerun this install with --merge-rules. "
                if c.get("not merged") else "")
             + f"Then write the project's part of `{R}/{RULES}` after the block, as "

@@ -40,92 +40,9 @@ same skills as `$ptt-*` (for example `$ptt-take designer`).
 
 ## Installing Partitur for a project
 
-When the user asks for it (that request is the AtE), from the project's
-workspace root, the directory holding its code checkouts. If the user gave
-this repository's link and it is not cloned yet, say where you will clone
-it (a lasting place, `~/partitur` by default: the project links to it by
-absolute path) and wait for the user's go-ahead on the location; then:
-
-```
-<this repository>/bin/install --scope project
-```
-
-It detects the agent tools on this machine and installs for those; if the
-project should serve a tool that is not installed here, add `--tool all` (ask
-the user). The tools are recorded in `<records>/.partitur-version`; later
-runs (install, `--update`, `--uninstall`) follow them on any machine, and
-`--tool` adds one (with `--uninstall`, removes only that one). The command is in use (F9, F10); report anything unexpected.
-Everything else has a default (see [parameters](parameters.md)); `--repo` is
-needed only for checkouts not directly in the workspace root, which can also
-be added later as lines in `<records>/pr/repos`. Report the output to the
-user, including anything reported as differing. Install also writes
-`partitur-install-report.md` in the workspace root: its output and the next
-steps below as they apply to this run. When the user ran install in a
-terminal and asks you to finish it, read that file and work through its
-steps; delete it, with the user's approval, when they are done.
-
-For Codex, explain the hook trust step in the install report. Until the
-project and `.codex/hooks.json` are trusted, use `$ptt-inbox` manually.
-
-Then, with the user:
-
-1. **Rules.** If install reports the rules file "not merged" (an existing
-   project with its own rules), read the project's rules and Partitur's
-   rules block (`templates/rules.md`, between the markers). Installing
-   Partitur already chose its rules, so ask the user only where the project
-   deliberately differs. Sort each of the project's rules into one of four
-   kinds:
-   - **Duplicate** of a rule in the block: it is removed; list what you
-     remove, do not ask.
-   - **Domain rule**, or a concrete instance of a general rule in the block
-     (the project's names, paths, repositories, conventions): it stays,
-     unchanged, under "## Project Rules"; do not ask.
-   - **Conflict**, where the project's rule says otherwise than the block:
-     ask, one question per conflict, as a numbered list right after its
-     question line (`1. Partitur's rule`, `2. Keep the project's rule as a
-     stated deviation`, `3. No decision, discuss further`), your
-     recommendation first (usually the block's rule); with several
-     conflicts in one message, label them (`A1`, `B2`) and end with the
-     `ALL1 AtE` line; see the decision
-     list in [authorization](flows/authorization.md). If the user keeps the
-     project's way, it goes under "## Project Rules" as a stated deviation
-     ("Partitur's rule on ... does not apply here: ..."), because install
-     maintains the block and it is never edited.
-   - **Partitur's rules the project lacks** come with the block. Ask one
-     question for all of them: adopt the block. Name the rules not yet
-     exercised in practice *(Proposed, T1)*: a successor checking its
-     handover against the records; withdrawing a request; offering to be
-     cleared at quiet points; and of the task rules, refusing to leave while
-     something waits, freeing a silent holder, sub-design scopes, and
-     checking holders before naming them (G5-G7, G10, G14, G15, G18). The
-     user drops one only by saying so, as a stated deviation.
-
-   Present the conflicts and the one block question together. On the
-   user's approval, run install again with `--merge-rules` and write the
-   project's part after the block as you sorted it. A new project gets the
-   block at install; fill in its "Project Rules": domain rules, and any
-   choice that differs from the defaults (T2).
-2. **Repositories.** If install warns that requests name a repository the
-   table lacks, or a checkout lies deeper than the workspace root, propose
-   the `--add-repo NAME:CHECKOUT:MAIN` line and run it when the user agrees.
-3. **Root design task.** Fill in `<records>/tasks/open/T0000-design/charter.md`,
-   the root designer's charter, with the user (this first fill-in is a
-   direct edit; later changes are the user's amendments). If the project
-   has its own design handover, the user may leave this to the designer,
-   who proposes it on taking T0000. Anything about the design agreed
-   during the setup goes into T0000's charter or `status.md`.
-4. **Superseded files.** If install reports a file "superseded", move its
-   content as the note says, with the user's approval, delete it.
-5. **Record and end.** Record the records repository:
-   `<records>/bin/ptt record -m "install Partitur" <records>`. You are the
-   installation session: you take no role. Tell the user to open fresh
-   sessions for the roles (`/ptt-take designer`, `/ptt-take integrator`),
-   which start from the records, and that requests wait until a session
-   holds the integrator role.
-6. **User link (optional).** If the report offers linking Partitur for the
-   user, ask once; on the user's approval run the command it names, then
-   this install again with `--update`, which removes the project's own
-   link.
+To install, update, or remove Partitur for a project, read
+[INSTALL.md](INSTALL.md); a session working in an installed project does
+not need it.
 
 ## Reading map
 
