@@ -16,8 +16,8 @@ worktree, delivered through requests (B5a, B5b).
   with the main branch (C10).
 - Answers review comments by ID: stance before the user's decision, then
   a brief plan (`/ptt-pr-draft-reply`) after changes are requested and its
-  execution (`/ptt-pr-reply`); on a rewrite tags the old head and
-  gives the mapping and range-diff (C6, C8).
+  execution (`/ptt-pr-reply`) (C7; the sequence *(Proposed)*); on a
+  rewrite tags the old head and gives the mapping and range-diff (C6, C8).
 - Keeps unit tests permanent; weakening one is a change of its own
   (E3a).
 - Brings design questions back to the designer instead of settling them in
