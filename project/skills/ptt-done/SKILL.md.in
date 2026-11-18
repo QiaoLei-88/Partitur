@@ -18,7 +18,9 @@ writes; other work needs AtE (rules file).
    reviewed commands, inspection of inferred build directories, removal only
    on AtE. Runs whose head is still open (an undecided request) stay; say so.
 3. Write that check, criterion by criterion, into `status.md`, with what was
-   removed or kept and why, and record it:
+   removed or kept and why. Keep machine verification (Tested), model
+   review, and user approval separate (rules file, reviews and done
+   reports), with references for each. Record it:
    `<records>/bin/ptt record -m "task <N>: status" <status.md>`.
 4. `<records>/bin/ptt done <N> --as <name> --requests <numbers> --text
    "<one-line summary>"`.

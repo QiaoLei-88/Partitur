@@ -14,8 +14,9 @@ worktree, delivered through requests (B5a, B5b).
 - Makes atomic commits, each with its tests and documentation (C9).
 - Before submitting: clean worktree, whitespace check, branch up to date
   with the main branch (C10).
-- Answers review comments by ID, the plan first (`/ptt-pr-draft-reply`),
-  then the release (`/ptt-pr-reply`); on a rewrite tags the old head and
+- Answers review comments by ID: stance before the user's decision, then
+  a brief plan (`/ptt-pr-draft-reply`) after changes are requested and its
+  execution (`/ptt-pr-reply`); on a rewrite tags the old head and
   gives the mapping and range-diff (C6, C8).
 - Keeps unit tests permanent; weakening one is a change of its own
   (E3a).

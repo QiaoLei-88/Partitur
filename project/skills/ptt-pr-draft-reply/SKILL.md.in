@@ -1,6 +1,6 @@
 ---
 name: ptt-pr-draft-reply
-description: "Draft the answer to a review of this branch's local request for the user to check: the planned change per comment and the full reply text. Writes and releases nothing; /ptt-pr-reply releases it. Argument: none or the request number N."
+description: "Brief the plan for answering a review of this branch's local request after the user's decision: approach per comment, resulting commits, and verification. Details on request. Writes nothing; /ptt-pr-reply carries it out and records the reply. Argument: none or the request number N."
 disable-model-invocation: true
 ---
 
@@ -14,21 +14,28 @@ this holder's task works in (`worktrees/<topic>`; if several, list them and
 ask). Run every git command from the workspace root with `git -C
 <worktree>`; never ask the user to change directory. Request numbers may be
 short (`4`, `pr-4`, `000004`). Without N, the request is this branch's one
-open request waiting for its author; if there is none or several, list them
-(`<records>/bin/pr list all --branch BRANCH`) and ask. With N, the request
+open request whose latest review needs an answer; if there is none or
+several, list them (`<records>/bin/pr list all --branch BRANCH`) and ask.
+With N, the request
 must be in `pr/open`: if `<records>/bin/pr list all` shows it merged or
-closed, report its state and decision and stop. A decided request takes no
-draft and no reply, and a pending draft of it lapses; a follow-up is a new
-request (`/ptt-pr-submit`).
+closed, report its state and decision and stop. A merged, rejected, or
+withdrawn request takes no draft or reply; a pending draft of it lapses.
+A follow-up is a new request (`/ptt-pr-submit`).
 
-1. Read `<records>/bin/pr show N` and the code on the branch.
-2. Show, per comment ID, the planned change (a diff where short) or why
-   you disagree; then the full reply text (the template in
-   `ptt-pr-reply`) in a fenced block (```` ```markdown ````; with more
-   backticks than any fence inside it), so that it displays as it will be
-   written. Values that exist only after carrying out the plan (commit
-   SHAs, run ids, test counts) are `{fill: what}`, e.g. `{fill: commit
-   SHA}`, with the expected result outside the block.
+1. Read `<records>/bin/pr show N`, the latest review and its decision, and
+   the code on the branch. Follow the rules file's review timing: before
+   the current review has a decision, give only the author's stance per
+   comment and stop, without a change plan or execution question. A merge,
+   reject, or withdraw decision ends the draft even if the request has
+   not yet moved. Continue only after a decision requesting changes.
+2. Brief the user on the plan, one line per item: per comment ID,
+   agree or disagree and the approach (with the reason when
+   disagreeing); the commit design after the change, one line per
+   resulting commit, saying which existing commits are folded into,
+   split, or added, and whether history is rewritten (recovery tag);
+   the verification planned and what is Unknown. No diffs and no reply
+   text unless the user asks; `ptt-pr-reply` writes the reply from the
+   agreed plan and its results.
 3. Write nothing: no file, no commit, no recorded message. End with: "To
-   release it, run `/ptt-pr-reply NNNNNN`; say first what to change, if
-   anything."
+   carry out this plan, run `/ptt-pr-reply NNNNNN`; say first what to
+   change, if anything."

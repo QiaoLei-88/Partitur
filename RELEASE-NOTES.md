@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Decisions overriding required review comments record their IDs and user reasons.
+- Charters require a check of the goal itself, with a command where available.
+- Reviews and done reports separate test results, model review, and approval.
+- Review replies brief the plan after the decision, with details on request.
+- Atomic history is complete and minimal; request skills inspect commit content.
+  Clear and resume running holders after updating the rules and skills.
 - README is for people; GETTING-STARTED.md shows the process by one example.
   Install and update with `install --release`, never `git pull`: INSTALL.md.
 - `install --release TAG_OR_COMMIT` prepares a detached clone containing

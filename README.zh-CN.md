@@ -80,7 +80,7 @@ flowchart LR
 | 根据你的话题和要点发送便笺 | 任意会话 | `/ptt-note <收件人>`（designer、integrator 或开放任务的 ID） |
 | 在 `/clear` 后或新会话中继续持有原角色 | 继续工作的会话 | `/ptt-resume <名字>`（不带名字时只列出持有者，在安静点留下交接标记的排在最前） |
 | 提交已完成的工作供审查 | 任务持有者 | `/ptt-pr-submit` |
-| 回复审查意见 | 任务持有者 | 先用 `/ptt-pr-draft-reply` 查看修改计划和回复全文，再用 `/ptt-pr-reply` 发布（提交前同样可以先用 `/ptt-pr-submit draft`） |
+| 回复审查意见 | 任务持有者 | 决定前逐条表态；决定要求修改后，`/ptt-pr-draft-reply` 简报计划（细节可按需查看），再用 `/ptt-pr-reply` 执行并记录回复（提交前同样可以先用 `/ptt-pr-submit draft`） |
 | 审查并执行你的决定 | 集成者（通过 `/ptt-take integrator` 领取） | `/ptt-pr-review` |
 | 报告任务完成／验收任务 | 持有者／其上级 | `/ptt-done` / `/ptt-close N` |
 | 开启或关闭会话之间的自动提醒 | 任意会话 | `/ptt-nudges on` / `/ptt-nudges off` |

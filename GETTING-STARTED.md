@@ -147,6 +147,10 @@ Request 1: what happens to it?
 3. No decision, discuss further
 ```
 
+Before you decide, the worker receives the review and states agreement
+or disagreement per comment, giving a reason for disagreement. The change
+plan comes after the decision.
+
 **Review recommends; you decide.** Nothing reaches the main branch on a
 session's judgment alone. You answer `1 AtE`, and the integrator records
 your decision with the review.
@@ -183,11 +187,13 @@ flowchart LR
   R -- "/ptt-resume worker-T0001<br>reads" --> S2["Fresh session<br>same holder, worker-T0001"]
 ```
 
-The worker answers the review: `/ptt-pr-draft-reply` shows you the fix it
-plans and the reply it will send; `/ptt-pr-reply` carries it out. The
-integrator reviews again (`/ptt-pr-review 1`): the comment is resolved,
-the tests pass, and it recommends merging. You answer `1 AtE`, and the
-integrator merges.
+After your decision requests changes, `/ptt-pr-draft-reply` briefs the
+approach per comment, the resulting commits, and planned verification.
+You can ask to see the proposed diff or reply text. When you approve the
+plan with `/ptt-pr-reply`, the worker carries it out and records the reply
+from the actual results. The integrator reviews again (`/ptt-pr-review 1`):
+the comment is resolved, the tests pass, and it recommends merging.
+You answer `1 AtE`, and the integrator merges.
 
 ## 5. Done, and checked by the one who asked
 

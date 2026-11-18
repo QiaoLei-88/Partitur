@@ -336,6 +336,60 @@ class Repo(unittest.TestCase):
                        "do not carry out the reported next steps"):
             self.assertIn(phrase, text)
 
+    def test_atomic_history_is_defined_once_and_checked_by_content(self):
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        rules = text("templates", "rules.md")
+        expected = " ".join("""
+            Commits are atomic: each commit is one logical change, complete and
+            minimal. Complete: everything the change needs is in the commit,
+            including its tests and documentation, and nothing of it lies in
+            another commit. Minimal: the commit holds no other change that
+            stands on its own, even one serving the same feature (for example, a
+            refactoring the feature needs is its own commit, before the
+            feature). A request's history records these changes, not how the
+            work went. A commit that breaks completeness is folded into the
+            commit it belongs to; such commits include, but are not limited to:
+            a fixup, work in progress, a revert, a later commit changing what an
+            earlier commit of the same branch introduced, and a document entry
+            added per step instead of one entry for the result. A commit that
+            breaks minimality is split. When in doubt, keep commits separate:
+            folding them later is easier than splitting one. Check the content
+            of the commits, not only the files they touch (`git log -p
+            <main>..HEAD`). Inspect status, staged changes, and whitespace before
+            committing.
+        """.split())
+        self.assertEqual(rules.split("- Commits are atomic: ")[1].split(" - ")[0],
+                         expected.removeprefix("Commits are atomic: "))
+        submit = text("project", "skills", "ptt-pr-submit", "SKILL.md.in")
+        self.assertIn("and its history atomic (rules file; `git log -p <main>..HEAD`)", submit)
+        reply = text("project", "skills", "ptt-pr-reply", "SKILL.md.in")
+        self.assertIn("Code changes go on the same branch: a change to an existing commit "
+                      "of the branch is folded into that commit, and only a new logical "
+                      "change is a new commit (rules file, atomic commits); the branch "
+                      "is checked as for submitting", reply)
+        review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
+        expected_review = " ".join("""
+            and the history (`git log -p <base>..<head>`), against
+            atomicity (rules file). The author keeps commits separate when in
+            doubt; the review settles that doubt. For each commit ask: is it
+            complete, or does a later commit of the branch change what it
+            introduced, or does it need something that lies in another commit?
+            Is it minimal, or does it hold a change that stands on its own? For
+            each pair of neighbouring commits ask whether they are one change.
+            Each message says what its commit changes. A history that breaks
+            atomicity gets a required comment naming the commits and the result
+            intended (fold with fixup/autosquash, or split); that means
+            recommending changes. Commits the review finds no reason to fold
+            stay separate. A claim that each commit builds and passes on its own
+            needs a run of each commit.
+        """.split())
+        self.assertIn(expected_review, review)
+        for wording in (submit, reply, review):
+            self.assertNotIn("git log --stat", wording)
+            self.assertNotIn("fold fixups, drop WIP", wording)
+            self.assertNotIn("Messy history (", wording)
+
     def test_reply_is_drafted_and_released_by_its_own_commands(self):
         """Replies to a review: /ptt-pr-draft-reply writes nothing, /ptt-pr-reply
         releases; /ptt-pr-submit no longer replies."""
@@ -348,6 +402,113 @@ class Repo(unittest.TestCase):
         self.assertIn("/ptt-pr-reply", text("ptt-pr-draft-reply"))
         self.assertIn("No draft for request NNNNNN in this conversation", text("ptt-pr-reply"))
         self.assertIn("kind: reply", text("ptt-pr-reply"))
+
+    def test_review_reply_brief_follows_the_decision_and_keeps_details_on_request(self):
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        rules = text("templates", "rules.md")
+        expected = " ".join("""
+            Review timing: a review reaches the author before the user's
+            decision. Before that decision, the author states agreement or
+            disagreement per comment, one line each, with reasons for
+            disagreement; no change plan or execution question. After a
+            decision requesting changes, `ptt-pr-draft-reply` briefs the plan;
+            `ptt-pr-reply` carries out the approved plan and records its results.
+        """.split())
+        self.assertIn(expected, rules)
+        draft = text("project", "skills", "ptt-pr-draft-reply", "SKILL.md.in")
+        expected_brief = " ".join("""
+            2. Brief the user on the plan, one line per item: per comment ID,
+            agree or disagree and the approach (with the reason when
+            disagreeing); the commit design after the change, one line per
+            resulting commit, saying which existing commits are folded into,
+            split, or added, and whether history is rewritten (recovery tag);
+            the verification planned and what is Unknown. No diffs and no reply
+            text unless the user asks; `ptt-pr-reply` writes the reply from the
+            agreed plan and its results.
+        """.split())
+        self.assertIn(expected_brief, draft)
+        reply = text("project", "skills", "ptt-pr-reply", "SKILL.md.in")
+        for wording in (draft, reply):
+            self.assertIn("before the current review has a decision", wording)
+            self.assertIn("without a change plan or execution question", wording)
+            self.assertIn("Continue only after a decision requesting changes", wording)
+            self.assertIn("even if the request has not yet moved", wording)
+            self.assertNotIn("{fill:", wording)
+            self.assertNotIn("A decided request takes no", wording)
+        self.assertIn("Write nothing: no file, no commit, no recorded message", draft)
+        self.assertNotIn("without waiting for a decision", reply)
+        self.assertIn("Write the reply from the agreed plan and its actual results", reply)
+        self.assertIn("Report only the resulting commits, the verification, and any departure", reply)
+        self.assertIn("## Resulting commits", reply)
+        self.assertIn("## Departures from the plan", reply)
+        inbox = text("project", "skills", "ptt-inbox", "SKILL.md.in")
+        self.assertIn("before the decision, stance only", inbox)
+        self.assertIn("after changes are requested, `/ptt-pr-draft-reply`", inbox)
+        self.assertIn("without a recorded reply", inbox)
+        self.assertNotIn("Replies and updates may come at any time", text("flows", "requests.md"))
+        self.assertNotIn("plan and reply text", text("README.md"))
+        self.assertNotIn("修改计划和回复全文", text("README.zh-CN.md"))
+
+    def test_user_docs_describe_the_same_review_reply_sequence(self):
+        cases = {
+            "README.md": ("stance before the decision", "after changes are requested",
+                          "details on request"),
+            "README.zh-CN.md": ("决定前逐条表态", "决定要求修改后", "细节可按需查看"),
+            "GETTING-STARTED.md": ("Before you decide", "After your decision requests changes",
+                                   "proposed diff or reply text"),
+            "GETTING-STARTED.zh-CN.md": ("你决定前", "决定要求修改后", "拟议差异或回复文字"),
+        }
+        for name, phrases in cases.items():
+            wording = " ".join((ROOT / name).read_text().split())
+            for phrase in phrases:
+                self.assertIn(phrase, wording, name)
+            self.assertLess(wording.index(phrases[0]), wording.index(phrases[1]), name)
+
+    def test_reviews_and_done_reports_keep_evidence_separate(self):
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        self.assertIn("Reviews and done reports state separately what machines checked "
+                      "(Tested), what a model reviewed, and what the user approved; "
+                      "none substitutes for another.", text("templates", "rules.md"))
+        review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
+        for heading in ("## Model review", "## Machine verification (Tested)",
+                        "## User approval"):
+            self.assertIn(heading, review)
+        self.assertIn("mark a pending decision as pending", review)
+        self.assertIn("Keep evidence separate (rules file, reviews and done reports)", review)
+        done = text("project", "skills", "ptt-done", "SKILL.md.in")
+        self.assertIn("criterion by criterion", done)
+        self.assertIn("Keep machine verification (Tested), model review, and user approval "
+                      "separate (rules file, reviews and done reports), with references for each", done)
+
+    def test_charter_acceptance_checks_the_goal_itself(self):
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        self.assertIn("A task's acceptance criteria include at least one check of the goal "
+                      "itself, expressed as a command where one exists; implementation "
+                      "checks alone do not establish that goal.", text("templates", "rules.md"))
+        charter = text("templates", "charter.md").split("## Acceptance", 1)[1]
+        self.assertIn("CHECK of the goal itself, as a command where one exists", charter)
+        self.assertIn("expected result; rules file, goal acceptance", charter)
+        draft = text("project", "skills", "ptt-mktask", "SKILL.md.in")
+        self.assertIn("Include at least one check of the goal itself, as a command where "
+                      "one exists, with its expected result (rules file, goal acceptance)", draft)
+
+    def test_required_review_overrides_record_the_users_reason(self):
+        def text(*parts):
+            return " ".join(ROOT.joinpath(*parts).read_text().split())
+        self.assertIn("A decision that overrides a required review comment names the "
+                      "comment ID and the user's reason. Ask the user for a missing "
+                      "reason before recording or carrying out the decision.",
+                      text("templates", "rules.md"))
+        review = text("project", "skills", "ptt-pr-review", "SKILL.md.in")
+        self.assertIn("check for required comments being overridden (rules file)", review)
+        self.assertIn("Merge anyway (give the comment IDs and your reason)", review)
+        self.assertLess(review.index("Obtain any missing reason from the user"),
+                        review.index("Then write `MMMM-decision.md`"))
+        self.assertIn("## Required comment overrides", review)
+        self.assertIn("Each overridden comment ID and the user's reason", review)
 
     def test_markdown_links_resolve(self):
         for f in tracked():
